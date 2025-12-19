@@ -34,6 +34,18 @@ jobs:
           run: |
             latexmk -pdf -interaction=nonstopmode -halt-on-error -file-line-error -output-directory=build tests/tex/smoke/main.tex
 
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build Rust Crates
+        run: cargo build --verbose --workspace
+
+      - name: Test Rust Crates
+        run: cargo test --verbose --workspace
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:

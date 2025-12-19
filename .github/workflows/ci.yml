@@ -67,3 +67,22 @@ jobs:
         with:
           run: |
             latexmk -pdf -interaction=nonstopmode -halt-on-error -file-line-error -output-directory=build tests/tex/smoke/main.tex
+
+  rust:
+    name: Rust Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: cargo build --verbose
+
+      - name: Test
+        run: cargo test --verbose
