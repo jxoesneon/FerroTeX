@@ -8,6 +8,7 @@ use std::sync::mpsc::channel;
 
 #[derive(Parser)]
 #[command(name = "ferrotex")]
+#[command(version)]
 #[command(about = "FerroTeX CLI tools", long_about = None)]
 struct Cli {
     #[command(subcommand)]

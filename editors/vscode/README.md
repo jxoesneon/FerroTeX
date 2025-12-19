@@ -4,9 +4,15 @@ Official VS Code extension for [FerroTeX](https://github.com/jxoesneon/FerroTeX)
 
 ## Features
 
-- **v0.4.0**:
-    - Bundles/Launches `ferrotexd` language server.
-    - Live build diagnostics from `.log` files.
+- **v0.6.0**:
+    - **Language Support**:
+        - Syntax checking (real-time).
+        - Document Outline (symbols).
+        - Document Links (navigation for `\input`).
+        - Circular dependency detection.
+    - **Build Integration**:
+        - Live diagnostics from `.log` files.
+    - Bundles `ferrotexd` v0.6.0.
 
 ## Configuration
 

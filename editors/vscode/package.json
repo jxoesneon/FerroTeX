@@ -2,7 +2,7 @@
     "name": "ferrotex",
     "displayName": "FerroTeX",
     "description": "FerroTeX Language Server Client",
-    "version": "0.4.0",
+    "version": "0.6.0",
     "publisher": "ferrotex",
     "engines": {
         "vscode": "^1.75.0"

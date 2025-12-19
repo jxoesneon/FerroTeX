@@ -6,6 +6,43 @@ The format is based on **Keep a Changelog**, and this project intends to follow 
 
 ## [Unreleased]
 
+## [0.6.0] - 2025-12-19
+
+### Added
+
+- **Project Model**: Introduced `Workspace` to track the include graph of LaTeX documents.
+- **Document Links**: `ferrotexd` now supports `textDocument/documentLink`.
+  - Resolves `\input{...}` and `\include{...}` paths relative to the current file.
+  - Allows navigation to included files.
+- **Cycle Detection**:
+  - Detects include cycles (e.g., A includes B, B includes A).
+  - Reports cycles as diagnostics on the include command.
+
+## [0.5.0] - 2025-12-19
+
+### Added
+
+- **LaTeX Parser**: Introduced `ferrotex-syntax` crate with a fault-tolerant CST parser based on `rowan`.
+  - Supports LaTeX lexing (commands, groups, environments).
+  - Handles recovery from syntax errors (e.g., missing braces).
+- **Document Symbols**: `ferrotexd` now supports `textDocument/documentSymbol`.
+  - Hierarchical outline for environments (`\begin{...}`) and groups.
+  - Section extraction (`\section{...}`) for navigation.
+- **Source Diagnostics**: Real-time syntax error reporting in the editor.
+  - Reports unmatched braces and unclosed environments.
+  - Maps source ranges accurately using `line-index`.
+
+## [0.4.0] - 2025-12-19
+
+### Added
+
+- **LSP Server**: Initial release of `ferrotexd`, a Language Server Protocol implementation for FerroTeX.
+  - Supports `textDocument/publishDiagnostics` via streaming log ingestion.
+  - Watches workspace `.log` files for changes using `notify`.
+- **VS Code Extension**: New extension (`editors/vscode`) to bootstrap the client.
+  - Launches `ferrotexd` automatically.
+  - Configurable server path via `ferrotex.serverPath`.
+
 ## [0.3.0] - 2025-12-19
 
 ### Added
