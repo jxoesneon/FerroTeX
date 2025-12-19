@@ -1,0 +1,44 @@
+{
+    "name": "ferrotex",
+    "displayName": "FerroTeX",
+    "description": "FerroTeX Language Server Client",
+    "version": "0.4.0",
+    "publisher": "ferrotex",
+    "engines": {
+        "vscode": "^1.75.0"
+    },
+    "categories": [
+        "Programming Languages"
+    ],
+    "activationEvents": [
+        "onLanguage:latex",
+        "onLanguage:tex"
+    ],
+    "main": "./out/extension.js",
+    "contributes": {
+        "configuration": {
+            "type": "object",
+            "title": "FerroTeX",
+            "properties": {
+                "ferrotex.serverPath": {
+                    "type": "string",
+                    "default": "ferrotexd",
+                    "description": "Path to the ferrotexd executable"
+                }
+            }
+        }
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./"
+    },
+    "devDependencies": {
+        "@types/node": "^18.0.0",
+        "@types/vscode": "^1.75.0",
+        "typescript": "^4.9.0"
+    },
+    "dependencies": {
+        "vscode-languageclient": "^8.1.0"
+    }
+}
