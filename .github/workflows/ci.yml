@@ -63,7 +63,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build smoke document (TeX Live)
-        uses: xu-cheng/texlive-action/full@v1
+        uses: xu-cheng/texlive-action/full@v3
         with:
           run: |
             latexmk -pdf -interaction=nonstopmode -halt-on-error -file-line-error -output-directory=build tests/tex/smoke/main.tex
