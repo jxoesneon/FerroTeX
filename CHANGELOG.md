@@ -6,7 +6,15 @@ The format is based on **Keep a Changelog**, and this project intends to follow 
 
 ## [Unreleased]
 
-## [0.2.0] - 2025-12-19
+## [0.3.0] - 2025-12-19
+
+### Added
+
+- **Streaming Log Ingestion**: `LogParser` now supports incremental updates via `update()` method.
+- **CLI Watch Command**: New `ferrotex watch <file>` command to tail log files in real-time.
+- **Peek-Line Strategy**: Robust handling of split lines and path wrapping during streaming.
+
+## [0.2.0] - 2024-05-20
 
 ### Added
 
