@@ -1,0 +1,32 @@
+name: Bug report
+description: Report a problem with FerroTeX
+title: "bug: "
+labels:
+  - "type:bug"
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Include a minimal .tex project if possible.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / diagnostics
+      description: Paste relevant build output and/or server logs.
+    validations:
+      required: false

@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "FerroTeX"
+type: software
+authors:
+  - family-names: "Rojas Jimenez"
+    given-names: "Jose Eduardo"
+abstract: "A high-performance, type-safe debugging and observability architecture for the TeX/LaTeX toolchain, providing structured diagnostics via LSP/DAP."
+version: "0.1.0"
+date-released: "2025-12-18"
+keywords:
+  - TeX
+  - LaTeX
+  - debugging
+  - parsing
+  - LSP
+  - DAP
+  - Rust
+license: "NOASSERTION"
+repository-code: "https://github.com/<TBD>/FerroTeX"

@@ -1,0 +1,20 @@
+{
+  "name": "ferrotex-repo-tools",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "format": "prettier --write . --ignore-unknown",
+    "lint": "npm run lint:yaml && npm run lint:md && npm run lint:prettier && npm run lint:links:internal",
+    "lint:yaml": "node scripts/check-yaml.mjs",
+    "lint:md": "markdownlint-cli2",
+    "lint:prettier": "prettier --check . --ignore-unknown",
+    "lint:links:internal": "node scripts/check-links.mjs --config scripts/markdown-link-check.internal.json",
+    "lint:links:external": "node scripts/check-links.mjs --config scripts/markdown-link-check.external.json"
+  },
+  "devDependencies": {
+    "markdown-link-check": "^3.12.2",
+    "markdownlint-cli2": "^0.20.0",
+    "prettier": "^3.4.2",
+    "yaml": "^2.6.1"
+  }
+}

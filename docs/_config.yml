@@ -1,0 +1,12 @@
+title: FerroTeX
+description: FerroTeX specifications and project documentation
+theme: minima
+markdown: kramdown
+kramdown:
+  input: GFM
+
+exclude:
+  - "vendor"
+  - "node_modules"
+  - "_site"
+  - "build"
