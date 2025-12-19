@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 The format is based on **Keep a Changelog**, and this project intends to follow **Semantic Versioning** once a stable public API exists.
 
+## [Unreleased]
+
 ## [0.2.0] - 2025-12-19
 
 ### Added
@@ -37,5 +39,7 @@ The format is based on **Keep a Changelog**, and this project intends to follow 
 
 - Initial repository documentation.
 
-[Unreleased]: https://github.com/jxoesneon/FerroTeX/compare/v0.0.0...HEAD
+[Unreleased]: https://github.com/jxoesneon/FerroTeX/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.0.0...v0.1.0
 [0.0.0]: https://github.com/jxoesneon/FerroTeX/releases/tag/v0.0.0
