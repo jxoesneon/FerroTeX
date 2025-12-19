@@ -1,0 +1,3 @@
+[workspace]
+members = ["crates/ferrotex-cli", "crates/ferrotex-log", "fuzz"]
+resolver = "2"

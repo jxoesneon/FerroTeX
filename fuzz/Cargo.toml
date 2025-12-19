@@ -1,0 +1,20 @@
+[package]
+name = "ferrotex-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.ferrotex-log]
+path = "../crates/ferrotex-log"
+
+[[bin]]
+name = "parser_panic"
+path = "fuzz_targets/parser_panic.rs"
+test = false
+doc = false

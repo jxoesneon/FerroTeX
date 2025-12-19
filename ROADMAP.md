@@ -51,7 +51,7 @@ Each release below includes:
 
 - None (documentation-only).
 
-### v0.2.0 — Offline Build/Log Parser MVP (JSON IR)
+### v0.2.0 — Offline Build/Log Parser MVP (JSON IR) (Completed)
 
 **Scope**
 
