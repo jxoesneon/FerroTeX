@@ -21,30 +21,25 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url || '' }}
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Configure Pages
-        id: configure_pages
         uses: actions/configure-pages@v5
-        continue-on-error: true
 
       - name: Build with Jekyll
-        if: steps.configure_pages.outcome == 'success'
         uses: actions/jekyll-build-pages@v1
         with:
           source: ./docs
           destination: ./_site
 
       - name: Upload artifact
-        if: steps.configure_pages.outcome == 'success'
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./_site
 
       - name: Deploy
-        if: steps.configure_pages.outcome == 'success'
         id: deployment
         uses: actions/deploy-pages@v4
