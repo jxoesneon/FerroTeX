@@ -12,6 +12,64 @@ use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
 use workspace::Workspace;
 
+enum CompletionKind {
+    None,
+    Citation,
+    Label,
+    Environment,
+    Command,
+    File,
+}
+
+const COMMANDS: &[&str] = &[
+    "begin",
+    "end",
+    "section",
+    "subsection",
+    "subsubsection",
+    "paragraph",
+    "subparagraph",
+    "item",
+    "label",
+    "ref",
+    "cite",
+    "input",
+    "include",
+    "bibliography",
+    "addbibresource",
+    "documentclass",
+    "usepackage",
+];
+
+const ENVIRONMENTS: &[&str] = &[
+    "document",
+    "itemize",
+    "enumerate",
+    "description",
+    "figure",
+    "table",
+    "tabular",
+    "equation",
+    "align",
+    "verbatim",
+    "center",
+];
+
+const SEMANTIC_TOKEN_TYPES: &[SemanticTokenType] = &[
+    SemanticTokenType::MACRO,     // 0: Commands (\foo)
+    SemanticTokenType::KEYWORD,   // 1: Environment markers (\begin, \end)
+    SemanticTokenType::STRING,    // 2: Arguments
+    SemanticTokenType::COMMENT,   // 3: Comments
+    SemanticTokenType::PARAMETER, // 4: Optional arguments
+    SemanticTokenType::VARIABLE,  // 5: Labels, citations
+];
+
+const SEMANTIC_TOKEN_MODIFIERS: &[SemanticTokenModifier] = &[
+    SemanticTokenModifier::DECLARATION,
+    SemanticTokenModifier::DEFINITION,
+    SemanticTokenModifier::READONLY,
+];
+
 #[derive(Debug)]
 struct Backend {
     client: Client,
@@ -44,9 +102,29 @@ impl LanguageServer for Backend {
                 rename_provider: Some(OneOf::Left(true)),
                 completion_provider: Some(CompletionOptions {
                     resolve_provider: Some(false),
-                    trigger_characters: Some(vec!["{".to_string(), ",".to_string()]),
+                    trigger_characters: Some(vec![
+                        "{".to_string(),
+                        ",".to_string(),
+                        "\\".to_string(),
+                        "/".to_string(),
+                    ]),
                     ..Default::default()
                 }),
+                semantic_tokens_provider: Some(
+                    SemanticTokensServerCapabilities::SemanticTokensOptions(
+                        SemanticTokensOptions {
+                            work_done_progress_options: WorkDoneProgressOptions::default(),
+                            legend: SemanticTokensLegend {
+                                token_types: SEMANTIC_TOKEN_TYPES.to_vec(),
+                                token_modifiers: SEMANTIC_TOKEN_MODIFIERS.to_vec(),
+                            },
+                            range: Some(false),
+                            full: Some(SemanticTokensFullOptions::Bool(true)),
+                        },
+                    ),
+                ),
+                folding_range_provider: Some(FoldingRangeProviderCapability::Simple(true)),
+                workspace_symbol_provider: Some(OneOf::Left(true)),
                 ..Default::default()
             },
             ..Default::default()
@@ -305,6 +383,9 @@ impl LanguageServer for Backend {
     /// Currently supports:
     /// - Citation keys inside `\cite{...}`
     /// - Label names inside `\ref{...}`
+    /// - Environment names inside `\begin{...}` / `\end{...}`
+    /// - Commands (starting with `\`)
+    /// - File paths inside `\input{...}` / `\include{...}`
     async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
         let uri = params.text_document_position.text_document.uri;
         let position = params.text_document_position.position;
@@ -328,43 +409,28 @@ impl LanguageServer for Backend {
         let parse = ferrotex_syntax::parse(&text);
         let root = parse.syntax();
 
-        let token: ferrotex_syntax::SyntaxToken = match root.token_at_offset(offset) {
-            rowan::TokenAtOffset::None => {
-                return Ok(None);
-            }
+        let token = match root.token_at_offset(offset) {
+            rowan::TokenAtOffset::None => return Ok(None),
             rowan::TokenAtOffset::Single(t) => t,
-            rowan::TokenAtOffset::Between(l, _r) => l,
-        };
-
-        let parent: ferrotex_syntax::SyntaxNode = if let Some(p) = token.parent() {
-            p
-        } else {
-            return Ok(None);
-        };
-
-        let mut context_kind = None; // 1 = cite, 2 = ref
-
-        // Check if we are inside a Group that belongs to Citation or LabelReference
-        if parent.kind() == SyntaxKind::Group {
-            if let Some(grandparent) = parent.parent() {
-                match grandparent.kind() {
-                    SyntaxKind::Citation => context_kind = Some(1),
-                    SyntaxKind::LabelReference => context_kind = Some(2),
-                    _ => {}
+            rowan::TokenAtOffset::Between(l, r) => {
+                // Prefer the token that suggests we are extending an identifier or starting a group
+                if l.kind() == SyntaxKind::Command
+                    || l.kind() == SyntaxKind::Text
+                    || l.text() == "{"
+                    || l.text() == ","
+                    || l.text() == "/"
+                {
+                    l
+                } else {
+                    r
                 }
             }
-        }
-        // Also handle case where we are just typing "{" of the command
-        else if parent.kind() == SyntaxKind::Citation {
-            // Might be completing right after {
-            context_kind = Some(1);
-        } else if parent.kind() == SyntaxKind::LabelReference {
-            context_kind = Some(2);
-        }
+        };
 
-        match context_kind {
-            Some(1) => {
-                // Citation completion
+        let kind = determine_completion_kind(&token);
+
+        match kind {
+            CompletionKind::Citation => {
                 let keys = self.workspace.get_all_citation_keys();
                 let items: Vec<CompletionItem> = keys
                     .into_iter()
@@ -377,8 +443,7 @@ impl LanguageServer for Backend {
                     .collect();
                 Ok(Some(CompletionResponse::Array(items)))
             }
-            Some(2) => {
-                // Label completion
+            CompletionKind::Label => {
                 let labels = self.workspace.get_all_labels();
                 let items: Vec<CompletionItem> = labels
                     .into_iter()
@@ -391,9 +456,316 @@ impl LanguageServer for Backend {
                     .collect();
                 Ok(Some(CompletionResponse::Array(items)))
             }
-            _ => Ok(None),
+            CompletionKind::Environment => {
+                let items: Vec<CompletionItem> = ENVIRONMENTS
+                    .iter()
+                    .map(|&env| CompletionItem {
+                        label: env.to_string(),
+                        kind: Some(CompletionItemKind::SNIPPET),
+                        detail: Some("Environment".to_string()),
+                        ..Default::default()
+                    })
+                    .collect();
+                Ok(Some(CompletionResponse::Array(items)))
+            }
+            CompletionKind::Command => {
+                let items: Vec<CompletionItem> = COMMANDS
+                    .iter()
+                    .map(|&cmd| CompletionItem {
+                        label: format!("\\{}", cmd),
+                        kind: Some(CompletionItemKind::FUNCTION),
+                        detail: Some("Command".to_string()),
+                        ..Default::default()
+                    })
+                    .collect();
+                Ok(Some(CompletionResponse::Array(items)))
+            }
+            CompletionKind::File => {
+                let items = if let Some(root_uri) = self.root_uri.lock().unwrap().as_ref() {
+                    if let Ok(path) = root_uri.to_file_path() {
+                        scan_files_for_completion(&path)
+                    } else {
+                        Vec::new()
+                    }
+                } else {
+                    Vec::new()
+                };
+                Ok(Some(CompletionResponse::Array(items)))
+            }
+            CompletionKind::None => Ok(None),
         }
     }
+
+    async fn semantic_tokens_full(
+        &self,
+        params: SemanticTokensParams,
+    ) -> Result<Option<SemanticTokensResult>> {
+        let uri = params.text_document.uri;
+        let text = if let Some(t) = self.get_text(&uri) {
+            t
+        } else {
+            return Ok(None);
+        };
+
+        let parse = ferrotex_syntax::parse(&text);
+        let root = parse.syntax();
+        let line_index = LineIndex::new(&text);
+
+        let tokens = extract_semantic_tokens(root, &line_index);
+
+        Ok(Some(SemanticTokensResult::Tokens(SemanticTokens {
+            result_id: None,
+            data: tokens,
+        })))
+    }
+
+    async fn folding_range(&self, params: FoldingRangeParams) -> Result<Option<Vec<FoldingRange>>> {
+        let uri = params.text_document.uri;
+        let text = if let Some(t) = self.get_text(&uri) {
+            t
+        } else {
+            return Ok(None);
+        };
+
+        let parse = ferrotex_syntax::parse(&text);
+        let root = parse.syntax();
+        let line_index = LineIndex::new(&text);
+
+        let ranges = extract_folding_ranges(root, &line_index);
+        Ok(Some(ranges))
+    }
+
+    async fn symbol(
+        &self,
+        params: WorkspaceSymbolParams,
+    ) -> Result<Option<Vec<SymbolInformation>>> {
+        let query = params.query;
+        let symbols = self.workspace.query_symbols(&query);
+
+        let result = symbols
+            .into_iter()
+            .filter_map(|(name, kind, uri, range)| {
+                self.range_to_location(&uri, range).map(|loc| {
+                    #[allow(deprecated)]
+                    SymbolInformation {
+                        name,
+                        kind,
+                        tags: None,
+                        deprecated: None,
+                        location: loc,
+                        container_name: None,
+                    }
+                })
+            })
+            .collect();
+
+        Ok(Some(result))
+    }
+}
+
+fn extract_folding_ranges(root: SyntaxNode, line_index: &LineIndex) -> Vec<FoldingRange> {
+    let mut ranges = Vec::new();
+    for node in root.descendants() {
+        match node.kind() {
+            SyntaxKind::Environment | SyntaxKind::Group => {
+                let text_range = node.text_range();
+                let start = line_index.line_col(text_range.start());
+                let end = line_index.line_col(text_range.end());
+
+                // Only fold if it spans multiple lines
+                if start.line < end.line {
+                    ranges.push(FoldingRange {
+                        start_line: start.line,
+                        start_character: Some(start.col),
+                        end_line: end.line,
+                        end_character: Some(end.col),
+                        kind: Some(FoldingRangeKind::Region),
+                        collapsed_text: None,
+                    });
+                }
+            }
+            _ => {}
+        }
+    }
+    ranges
+}
+
+fn extract_semantic_tokens(root: SyntaxNode, line_index: &LineIndex) -> Vec<SemanticToken> {
+    let mut tokens = Vec::new();
+    let mut prev_line = 0;
+    let mut prev_start = 0;
+
+    for event in root.preorder_with_tokens() {
+        if let rowan::WalkEvent::Enter(rowan::NodeOrToken::Token(token)) = event
+            && let Some((type_idx, modifier_bitset)) = classify_token(&token)
+        {
+            let range = token.text_range();
+            let start_pos = line_index.line_col(range.start());
+            let length = range.len().into();
+
+            let delta_line = start_pos.line - prev_line;
+            let delta_start = if delta_line == 0 {
+                start_pos.col - prev_start
+            } else {
+                start_pos.col
+            };
+
+            tokens.push(SemanticToken {
+                delta_line,
+                delta_start,
+                length,
+                token_type: type_idx,
+                token_modifiers_bitset: modifier_bitset,
+            });
+
+            prev_line = start_pos.line;
+            prev_start = start_pos.col;
+        }
+    }
+
+    tokens
+}
+
+fn classify_token(token: &ferrotex_syntax::SyntaxToken) -> Option<(u32, u32)> {
+    let kind = token.kind();
+    let text = token.text();
+    let parent = token.parent()?;
+
+    match kind {
+        SyntaxKind::Command => {
+            if text == "\\begin" || text == "\\end" {
+                Some((1, 0)) // KEYWORD
+            } else {
+                Some((0, 0)) // MACRO
+            }
+        }
+        SyntaxKind::Comment => Some((3, 0)), // COMMENT
+        SyntaxKind::Text => {
+            // Check context
+            if parent.kind() == SyntaxKind::Group {
+                if let Some(grandparent) = parent.parent() {
+                    match grandparent.kind() {
+                        SyntaxKind::Environment => Some((2, 0)), // STRING (env name)
+                        SyntaxKind::LabelDefinition => Some((5, 1 << 1)), // VARIABLE | DEFINITION
+                        SyntaxKind::LabelReference => Some((5, 1 << 2)), // VARIABLE | READONLY
+                        SyntaxKind::Citation => Some((5, 1 << 2)), // VARIABLE | READONLY
+                        SyntaxKind::Section => Some((2, 0)),     // STRING (Section title)
+                        SyntaxKind::Include => Some((2, 0)),     // STRING (Path)
+                        _ => None,
+                    }
+                } else {
+                    None
+                }
+            } else {
+                // Handle text that is directly a child of special nodes (e.g. optional args in brackets)
+                // In ferrotex-syntax, items in brackets are just children of the Citation/Bib node
+                match parent.kind() {
+                    SyntaxKind::Citation | SyntaxKind::Bibliography => {
+                        // If it's inside brackets?
+                        // Simple heuristic: if it's not the command and not the brace-group
+                        // But wait, ferrotex-syntax parser puts bracketed content as siblings.
+                        // We can't easily check siblings here without walking.
+                        // But we know 'Text' inside Citation but NOT in a Group is likely the optional arg.
+                        Some((4, 0)) // PARAMETER
+                    }
+                    _ => None,
+                }
+            }
+        }
+        _ => None,
+    }
+}
+
+fn determine_completion_kind(token: &ferrotex_syntax::SyntaxToken) -> CompletionKind {
+    let kind = token.kind();
+    let text = token.text();
+    let parent = token.parent();
+
+    if kind == SyntaxKind::Command || text == "\\" {
+        return CompletionKind::Command;
+    }
+
+    if let Some(parent) = parent {
+        if parent.kind() == SyntaxKind::Group {
+            if let Some(grandparent) = parent.parent() {
+                match grandparent.kind() {
+                    SyntaxKind::Citation => return CompletionKind::Citation,
+                    SyntaxKind::LabelReference => return CompletionKind::Label,
+                    SyntaxKind::Environment => return CompletionKind::Environment,
+                    SyntaxKind::Include => return CompletionKind::File,
+                    _ => {}
+                }
+            }
+        } else if kind == SyntaxKind::LBrace {
+            match parent.kind() {
+                SyntaxKind::Environment => return CompletionKind::Environment,
+                SyntaxKind::Citation => return CompletionKind::Citation,
+                SyntaxKind::LabelReference => return CompletionKind::Label,
+                SyntaxKind::Include => return CompletionKind::File,
+                _ => {}
+            }
+        }
+    }
+
+    // Fallback for Text inside Group
+    if kind == SyntaxKind::Text
+        && let Some(parent) = token.parent()
+        && parent.kind() == SyntaxKind::Group
+        && let Some(grandparent) = parent.parent()
+    {
+        match grandparent.kind() {
+            SyntaxKind::Citation => return CompletionKind::Citation,
+            SyntaxKind::LabelReference => return CompletionKind::Label,
+            SyntaxKind::Environment => return CompletionKind::Environment,
+            SyntaxKind::Include => return CompletionKind::File,
+            _ => {}
+        }
+    }
+
+    CompletionKind::None
+}
+
+fn scan_files_for_completion(root_path: &std::path::Path) -> Vec<CompletionItem> {
+    let mut items = Vec::new();
+    let mut stack = vec![root_path.to_path_buf()];
+
+    // Limit depth or count to avoid infinite loops or huge delays
+    let mut count = 0;
+    const MAX_FILES: usize = 1000;
+
+    while let Some(dir) = stack.pop() {
+        if let Ok(entries) = std::fs::read_dir(&dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    // Simple skip of hidden dirs
+                    if let Some(name) = path.file_name().and_then(|n| n.to_str())
+                        && !name.starts_with('.')
+                    {
+                        stack.push(path);
+                    }
+                } else if let Some(ext) = path.extension()
+                    && ext == "tex"
+                    && let Ok(rel) = path.strip_prefix(root_path)
+                    && let Some(s) = rel.to_str()
+                {
+                    // Strip extension for standard LaTeX includes
+                    let label = s.trim_end_matches(".tex").to_string();
+                    items.push(CompletionItem {
+                        label,
+                        kind: Some(CompletionItemKind::FILE),
+                        detail: Some("File".to_string()),
+                        ..Default::default()
+                    });
+                    count += 1;
+                    if count >= MAX_FILES {
+                        return items;
+                    }
+                }
+            }
+        }
+    }
+    items
 }
 
 impl Backend {

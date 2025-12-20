@@ -1163,6 +1163,170 @@ async fn test_citation_flow() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[tokio::test]
+async fn test_enhanced_completion_flow() -> anyhow::Result<()> {
+    // 1. Setup temp dir
+    let temp_dir = tempfile::tempdir()?;
+    let temp_path = temp_dir.path().to_owned();
+
+    // Create a dummy included file for file completion
+    let chapter_dir = temp_path.join("chapters");
+    tokio::fs::create_dir(&chapter_dir).await?;
+    tokio::fs::write(chapter_dir.join("intro.tex"), "Intro content").await?;
+
+    // 2. Locate binary
+    let mut bin_path = None;
+    let candidates = vec!["../../target/debug/ferrotexd", "target/debug/ferrotexd"];
+    for candidate in candidates {
+        let path = std::env::current_dir()?.join(candidate);
+        if path.exists() {
+            bin_path = Some(path);
+            break;
+        }
+    }
+    let final_bin_path = bin_path.ok_or_else(|| anyhow::anyhow!("ferrotexd binary not found"))?;
+
+    // 3. Start server
+    let mut child = Command::new(final_bin_path)
+        .current_dir(&temp_path)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .spawn()?;
+
+    let stdin = child.stdin.as_mut().unwrap();
+    let stdout = child.stdout.take().unwrap();
+    let mut reader = BufReader::new(stdout);
+
+    // 4. Initialize
+    let init_msg = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "capabilities": {},
+            "rootUri": format!("file://{}", temp_path.display()),
+            "processId": std::process::id()
+        }
+    });
+    send_msg(stdin, &init_msg).await?;
+    read_msg(&mut reader).await?;
+
+    let initialized_msg = json!({
+        "jsonrpc": "2.0",
+        "method": "initialized",
+        "params": {}
+    });
+    send_msg(stdin, &initialized_msg).await?;
+
+    // 5. Open document
+    let doc_uri = format!("file://{}/main.tex", temp_path.display());
+    // Contexts to test:
+    // 1. Command: \s -> section
+    // 2. Environment: \begin{i -> itemize
+    // 3. File: \input{ch -> chapters/intro
+    let doc_text = "\\s\n\\begin{i\n\\input{ch";
+    let did_open = json!({
+        "jsonrpc": "2.0",
+        "method": "textDocument/didOpen",
+        "params": {
+            "textDocument": {
+                "uri": doc_uri,
+                "languageId": "latex",
+                "version": 1,
+                "text": doc_text
+            }
+        }
+    });
+    send_msg(stdin, &did_open).await?;
+
+    // 6. Test Command Completion (\s)
+    let comp_cmd = json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "textDocument/completion",
+        "params": {
+            "textDocument": { "uri": doc_uri },
+            "position": { "line": 0, "character": 2 }
+        }
+    });
+    send_msg(stdin, &comp_cmd).await?;
+    let res_cmd = loop {
+        let msg = read_msg(&mut reader).await?;
+        if let Some(id) = msg.get("id")
+            && id == 2
+        {
+            break msg;
+        }
+    };
+    let items_cmd = res_cmd["result"]
+        .as_array()
+        .expect("Command completion items");
+    assert!(
+        items_cmd.iter().any(|i| i["label"] == "\\section"),
+        "Should suggest \\section"
+    );
+
+    // 7. Test Environment Completion (\begin{i)
+    let comp_env = json!({
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "textDocument/completion",
+        "params": {
+            "textDocument": { "uri": doc_uri },
+            "position": { "line": 1, "character": 8 }
+        }
+    });
+    send_msg(stdin, &comp_env).await?;
+    let res_env = loop {
+        let msg = read_msg(&mut reader).await?;
+        if let Some(id) = msg.get("id")
+            && id == 3
+        {
+            break msg;
+        }
+    };
+    let items_env = res_env["result"].as_array().expect("Env completion items");
+    assert!(
+        items_env.iter().any(|i| i["label"] == "itemize"),
+        "Should suggest itemize"
+    );
+
+    // 8. Test File Completion (\input{ch)
+    let comp_file = json!({
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "textDocument/completion",
+        "params": {
+            "textDocument": { "uri": doc_uri },
+            "position": { "line": 2, "character": 9 }
+        }
+    });
+    send_msg(stdin, &comp_file).await?;
+    let res_file = loop {
+        let msg = read_msg(&mut reader).await?;
+        if let Some(id) = msg.get("id")
+            && id == 4
+        {
+            break msg;
+        }
+    };
+    let items_file = res_file["result"]
+        .as_array()
+        .expect("File completion items");
+    // Depending on path separators and scanning, we expect "chapters/intro" (without extension)
+    // The implementation currently returns relative paths from root.
+    // "chapters/intro.tex" -> "chapters/intro"
+    let found_file = items_file.iter().any(|i| {
+        let label = i["label"].as_str().unwrap();
+        label == "chapters/intro" || label == "chapters\\intro"
+    });
+    assert!(found_file, "Should suggest chapters/intro");
+
+    child.kill().await?;
+    Ok(())
+}
+
 async fn send_msg<W: AsyncWriteExt + Unpin>(
     writer: &mut W,
     msg: &serde_json::Value,
