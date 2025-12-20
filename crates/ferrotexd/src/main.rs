@@ -523,6 +523,7 @@ async fn publish_diagnostics_logic(
     // 1. Collect all project-level diagnostics
     let cycles = workspace.detect_cycles();
     let label_errors = workspace.validate_labels();
+    let bibliography_errors = workspace.validate_bibliographies();
     let citation_errors = workspace.validate_citations();
 
     // Group by URI: Map<Url, Vec<(Range, Message, Source)>>
@@ -542,6 +543,12 @@ async fn publish_diagnostics_logic(
             .entry(uri)
             .or_default()
             .push((range, msg, "ferrotex-labels".into()));
+    }
+    for (uri, range, msg) in bibliography_errors {
+        project_diags
+            .entry(uri)
+            .or_default()
+            .push((range, msg, "ferrotex-bibliography".into()));
     }
     for (uri, range, msg) in citation_errors {
         project_diags
