@@ -134,13 +134,43 @@ impl Workspace {
 
     /// Returns all citation keys defined in all indexed BibTeX files.
     pub fn get_all_citation_keys(&self) -> Vec<String> {
-        let mut keys = Vec::new();
-        for entry in self.bib_indices.iter() {
-            for bib_entry in &entry.value().entries {
-                keys.push(bib_entry.key.clone());
+        let referenced_bibs = self.get_referenced_bib_uris();
+        let mut keys = HashSet::new();
+
+        if referenced_bibs.is_empty() {
+            for entry in self.bib_indices.iter() {
+                for bib_entry in &entry.value().entries {
+                    keys.insert(bib_entry.key.clone());
+                }
+            }
+        } else {
+            for uri in referenced_bibs {
+                if let Some(bib_file) = self.bib_indices.get(&uri) {
+                    for bib_entry in &bib_file.entries {
+                        keys.insert(bib_entry.key.clone());
+                    }
+                }
             }
         }
+
+        let mut keys: Vec<String> = keys.into_iter().collect();
+        keys.sort();
         keys
+    }
+
+    pub fn get_referenced_bib_uris(&self) -> Vec<Url> {
+        let mut uris = HashSet::new();
+
+        for entry in self.indices.iter() {
+            let base_uri = entry.key();
+            for bib in &entry.value().bibliographies {
+                if let Some(uri) = resolve_bib_uri(base_uri, &bib.path) {
+                    uris.insert(uri);
+                }
+            }
+        }
+
+        uris.into_iter().collect()
     }
 
     /// Returns all label names defined in all indexed TeX files.
@@ -156,13 +186,24 @@ impl Workspace {
 
     /// Checks if a citation key exists in the workspace.
     pub fn has_citation_key(&self, key: &str) -> bool {
-        for entry in self.bib_indices.iter() {
-            for bib_entry in &entry.value().entries {
-                if bib_entry.key == key {
+        let referenced_bibs = self.get_referenced_bib_uris();
+
+        if referenced_bibs.is_empty() {
+            for entry in self.bib_indices.iter() {
+                if entry.value().entries.iter().any(|e| e.key == key) {
+                    return true;
+                }
+            }
+        } else {
+            for uri in referenced_bibs {
+                if let Some(bib_file) = self.bib_indices.get(&uri)
+                    && bib_file.entries.iter().any(|e| e.key == key)
+                {
                     return true;
                 }
             }
         }
+
         false
     }
 
@@ -198,11 +239,48 @@ impl Workspace {
 
     // --- Diagnostics ---
 
+    pub fn validate_bibliographies(&self) -> Vec<(Url, TextRange, String)> {
+        let mut diagnostics = Vec::new();
+
+        for entry in self.indices.iter() {
+            let base_uri = entry.key();
+            for bib in &entry.value().bibliographies {
+                let Some(uri) = resolve_bib_uri(base_uri, &bib.path) else {
+                    diagnostics.push((
+                        base_uri.clone(),
+                        bib.range,
+                        format!("Invalid bibliography path: '{}'", bib.path),
+                    ));
+                    continue;
+                };
+
+                if !self.bib_indices.contains_key(&uri) {
+                    diagnostics.push((
+                        base_uri.clone(),
+                        bib.range,
+                        format!("Missing bibliography file: '{}'", bib.path),
+                    ));
+                }
+            }
+        }
+
+        diagnostics
+    }
+
     /// Validates citations across the workspace.
     ///
     /// Returns a list of diagnostics for undefined citations.
     pub fn validate_citations(&self) -> Vec<(Url, TextRange, String)> {
         let mut diagnostics = Vec::new();
+
+        let referenced_bibs = self.get_referenced_bib_uris();
+        if !referenced_bibs.is_empty()
+            && !referenced_bibs
+                .iter()
+                .all(|uri| self.bib_indices.contains_key(uri))
+        {
+            return diagnostics;
+        }
 
         // Check for undefined citations
         for entry in self.indices.iter() {
@@ -456,4 +534,18 @@ pub fn extract_label_data(node: &ferrotex_syntax::SyntaxNode) -> Option<(String,
     let final_len = TextSize::from(trimmed.len() as u32);
 
     Some((trimmed.to_string(), TextRange::at(final_start, final_len)))
+}
+
+fn resolve_bib_uri(base_uri: &Url, raw_path: &str) -> Option<Url> {
+    let mut path = raw_path.trim().trim_matches('"').to_string();
+    if path.is_empty() {
+        return None;
+    }
+
+    let has_extension = std::path::Path::new(&path).extension().is_some();
+    if !has_extension {
+        path.push_str(".bib");
+    }
+
+    base_uri.join(&path).ok()
 }
