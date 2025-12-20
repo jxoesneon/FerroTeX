@@ -1,7 +1,7 @@
 use dashmap::DashMap;
 use ferrotex_syntax::{SyntaxKind, TextRange, parse};
 use std::collections::{HashMap, HashSet};
-use tower_lsp::lsp_types::Url;
+use tower_lsp::lsp_types::{SymbolKind, Url};
 
 /// The central workspace manager for the LSP server.
 ///
@@ -28,6 +28,8 @@ pub struct FileIndex {
     pub citations: Vec<CitationRef>,
     /// List of bibliography references (e.g., `\bibliography{...}`).
     pub bibliographies: Vec<BibRef>,
+    /// List of sections (e.g., `\section{...}`).
+    pub sections: Vec<SectionDef>,
 }
 
 /// Represents an included file reference.
@@ -36,6 +38,15 @@ pub struct IncludeRef {
     /// The path to the included file (as written in the source).
     pub path: String,
     /// The range of the path string in the source file.
+    pub range: TextRange,
+}
+
+/// Represents a section definition.
+#[derive(Debug, Clone)]
+pub struct SectionDef {
+    /// The section title.
+    pub name: String,
+    /// The range of the section title in the source file.
     pub range: TextRange,
 }
 
@@ -86,7 +97,8 @@ impl Workspace {
     ///
     /// Parses the file content and extracts includes, labels, citations, etc.
     pub fn update(&self, uri: &Url, text: &str) {
-        let (includes, definitions, references, citations, bibliographies) = scan_file(text);
+        let (includes, definitions, references, citations, bibliographies, sections) =
+            scan_file(text);
         self.indices.insert(
             uri.clone(),
             FileIndex {
@@ -95,6 +107,7 @@ impl Workspace {
                 references,
                 citations,
                 bibliographies,
+                sections,
             },
         );
     }
@@ -234,6 +247,63 @@ impl Workspace {
                 }
             }
         }
+        results
+    }
+
+    /// Searches for symbols across the workspace matching the query string.
+    ///
+    /// Returns a list of (Name, Kind, File URI, Range) tuples.
+    pub fn query_symbols(&self, query: &str) -> Vec<(String, SymbolKind, Url, TextRange)> {
+        let mut results = Vec::new();
+        let query = query.to_lowercase();
+
+        // 1. Search TeX files (Labels and Sections)
+        for entry in self.indices.iter() {
+            let uri = entry.key();
+            let index = entry.value();
+
+            // Labels
+            for def in &index.definitions {
+                if def.name.to_lowercase().contains(&query) {
+                    results.push((
+                        def.name.clone(),
+                        SymbolKind::CONSTANT, // Labels are like constants
+                        uri.clone(),
+                        def.range,
+                    ));
+                }
+            }
+
+            // Sections
+            for section in &index.sections {
+                if section.name.to_lowercase().contains(&query) {
+                    results.push((
+                        section.name.clone(),
+                        SymbolKind::STRING, // Sections are structural/strings
+                        uri.clone(),
+                        section.range,
+                    ));
+                }
+            }
+        }
+
+        // 2. Search BibTeX files (Entries)
+        for entry in self.bib_indices.iter() {
+            let uri = entry.key();
+            let bib_file = entry.value();
+
+            for bib_entry in &bib_file.entries {
+                if bib_entry.key.to_lowercase().contains(&query) {
+                    results.push((
+                        bib_entry.key.clone(),
+                        SymbolKind::CLASS, // Bib entries are like classes/records
+                        uri.clone(),
+                        bib_entry.range,
+                    ));
+                }
+            }
+        }
+
         results
     }
 
@@ -426,6 +496,7 @@ type ScanResult = (
     Vec<LabelRef>,
     Vec<CitationRef>,
     Vec<BibRef>,
+    Vec<SectionDef>,
 );
 
 fn scan_file(text: &str) -> ScanResult {
@@ -436,6 +507,7 @@ fn scan_file(text: &str) -> ScanResult {
     let mut refs = Vec::new();
     let mut citations = Vec::new();
     let mut bibs = Vec::new();
+    let mut sections = Vec::new();
 
     for node in root.descendants() {
         match node.kind() {
@@ -491,10 +563,15 @@ fn scan_file(text: &str) -> ScanResult {
                     }
                 }
             }
+            SyntaxKind::Section => {
+                if let Some((name, range)) = extract_label_data(&node) {
+                    sections.push(SectionDef { name, range });
+                }
+            }
             _ => {}
         }
     }
-    (includes, defs, refs, citations, bibs)
+    (includes, defs, refs, citations, bibs, sections)
 }
 
 pub fn extract_group_text(node: &ferrotex_syntax::SyntaxNode) -> Option<String> {

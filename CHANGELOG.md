@@ -6,6 +6,25 @@ The format is based on **Keep a Changelog**, and this project intends to follow 
 
 ## [Unreleased]
 
+## [0.9.0] - 2025-12-20
+
+### Added
+
+- **Semantic Highlighting**:
+  - Full support for `textDocument/semanticTokens/full`.
+  - Highlights commands (`\foo`), environments (`\begin`, `\end`), comments (`%`), and parameters.
+  - Distinguishes between control flow (keywords) and content.
+- **Folding Ranges**:
+  - Foldable regions for environments (`\begin`...`\end`), groups (`{...}`), and sections.
+- **Workspace Symbols**:
+  - `workspace/symbol` support for searching labels (`\label{...}`) and sections (`\section{...}`) across the entire project.
+  - Searchable BibTeX entries by citation key.
+- **Enhanced Completion**:
+  - **Environments**: Autocomplete for `\begin{...}` based on standard LaTeX environments.
+  - **Commands**: Autocomplete for common LaTeX commands (starting with `\`).
+  - **File Paths**: Autocomplete for `\input{...}` and `\include{...}` scanning the workspace for `.tex` files.
+  - **Context Aware**: Smarter triggering inside braces and commands.
+
 ## [0.8.0] - 2025-12-20
 
 ### Added
@@ -120,7 +139,9 @@ The format is based on **Keep a Changelog**, and this project intends to follow 
 
 - Initial repository documentation.
 
-[Unreleased]: https://github.com/jxoesneon/FerroTeX/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/jxoesneon/FerroTeX/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.8.0...v0.9.0
+[0.8.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.7.0...v0.8.0
 [0.2.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.0.0...v0.1.0
 [0.0.0]: https://github.com/jxoesneon/FerroTeX/releases/tag/v0.0.0
