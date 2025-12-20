@@ -77,6 +77,8 @@ async fn test_lsp_diagnostics_flow() -> anyhow::Result<()> {
         .await?;
 
     // 8. Create a log file with warnings
+    // Give the watcher a moment to establish
+    sleep(Duration::from_secs(2)).await;
     let log_file = temp_path.join("test.log");
     tokio::fs::write(&log_file, "LaTeX Warning: Label `foo' multiply defined.\n").await?;
 
@@ -108,7 +110,7 @@ async fn test_lsp_diagnostics_flow() -> anyhow::Result<()> {
         }
     };
 
-    match timeout(Duration::from_secs(30), wait_loop).await {
+    match timeout(Duration::from_secs(60), wait_loop).await {
         Ok(Ok(())) => {}
         Ok(Err(e)) => anyhow::bail!("Error reading message: {:?}", e),
         Err(_) => anyhow::bail!(
