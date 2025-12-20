@@ -269,6 +269,7 @@ Each release below includes:
 **Scope**
 
 - Runner adapters per `docs/spec/engine-adapters.md`.
+  - **Tectonic support** prioritized for zero-config users.
 - Unified build event stream across adapters.
 - Improved diagnostic mapping using source analysis (line→range best-effort).
 
@@ -293,7 +294,12 @@ Each release below includes:
 - Extension UX polish:
   - consistent commands
   - confidence visualization
+  - Extension UX polish:
+  - consistent commands
+  - confidence visualization
   - provenance view ergonomics
+  - **Image Paste Wizard**: Handle clipboard image paste events.
+  - **Magic Comments**: Respect `%!TEX root` and `%!TEX program`.
 
 **Acceptance criteria**
 
@@ -306,6 +312,32 @@ Each release below includes:
 - EX-3
 - SX-2
 - PF-2
+
+### v0.13.0 — Integrated Environment Complete (PDF + Packages + Math)
+
+**Scope**
+
+- **Integrated PDF Viewer**:
+  - Webview-based PDF viewer in VS Code.
+  - Bidirectional SyncTeX (click-to-jump).
+- **Package Management**:
+  - Detect missing packages from logs.
+  - Prompt to specific `tlmgr` / `miktex` install commands.
+- **Math Semantics & UX**:
+  - Deep validation for math environments.
+  - **Hover Preview**: Render LaTeX equations in editor tooltips (MathJax/KaTeX).
+
+**Acceptance criteria**
+
+- PDF Viewer renders correctly and synchronizes cursors.
+- Missing package errors allow one-click install flow.
+
+**Feature Matrix coverage**
+
+- LP-5
+- BO-9
+- EX-4
+- SX-2, SX-3 (Integrated)
 
 ### v1.0.0 — Stable 1.0 Release (Industry-Standard Baseline)
 
