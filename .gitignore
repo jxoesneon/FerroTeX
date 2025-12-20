@@ -2,7 +2,8 @@ node_modules
 _site
 build
 .DS_Store
-.windsurf/*
-!.windsurf/workflows/
+.windsurf/* 
 /target
 Cargo.locktest.log
+refactor_plan.md
+plan*.md

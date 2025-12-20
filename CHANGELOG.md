@@ -6,7 +6,67 @@ The format is based on **Keep a Changelog**, and this project intends to follow 
 
 ## [Unreleased]
 
-## [0.2.0] - 2025-12-19
+## [0.7.0] - 2025-12-19
+
+### Added
+
+- **Label Management**: Full support for `\label` and `\ref`.
+  - **Go to Definition**: Jump from `\ref{...}` to `\label{...}`.
+  - **Find References**: List all references to a label.
+  - **Rename**: Rename a label and update all references across the workspace.
+- **Label Diagnostics**:
+  - **Duplicate Definitions**: Reports error if a label is defined multiple times.
+  - **Undefined References**: Reports error if a `\ref` points to a non-existent label.
+- **Workspace Indexing**:
+  - **Startup Scan**: Recursively indexes all `.tex` files in the workspace root on startup.
+  - **File Watching**: Monitors `.tex` files for creation, modification, and deletion to keep the index in sync.
+
+## [0.6.0] - 2025-12-19
+
+### Added
+
+- **Project Model**: Introduced `Workspace` to track the include graph of LaTeX documents.
+- **Document Links**: `ferrotexd` now supports `textDocument/documentLink`.
+  - Resolves `\input{...}` and `\include{...}` paths relative to the current file.
+  - Allows navigation to included files.
+- **Cycle Detection**:
+  - Detects include cycles (e.g., A includes B, B includes A).
+  - Reports cycles as diagnostics on the include command.
+
+## [0.5.0] - 2025-12-19
+
+### Added
+
+- **LaTeX Parser**: Introduced `ferrotex-syntax` crate with a fault-tolerant CST parser based on `rowan`.
+  - Supports LaTeX lexing (commands, groups, environments).
+  - Handles recovery from syntax errors (e.g., missing braces).
+- **Document Symbols**: `ferrotexd` now supports `textDocument/documentSymbol`.
+  - Hierarchical outline for environments (`\begin{...}`) and groups.
+  - Section extraction (`\section{...}`) for navigation.
+- **Source Diagnostics**: Real-time syntax error reporting in the editor.
+  - Reports unmatched braces and unclosed environments.
+  - Maps source ranges accurately using `line-index`.
+
+## [0.4.0] - 2025-12-19
+
+### Added
+
+- **LSP Server**: Initial release of `ferrotexd`, a Language Server Protocol implementation for FerroTeX.
+  - Supports `textDocument/publishDiagnostics` via streaming log ingestion.
+  - Watches workspace `.log` files for changes using `notify`.
+- **VS Code Extension**: New extension (`editors/vscode`) to bootstrap the client.
+  - Launches `ferrotexd` automatically.
+  - Configurable server path via `ferrotex.serverPath`.
+
+## [0.3.0] - 2025-12-19
+
+### Added
+
+- **Streaming Log Ingestion**: `LogParser` now supports incremental updates via `update()` method.
+- **CLI Watch Command**: New `ferrotex watch <file>` command to tail log files in real-time.
+- **Peek-Line Strategy**: Robust handling of split lines and path wrapping during streaming.
+
+## [0.2.0] - 2024-05-20
 
 ### Added
 
