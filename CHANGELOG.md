@@ -6,6 +6,21 @@ The format is based on **Keep a Changelog**, and this project intends to follow 
 
 ## [Unreleased]
 
+## [0.7.0] - 2025-12-19
+
+### Added
+
+- **Label Management**: Full support for `\label` and `\ref`.
+  - **Go to Definition**: Jump from `\ref{...}` to `\label{...}`.
+  - **Find References**: List all references to a label.
+  - **Rename**: Rename a label and update all references across the workspace.
+- **Label Diagnostics**:
+  - **Duplicate Definitions**: Reports error if a label is defined multiple times.
+  - **Undefined References**: Reports error if a `\ref` points to a non-existent label.
+- **Workspace Indexing**:
+  - **Startup Scan**: Recursively indexes all `.tex` files in the workspace root on startup.
+  - **File Watching**: Monitors `.tex` files for creation, modification, and deletion to keep the index in sync.
+
 ## [0.6.0] - 2025-12-19
 
 ### Added

@@ -21,10 +21,12 @@ pub enum SyntaxKind {
 
     // Composite Nodes
     Root,
-    Group,       // { ... }
-    Environment, // \begin{...} ... \end{...}
-    Section,     // \section{...} (heuristic)
-    Include,     // \input{...}, \include{...}
+    Group,           // { ... }
+    Environment,     // \begin{...} ... \end{...}
+    Section,         // \section{...} (heuristic)
+    Include,         // \input{...}, \include{...}
+    LabelDefinition, // \label{...}
+    LabelReference,  // \ref{...}
 
     // Technical
     Eof,

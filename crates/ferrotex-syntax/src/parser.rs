@@ -103,6 +103,10 @@ impl<'a> Parser<'a> {
                 2 // Section
             } else if *text == "\\input" || *text == "\\include" {
                 3 // Include
+            } else if *text == "\\label" {
+                4 // Label
+            } else if *text == "\\ref" {
+                5 // Ref
             } else {
                 0 // Other
             }
@@ -114,8 +118,38 @@ impl<'a> Parser<'a> {
             1 => self.parse_environment(),
             2 => self.parse_section(),
             3 => self.parse_include(),
+            4 => self.parse_label(),
+            5 => self.parse_ref(),
             _ => self.bump(),
         }
+    }
+
+    fn parse_label(&mut self) {
+        self.builder.start_node(SyntaxKind::LabelDefinition.into());
+        self.bump(); // Consume \label
+
+        // Expect {name}
+        if self.peek() == SyntaxKind::LBrace {
+            self.parse_group();
+        } else {
+            self.error("Expected '{' after \\label".into());
+        }
+
+        self.builder.finish_node();
+    }
+
+    fn parse_ref(&mut self) {
+        self.builder.start_node(SyntaxKind::LabelReference.into());
+        self.bump(); // Consume \ref
+
+        // Expect {name}
+        if self.peek() == SyntaxKind::LBrace {
+            self.parse_group();
+        } else {
+            self.error("Expected '{' after \\ref".into());
+        }
+
+        self.builder.finish_node();
     }
 
     fn parse_include(&mut self) {
@@ -292,5 +326,17 @@ mod tests {
         let node2 = result2.syntax();
         let include2 = node2.children().next().unwrap();
         assert_eq!(include2.kind(), SyntaxKind::Include);
+    }
+
+    #[test]
+    fn test_labels_refs() {
+        let input = r"\section{A} \label{sec:a} \ref{sec:a}";
+        let parse = parse(input);
+        let node = parse.syntax();
+        let children: Vec<_> = node.children().collect();
+        // Section, LabelDefinition, LabelReference
+        assert_eq!(children.len(), 3);
+        assert_eq!(children[1].kind(), SyntaxKind::LabelDefinition);
+        assert_eq!(children[2].kind(), SyntaxKind::LabelReference);
     }
 }

@@ -4,6 +4,11 @@ This is the reference implementation of the FerroTeX Language Server Protocol (L
 
 ## Features
 
+- **v0.7.0**:
+    - **Label Management**: Go to Definition, Find References, and Rename for `\label`/`\ref`.
+    - **Label Diagnostics**: Detect duplicate labels and undefined references.
+    - **Workspace Scanning**: Indexes all `.tex` files on startup.
+    - **File Watching**: Reacts to file changes, additions, and deletions.
 - **v0.6.0**:
     - **Project Model**: Tracks file dependencies (`\input`, `\include`).
     - **Document Links**: Navigate to included files.
