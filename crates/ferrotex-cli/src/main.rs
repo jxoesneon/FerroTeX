@@ -6,26 +6,29 @@ use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::channel;
 
+/// The main CLI argument parser.
 #[derive(Parser)]
 #[command(name = "ferrotex")]
 #[command(version)]
 #[command(about = "FerroTeX CLI tools", long_about = None)]
 struct Cli {
+    /// The subcommand to execute.
     #[command(subcommand)]
     command: Commands,
 }
 
+/// Available CLI subcommands.
 #[derive(Subcommand)]
 enum Commands {
-    /// Parse a TeX log file and emit JSON IR
+    /// Parse a TeX log file and emit JSON IR.
     Parse {
-        /// Path to the .log file
+        /// Path to the .log file.
         #[arg(value_name = "FILE")]
         path: PathBuf,
     },
-    /// Watch a TeX log file for changes and stream events
+    /// Watch a TeX log file for changes and stream events.
     Watch {
-        /// Path to the .log file
+        /// Path to the .log file.
         #[arg(value_name = "FILE")]
         path: PathBuf,
     },
@@ -48,6 +51,14 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Watches a log file for changes and prints new events as JSON.
+///
+/// This function tails the file, similar to `tail -f`, but parses the content
+/// using `LogParser` to emit structured events.
+///
+/// # Arguments
+///
+/// * `path` - The path to the log file to watch.
 fn watch_log(path: &Path) -> anyhow::Result<()> {
     let mut parser = LogParser::new();
     let mut file = File::open(path)?;
