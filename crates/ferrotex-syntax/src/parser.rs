@@ -138,13 +138,11 @@ impl<'a> Parser<'a> {
 
         // Optional argument [ ... ]
         if self.peek() == SyntaxKind::LBracket {
-            self.builder.token(SyntaxKind::LBracket.into(), "[");
             self.bump(); // consume [
             while self.peek() != SyntaxKind::Eof && self.peek() != SyntaxKind::RBracket {
                 self.parse_element();
             }
             if self.peek() == SyntaxKind::RBracket {
-                self.builder.token(SyntaxKind::RBracket.into(), "]");
                 self.bump(); // consume ]
             } else {
                 self.error("Expected ']'".into());
@@ -163,7 +161,25 @@ impl<'a> Parser<'a> {
 
     fn parse_bibliography(&mut self) {
         self.builder.start_node(SyntaxKind::Bibliography.into());
+        let is_addbibresource = if let Some((SyntaxKind::Command, text)) = self.lexer.peek() {
+            *text == "\\addbibresource"
+        } else {
+            false
+        };
         self.bump(); // Consume command
+
+        // Optional argument [ ... ] (biblatex: \addbibresource[...]{...})
+        if is_addbibresource && self.peek() == SyntaxKind::LBracket {
+            self.bump(); // consume [
+            while self.peek() != SyntaxKind::Eof && self.peek() != SyntaxKind::RBracket {
+                self.parse_element();
+            }
+            if self.peek() == SyntaxKind::RBracket {
+                self.bump(); // consume ]
+            } else {
+                self.error("Expected ']'".into());
+            }
+        }
 
         // Expect {path}
         if self.peek() == SyntaxKind::LBrace {
@@ -404,7 +420,7 @@ mod tests {
 
     #[test]
     fn test_bibliography() {
-        let input = r"\bibliography{refs} \addbibresource{refs.bib}";
+        let input = r"\bibliography{refs} \addbibresource[backend=biber]{refs.bib}";
         let parse = parse(input);
         let node = parse.syntax();
         let children: Vec<_> = node.children().collect();
