@@ -1,0 +1,33 @@
+<governance>
+  <!-- Fundamental rules of engagement for the repository -->
+  <rule id="trunk-based">Work trunk-based: all changes go through PRs; do not assume direct pushes to main.</rule>
+  <rule id="ci-green">Keep CI green: run lint/tests locally before commits when feasible.</rule>
+</governance>
+
+<tech_stack>
+  <!-- Defines the exact libraries and versions to prevent hallucinations -->
+  <language>Rust (2021 edition)</language>
+  <core_crates>ferrotex-log, ferrotex-cli</core_crates>
+  <documentation>Jekyll (GitHub Pages)</documentation>
+  <ci>GitHub Actions</ci>
+</tech_stack>
+
+<tooling>
+  <!-- Preferences for external tool usage -->
+  <preference>Prefer GitHub MCP tooling for GitHub operations (labels, milestones, PRs, releases). Use gh CLI only if MCP is unavailable.</preference>
+  <ci_policy>When adding CI workflows, prefer deterministic pinned action versions and fail-fast checks.</ci_policy>
+</tooling>
+
+<quality_gates>
+  <!-- Requirements before tagging a release -->
+  <gate>Markdown lint passing (npm run lint:md)</gate>
+  <gate>YAML lint passing (npm run lint:yaml)</gate>
+  <gate>Link check passing (npm run lint:links:internal)</gate>
+  <gate>TeX Live smoke build passing</gate>
+  <gate>Rust tests and formatting (cargo test, cargo fmt)</gate>
+</quality_gates>
+
+<documentation_policy>
+  <source>docs/ directory is the canonical source</source>
+  <style>Keep docs changes reviewable and avoid mass rewrites unless required for publishing.</style>
+</documentation_policy>
