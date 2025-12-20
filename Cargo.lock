@@ -280,6 +280,7 @@ dependencies = [
  "ferrotex-syntax",
  "line-index",
  "notify",
+ "rowan",
  "serde",
  "serde_json",
  "tempfile",

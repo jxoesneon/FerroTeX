@@ -1,11 +1,15 @@
 use crate::SyntaxKind;
 
+/// A simple lexer for LaTeX source code.
+///
+/// It breaks the input string into a stream of `SyntaxKind` tokens.
 pub struct Lexer<'a> {
     input: &'a str,
     position: usize,
 }
 
 impl<'a> Lexer<'a> {
+    /// Creates a new `Lexer` for the given input string.
     pub fn new(input: &'a str) -> Self {
         Self { input, position: 0 }
     }

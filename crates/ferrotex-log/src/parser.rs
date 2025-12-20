@@ -1,5 +1,10 @@
 use crate::ir::{Confidence, EventPayload, LogEvent, Span};
 
+/// A streaming parser for LaTeX logs.
+///
+/// `LogParser` processes log output incrementally or as a whole, extracting events
+/// such as file entry/exit, warnings, and errors. It maintains a stack of open files
+/// to track the context of messages.
 pub struct LogParser {
     events: Vec<LogEvent>,
     file_stack: Vec<String>,
@@ -14,6 +19,7 @@ impl Default for LogParser {
 }
 
 impl LogParser {
+    /// Creates a new, empty `LogParser`.
     pub fn new() -> Self {
         Self {
             events: Vec::new(),
@@ -24,13 +30,24 @@ impl LogParser {
     }
 
     /// Appends input to the internal buffer and processes available events.
-    /// Returns the newly found events.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - A slice of the log file content to append.
+    ///
+    /// # Returns
+    ///
+    /// A vector of newly parsed `LogEvent`s.
     pub fn update(&mut self, input: &str) -> Vec<LogEvent> {
         self.buffer.push_str(input);
         self.process_buffer()
     }
 
     /// Consumes the current parser state and processes any remaining buffer as if it were the end of input.
+    ///
+    /// # Returns
+    ///
+    /// All remaining parsed `LogEvent`s, including any from the final buffer flush.
     pub fn finish(mut self) -> Vec<LogEvent> {
         // Ensure any trailing data is processed
         if !self.buffer.is_empty() {
@@ -285,23 +302,23 @@ impl LogParser {
                 .chars()
                 .take_while(|c| c.is_ascii_digit())
                 .collect();
-            if !digits.is_empty() {
-                if let Ok(line_num) = digits.parse::<u32>() {
-                    let excerpt = if 2 + digits.len() < text.len() {
-                        Some(text[2 + digits.len()..].trim().to_string())
-                    } else {
-                        None
-                    };
-                    events.push(LogEvent {
-                        span: Span::new(span_start, span_end),
-                        confidence: Confidence::default(),
-                        payload: EventPayload::ErrorLineRef {
-                            line: line_num,
-                            source_excerpt: excerpt,
-                        },
-                    });
-                    return true;
-                }
+            if !digits.is_empty()
+                && let Ok(line_num) = digits.parse::<u32>()
+            {
+                let excerpt = if 2 + digits.len() < text.len() {
+                    Some(text[2 + digits.len()..].trim().to_string())
+                } else {
+                    None
+                };
+                events.push(LogEvent {
+                    span: Span::new(span_start, span_end),
+                    confidence: Confidence::default(),
+                    payload: EventPayload::ErrorLineRef {
+                        line: line_num,
+                        source_excerpt: excerpt,
+                    },
+                });
+                return true;
             }
         }
         false
@@ -321,20 +338,19 @@ impl LogParser {
             if current_line_idx >= lines.len() {
                 // We ran out of lines in the current chunk.
                 // Check peek_line if available.
-                if let Some(next_line) = peek_line {
-                    if next_line.starts_with("LaTeX Warning:")
+                if let Some(next_line) = peek_line
+                    && (next_line.starts_with("LaTeX Warning:")
                         || next_line.starts_with("Package")
                         || next_line.starts_with("!")
                         || next_line.starts_with("(")
                         || next_line.starts_with(")")
                         || next_line.starts_with("Overfull")
-                        || next_line.starts_with("Underfull")
-                    {
-                        // The next line (partial) looks like a new event.
-                        // So the path definitely ended at the previous newline.
-                        // We return successfully.
-                        return (path, current_line_idx - start_line_idx, 0, false);
-                    }
+                        || next_line.starts_with("Underfull"))
+                {
+                    // The next line (partial) looks like a new event.
+                    // So the path definitely ended at the previous newline.
+                    // We return successfully.
+                    return (path, current_line_idx - start_line_idx, 0, false);
                 }
 
                 // If peek_line didn't match a guard, or wasn't available, we are incomplete.
@@ -372,19 +388,18 @@ impl LogParser {
                 } else {
                     // We are at the last line of the current chunk.
                     // We check peek_line to decide if we should wrap.
-                    if let Some(next_line) = peek_line {
-                        if next_line.starts_with("LaTeX Warning:")
+                    if let Some(next_line) = peek_line
+                        && (next_line.starts_with("LaTeX Warning:")
                             || next_line.starts_with("Package")
                             || next_line.starts_with("!")
                             || next_line.starts_with("(")
                             || next_line.starts_with(")")
                             || next_line.starts_with("Overfull")
-                            || next_line.starts_with("Underfull")
-                        {
-                            // Don't join.
-                            path.push_str(remainder);
-                            return (path, current_line_idx - start_line_idx, line.len(), false);
-                        }
+                            || next_line.starts_with("Underfull"))
+                    {
+                        // Don't join.
+                        path.push_str(remainder);
+                        return (path, current_line_idx - start_line_idx, line.len(), false);
                     }
 
                     // Otherwise, we can't decide. Incomplete.

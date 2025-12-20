@@ -6,6 +6,12 @@ The format is based on **Keep a Changelog**, and this project intends to follow 
 
 ## [Unreleased]
 
+### Changed
+
+- **Rust 2024 Edition**: Migrated all crates (`ferrotexd`, `ferrotex-syntax`, `ferrotex-log`, `ferrotex-cli`) to Rust 2024 edition.
+  - Updated control flow to use `let-chains` (`if let ... && ...`).
+  - modernized loops (`while let` -> `loop { let ... else { break } }`) for strict compliance.
+
 ## [0.7.0] - 2025-12-19
 
 ### Added
