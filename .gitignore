@@ -6,4 +6,4 @@ build
 /target
 Cargo.locktest.log
 refactor_plan.md
-plan*.md
+*plan*.md

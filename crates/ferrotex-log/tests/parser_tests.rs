@@ -1,5 +1,5 @@
-use ferrotex_log::ir::EventPayload;
 use ferrotex_log::LogParser;
+use ferrotex_log::ir::EventPayload;
 
 #[test]
 fn test_simple_structure() {

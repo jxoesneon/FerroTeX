@@ -14,7 +14,7 @@ fn run_golden_tests() {
         let entry = entry.unwrap();
         let path = entry.path();
 
-        if path.extension().map_or(false, |ext| ext == "log") {
+        if path.extension().is_some_and(|ext| ext == "log") {
             let log_content = fs::read_to_string(&path).expect("Failed to read log");
             let parser = LogParser::new();
             let events = parser.parse(&log_content);
