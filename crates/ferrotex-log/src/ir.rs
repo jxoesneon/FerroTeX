@@ -32,33 +32,33 @@ pub struct LogEvent {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "data")]
 pub enum EventPayload {
-    FileEnter { 
-        path: String 
+    FileEnter {
+        path: String,
     },
     FileExit,
-    ErrorStart { 
-        message: String 
+    ErrorStart {
+        message: String,
     },
-    ErrorLineRef { 
-        line: u32, 
-        source_excerpt: Option<String> 
+    ErrorLineRef {
+        line: u32,
+        source_excerpt: Option<String>,
     },
-    ErrorContextLine { 
-        text: String 
+    ErrorContextLine {
+        text: String,
     },
-    Warning { 
-        message: String 
+    Warning {
+        message: String,
     },
-    Info { 
-        message: String 
+    Info {
+        message: String,
     },
-    OutputArtifact { 
-        path: Option<String>, 
-        format: Option<String>, 
-        role: Option<String> 
+    OutputArtifact {
+        path: Option<String>,
+        format: Option<String>,
+        role: Option<String>,
     },
-    BuildSummary { 
-        success: bool 
+    BuildSummary {
+        success: bool,
     },
 }
 

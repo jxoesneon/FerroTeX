@@ -16,6 +16,26 @@ This repository currently contains **project documentation and specifications** 
   - serves features to editors via **Language Server Protocol (LSP)** and (optionally) **Debug Adapter Protocol (DAP)**.
 - A **VS Code extension** that acts as a thin client, managing server lifecycle and UX.
 
+## CLI Usage
+
+FerroTeX provides a command-line interface for interacting with its tools.
+
+### Parse
+
+Parse a TeX log file and emit structured JSON events.
+
+```bash
+ferrotex parse main.log
+```
+
+### Watch
+
+Watch a TeX log file for changes in real-time and stream JSON events as they occur. This is useful for integrating with build tools or editors.
+
+```bash
+ferrotex watch main.log
+```
+
 ## Status
 
 - **Phase:** Design + research proposal (pre-implementation).
