@@ -6,6 +6,21 @@ The format is based on **Keep a Changelog**, and this project intends to follow 
 
 ## [Unreleased]
 
+## [0.8.0] - 2025-12-20
+
+### Added
+
+- **Bibliography Support**:
+  - **Discovery**: Automatically detects `.bib` files referenced via `\bibliography{...}` and `\addbibresource{...}`.
+  - **Watching**: Monitors referenced `.bib` files for changes and updates the index in real-time.
+  - **BibTeX Parsing**: Robust parsing of BibTeX entries to extract citation keys.
+- **Citation Intelligence**:
+  - **Completion**: Autocomplete support for `\cite{...}` using indexed keys from all referenced bibliographies.
+  - **Diagnostics**:
+    - **Undefined Citations**: Reports errors for citations not found in loaded bibliographies.
+    - **Missing Bibliography**: Reports errors if a referenced `.bib` file is missing or unreadable.
+    - **Smart Validation**: Suppresses "undefined citation" noise if the referenced bibliography file itself is missing.
+
 ### Changed
 
 - **Rust 2024 Edition**: Migrated all crates (`ferrotexd`, `ferrotex-syntax`, `ferrotex-log`, `ferrotex-cli`) to Rust 2024 edition.
