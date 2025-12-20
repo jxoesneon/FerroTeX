@@ -1,4 +1,7 @@
+use rowan::{TextRange, TextSize};
 use std::collections::HashMap;
+use std::iter::Peekable;
+use std::str::CharIndices;
 
 /// Represents a single BibTeX entry (e.g., `@article{...}`).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -9,6 +12,8 @@ pub struct BibEntry {
     pub key: String,
     /// The fields of the entry (e.g., "author" -> "Knuth", "title" -> "The TeXbook").
     pub fields: HashMap<String, String>,
+    /// The full range of the entry in the source file.
+    pub range: TextRange,
 }
 
 /// Represents a parsed BibTeX file.
@@ -19,28 +24,16 @@ pub struct BibFile {
 }
 
 /// A very simple, best-effort BibTeX parser.
-///
-/// It doesn't use the full Lexer/Parser infrastructure of LaTeX because
-/// BibTeX syntax is quite different and simpler in structure (though complex in details).
-/// For v0.8.0, we prioritize extracting keys for completion.
-///
-/// # Arguments
-///
-/// * `input` - The BibTeX source code as a string.
-///
-/// # Returns
-///
-/// A `BibFile` struct containing all parsed entries.
 pub fn parse_bibtex(input: &str) -> BibFile {
     let mut entries = Vec::new();
-    let mut chars = input.chars().peekable();
+    let mut chars = input.char_indices().peekable();
 
     loop {
-        let Some(c) = chars.next() else {
+        let Some((start_idx, c)) = chars.next() else {
             break;
         };
         if c == '@'
-            && let Some(entry) = parse_entry(&mut chars)
+            && let Some(entry) = parse_entry(&mut chars, start_idx, input.len())
         {
             entries.push(entry);
         }
@@ -49,12 +42,18 @@ pub fn parse_bibtex(input: &str) -> BibFile {
     BibFile { entries }
 }
 
-fn parse_entry(chars: &mut std::iter::Peekable<std::str::Chars>) -> Option<BibEntry> {
+fn parse_entry(
+    chars: &mut Peekable<CharIndices>,
+    start_idx: usize,
+    input_len: usize,
+) -> Option<BibEntry> {
     // 1. Read entry type (e.g., article)
     let entry_type = read_until(chars, |c| c == '{' || c.is_whitespace())?;
     skip_whitespace(chars);
 
-    if chars.next()? != '{' {
+    if let Some((_, '{')) = chars.next() {
+        // Ok
+    } else {
         return None;
     }
     skip_whitespace(chars);
@@ -64,22 +63,19 @@ fn parse_entry(chars: &mut std::iter::Peekable<std::str::Chars>) -> Option<BibEn
     skip_whitespace(chars);
 
     // Expect comma
-    if chars.peek() == Some(&',') {
+    if let Some(&(_, ',')) = chars.peek() {
         chars.next();
-    } else {
-        // Might be just a key and nothing else? rare but possible
     }
 
     // 3. Read fields (simplified: skip until closing brace of entry)
-    // For v0.8.0 we mostly care about keys, but reading fields is good for future.
-    // For now, let's just skip to the matching closing brace to advance properly.
-    // A proper parser would parse "field = value".
-
     let fields = HashMap::new();
     let mut brace_depth = 1;
+    let end_idx;
 
     loop {
-        let Some(c) = chars.next() else {
+        let Some((idx, c)) = chars.next() else {
+            // End of file inside entry? Use input_len as end
+            end_idx = input_len;
             break;
         };
         match c {
@@ -87,6 +83,7 @@ fn parse_entry(chars: &mut std::iter::Peekable<std::str::Chars>) -> Option<BibEn
             '}' => {
                 brace_depth -= 1;
                 if brace_depth == 0 {
+                    end_idx = idx + 1; // Include the closing brace
                     break;
                 }
             }
@@ -98,15 +95,19 @@ fn parse_entry(chars: &mut std::iter::Peekable<std::str::Chars>) -> Option<BibEn
         entry_type: entry_type.to_lowercase(),
         key,
         fields,
+        range: TextRange::new(
+            TextSize::from(start_idx as u32),
+            TextSize::from(end_idx as u32),
+        ),
     })
 }
 
-fn read_until<F>(chars: &mut std::iter::Peekable<std::str::Chars>, predicate: F) -> Option<String>
+fn read_until<F>(chars: &mut Peekable<CharIndices>, predicate: F) -> Option<String>
 where
     F: Fn(char) -> bool,
 {
     let mut s = String::new();
-    while let Some(&c) = chars.peek() {
+    while let Some(&(_, c)) = chars.peek() {
         if predicate(c) {
             break;
         }
@@ -116,8 +117,8 @@ where
     if s.is_empty() { None } else { Some(s) }
 }
 
-fn skip_whitespace(chars: &mut std::iter::Peekable<std::str::Chars>) {
-    while let Some(&c) = chars.peek() {
+fn skip_whitespace(chars: &mut Peekable<CharIndices>) {
+    while let Some(&(_, c)) = chars.peek() {
         if c.is_whitespace() {
             chars.next();
         } else {
