@@ -217,13 +217,13 @@ async fn test_document_symbol_flow() -> anyhow::Result<()> {
     // We might get window/logMessage notifications, so we loop until we get the response to ID 2
     let syms = loop {
         let msg = read_msg(&mut reader).await?;
-        if let Some(id) = msg.get("id") {
-            if id == 2 {
-                break msg["result"]
-                    .as_array()
-                    .expect("result should be an array")
-                    .clone();
-            }
+        if let Some(id) = msg.get("id")
+            && id == 2
+        {
+            break msg["result"]
+                .as_array()
+                .expect("result should be an array")
+                .clone();
         }
         // Ignore other messages (notifications)
     };
@@ -430,13 +430,13 @@ async fn test_document_symbol_section_flow() -> anyhow::Result<()> {
     // 7. Read Response
     let syms = loop {
         let msg = read_msg(&mut reader).await?;
-        if let Some(id) = msg.get("id") {
-            if id == 2 {
-                break msg["result"]
-                    .as_array()
-                    .expect("result should be an array")
-                    .clone();
-            }
+        if let Some(id) = msg.get("id")
+            && id == 2
+        {
+            break msg["result"]
+                .as_array()
+                .expect("result should be an array")
+                .clone();
         }
     };
 
@@ -542,13 +542,13 @@ async fn test_document_link_flow() -> anyhow::Result<()> {
     // 7. Read Response
     let links = loop {
         let msg = read_msg(&mut reader).await?;
-        if let Some(id) = msg.get("id") {
-            if id == 2 {
-                break msg["result"]
-                    .as_array()
-                    .expect("result should be an array")
-                    .clone();
-            }
+        if let Some(id) = msg.get("id")
+            && id == 2
+        {
+            break msg["result"]
+                .as_array()
+                .expect("result should be an array")
+                .clone();
         }
     };
 
@@ -786,10 +786,10 @@ async fn test_label_features_flow() -> anyhow::Result<()> {
 
     let def_res = loop {
         let msg = read_msg(&mut reader).await?;
-        if let Some(id) = msg.get("id") {
-            if id == 2 {
-                break msg;
-            }
+        if let Some(id) = msg.get("id")
+            && id == 2
+        {
+            break msg;
         }
     };
 
@@ -817,10 +817,10 @@ async fn test_label_features_flow() -> anyhow::Result<()> {
 
     let ref_res = loop {
         let msg = read_msg(&mut reader).await?;
-        if let Some(id) = msg.get("id") {
-            if id == 3 {
-                break msg;
-            }
+        if let Some(id) = msg.get("id")
+            && id == 3
+        {
+            break msg;
         }
     };
     let refs = ref_res["result"]
@@ -849,10 +849,10 @@ async fn test_label_features_flow() -> anyhow::Result<()> {
                 if uri == doc_uri {
                     let diags = params["diagnostics"].as_array().unwrap();
                     for d in diags {
-                        if let Some(msg) = d["message"].as_str() {
-                            if msg.contains("Undefined reference: 'missing'") {
-                                return Ok::<(), anyhow::Error>(());
-                            }
+                        if let Some(msg) = d["message"].as_str()
+                            && msg.contains("Undefined reference: 'missing'")
+                        {
+                            return Ok::<(), anyhow::Error>(());
                         }
                     }
                 }
@@ -969,10 +969,10 @@ async fn test_rename_flow() -> anyhow::Result<()> {
     // 7. Verify Edit
     let rename_res = loop {
         let msg = read_msg(&mut reader).await?;
-        if let Some(id) = msg.get("id") {
-            if id == 2 {
-                break msg;
-            }
+        if let Some(id) = msg.get("id")
+            && id == 2
+        {
+            break msg;
         }
     };
 
@@ -1001,6 +1001,163 @@ async fn test_rename_flow() -> anyhow::Result<()> {
     } else {
         panic!("WorkspaceEdit should contain changes or documentChanges");
     }
+
+    child.kill().await?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_citation_flow() -> anyhow::Result<()> {
+    // 1. Setup temp dir
+    let temp_dir = tempfile::tempdir()?;
+    let temp_path = temp_dir.path().to_owned();
+
+    // 2. Locate binary
+    let mut bin_path = None;
+    let candidates = vec!["../../target/debug/ferrotexd", "target/debug/ferrotexd"];
+    for candidate in candidates {
+        let path = std::env::current_dir()?.join(candidate);
+        if path.exists() {
+            bin_path = Some(path);
+            break;
+        }
+    }
+    let final_bin_path = bin_path.ok_or_else(|| anyhow::anyhow!("ferrotexd binary not found"))?;
+
+    // 3. Start server
+    let mut child = Command::new(final_bin_path)
+        .current_dir(&temp_path)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .spawn()?;
+
+    let stdin = child.stdin.as_mut().unwrap();
+    let stdout = child.stdout.take().unwrap();
+    let mut reader = BufReader::new(stdout);
+
+    // 4. Initialize
+    let init_msg = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "capabilities": {},
+            "rootUri": format!("file://{}", temp_path.display()),
+            "processId": std::process::id()
+        }
+    });
+    send_msg(stdin, &init_msg).await?;
+    read_msg(&mut reader).await?;
+
+    let initialized_msg = json!({
+        "jsonrpc": "2.0",
+        "method": "initialized",
+        "params": {}
+    });
+    send_msg(stdin, &initialized_msg).await?;
+
+    // 5. Open .tex with undefined citation
+    let tex_uri = format!("file://{}/main.tex", temp_path.display());
+    let tex_text = r"\cite{myKey}";
+    let did_open_tex = json!({
+        "jsonrpc": "2.0",
+        "method": "textDocument/didOpen",
+        "params": {
+            "textDocument": {
+                "uri": tex_uri,
+                "languageId": "latex",
+                "version": 1,
+                "text": tex_text
+            }
+        }
+    });
+    send_msg(stdin, &did_open_tex).await?;
+
+    // 6. Verify "Undefined citation" diagnostic
+    let mut found_undef = false;
+    for _ in 0..10 {
+        let msg = timeout(Duration::from_secs(1), read_msg(&mut reader)).await??;
+        if msg["method"] == "textDocument/publishDiagnostics" {
+            let params = &msg["params"];
+            if params["uri"] == tex_uri {
+                let diags = params["diagnostics"].as_array().unwrap();
+                for d in diags {
+                    if let Some(m) = d["message"].as_str()
+                        && m.contains("Undefined citation: 'myKey'")
+                    {
+                        found_undef = true;
+                        break;
+                    }
+                }
+            }
+        }
+        if found_undef {
+            break;
+        }
+    }
+    assert!(found_undef, "Expected undefined citation diagnostic");
+
+    // 7. Open .bib file defining the key
+    let bib_uri = format!("file://{}/refs.bib", temp_path.display());
+    let bib_text = r"@article{myKey, title={A Title}}";
+    let did_open_bib = json!({
+        "jsonrpc": "2.0",
+        "method": "textDocument/didOpen",
+        "params": {
+            "textDocument": {
+                "uri": bib_uri,
+                "languageId": "bibtex",
+                "version": 1,
+                "text": bib_text
+            }
+        }
+    });
+    send_msg(stdin, &did_open_bib).await?;
+
+    // 8. Verify diagnostic clears (empty diagnostics list for tex file)
+    let mut cleared = false;
+    for _ in 0..10 {
+        // We expect a publishDiagnostics for main.tex with empty array
+        let msg = timeout(Duration::from_secs(1), read_msg(&mut reader)).await??;
+        if msg["method"] == "textDocument/publishDiagnostics" {
+            let params = &msg["params"];
+            if params["uri"] == tex_uri {
+                let diags = params["diagnostics"].as_array().unwrap();
+                if diags.is_empty() {
+                    cleared = true;
+                    break;
+                }
+            }
+        }
+    }
+    assert!(cleared, "Diagnostic did not clear after adding .bib");
+
+    // 9. Test Completion
+    // Request completion at \cite{|} (char 6)
+    let comp_req = json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "textDocument/completion",
+        "params": {
+            "textDocument": { "uri": tex_uri },
+            "position": { "line": 0, "character": 6 }
+        }
+    });
+    send_msg(stdin, &comp_req).await?;
+
+    let comp_res = loop {
+        let msg = read_msg(&mut reader).await?;
+        if let Some(id) = msg.get("id")
+            && id == 2
+        {
+            break msg;
+        }
+    };
+
+    let items = comp_res["result"].as_array().expect("Completion items");
+    let has_key = items.iter().any(|i| i["label"] == "myKey");
+    assert!(has_key, "Completion should contain 'myKey'");
 
     child.kill().await?;
     Ok(())

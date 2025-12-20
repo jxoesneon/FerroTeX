@@ -42,6 +42,11 @@ impl LanguageServer for Backend {
                 definition_provider: Some(OneOf::Left(true)),
                 references_provider: Some(OneOf::Left(true)),
                 rename_provider: Some(OneOf::Left(true)),
+                completion_provider: Some(CompletionOptions {
+                    resolve_provider: Some(false),
+                    trigger_characters: Some(vec!["{".to_string(), ",".to_string()]),
+                    ..Default::default()
+                }),
                 ..Default::default()
             },
             ..Default::default()
@@ -78,8 +83,14 @@ impl LanguageServer for Backend {
         let text = params.text_document.text;
 
         self.documents.insert(uri.clone(), text.clone());
-        self.workspace.update(&uri, &text);
-        self.validate_document(&uri, &text).await;
+        if uri.path().ends_with(".bib") {
+            self.workspace.update_bib(&uri, &text);
+            // Re-validate all diagnostics to clear "undefined citation" errors
+            self.publish_all_diagnostics().await;
+        } else {
+            self.workspace.update(&uri, &text);
+            self.validate_document(&uri, &text).await;
+        }
     }
 
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
@@ -89,8 +100,13 @@ impl LanguageServer for Backend {
             let text = change.text;
 
             self.documents.insert(uri.clone(), text.clone());
-            self.workspace.update(&uri, &text);
-            self.validate_document(&uri, &text).await;
+            if uri.path().ends_with(".bib") {
+                self.workspace.update_bib(&uri, &text);
+                self.publish_all_diagnostics().await;
+            } else {
+                self.workspace.update(&uri, &text);
+                self.validate_document(&uri, &text).await;
+            }
         }
     }
 
@@ -194,6 +210,7 @@ impl LanguageServer for Backend {
         }
     }
 
+    /// Finds references to the symbol at the given position.
     async fn references(&self, params: ReferenceParams) -> Result<Option<Vec<Location>>> {
         let uri = params.text_document_position.text_document.uri;
         let position = params.text_document_position.position;
@@ -233,6 +250,7 @@ impl LanguageServer for Backend {
         }
     }
 
+    /// Renames the symbol at the given position.
     async fn rename(&self, params: RenameParams) -> Result<Option<WorkspaceEdit>> {
         let uri = params.text_document_position.text_document.uri;
         let position = params.text_document_position.position;
@@ -281,9 +299,105 @@ impl LanguageServer for Backend {
             Ok(None)
         }
     }
+
+    /// Provides code completion suggestions.
+    ///
+    /// Currently supports:
+    /// - Citation keys inside `\cite{...}`
+    /// - Label names inside `\ref{...}`
+    async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
+        let uri = params.text_document_position.text_document.uri;
+        let position = params.text_document_position.position;
+
+        let text = if let Some(t) = self.get_text(&uri) {
+            t
+        } else {
+            return Ok(None);
+        };
+
+        let line_index = LineIndex::new(&text);
+        let offset = if let Some(o) = line_index.offset(line_index::LineCol {
+            line: position.line,
+            col: position.character,
+        }) {
+            ferrotex_syntax::TextSize::from(u32::from(o))
+        } else {
+            return Ok(None);
+        };
+
+        let parse = ferrotex_syntax::parse(&text);
+        let root = parse.syntax();
+
+        let token: ferrotex_syntax::SyntaxToken = match root.token_at_offset(offset) {
+            rowan::TokenAtOffset::None => {
+                return Ok(None);
+            }
+            rowan::TokenAtOffset::Single(t) => t,
+            rowan::TokenAtOffset::Between(l, _r) => l,
+        };
+
+        let parent: ferrotex_syntax::SyntaxNode = if let Some(p) = token.parent() {
+            p
+        } else {
+            return Ok(None);
+        };
+
+        let mut context_kind = None; // 1 = cite, 2 = ref
+
+        // Check if we are inside a Group that belongs to Citation or LabelReference
+        if parent.kind() == SyntaxKind::Group {
+            if let Some(grandparent) = parent.parent() {
+                match grandparent.kind() {
+                    SyntaxKind::Citation => context_kind = Some(1),
+                    SyntaxKind::LabelReference => context_kind = Some(2),
+                    _ => {}
+                }
+            }
+        }
+        // Also handle case where we are just typing "{" of the command
+        else if parent.kind() == SyntaxKind::Citation {
+            // Might be completing right after {
+            context_kind = Some(1);
+        } else if parent.kind() == SyntaxKind::LabelReference {
+            context_kind = Some(2);
+        }
+
+        match context_kind {
+            Some(1) => {
+                // Citation completion
+                let keys = self.workspace.get_all_citation_keys();
+                let items: Vec<CompletionItem> = keys
+                    .into_iter()
+                    .map(|key| CompletionItem {
+                        label: key,
+                        kind: Some(CompletionItemKind::REFERENCE),
+                        detail: Some("Citation".to_string()),
+                        ..Default::default()
+                    })
+                    .collect();
+                Ok(Some(CompletionResponse::Array(items)))
+            }
+            Some(2) => {
+                // Label completion
+                let labels = self.workspace.get_all_labels();
+                let items: Vec<CompletionItem> = labels
+                    .into_iter()
+                    .map(|label| CompletionItem {
+                        label,
+                        kind: Some(CompletionItemKind::REFERENCE),
+                        detail: Some("Label".to_string()),
+                        ..Default::default()
+                    })
+                    .collect();
+                Ok(Some(CompletionResponse::Array(items)))
+            }
+            _ => Ok(None),
+        }
+    }
 }
 
 impl Backend {
+    /// Validates a single document and updates its diagnostics.
     async fn validate_document(&self, uri: &Url, text: &str) {
         let parse = ferrotex_syntax::parse(text);
         let line_index = LineIndex::new(text);
@@ -323,6 +437,9 @@ impl Backend {
         self.publish_all_diagnostics().await;
     }
 
+    /// Refreshes diagnostics for all open documents.
+    ///
+    /// This includes syntax errors, cycle detection, duplicate labels, and undefined citations.
     async fn publish_all_diagnostics(&self) {
         publish_diagnostics_logic(
             &self.client,
@@ -333,6 +450,7 @@ impl Backend {
         .await;
     }
 
+    /// Helper to find the label name under the cursor.
     fn find_label_at_position(&self, text: &str, position: Position) -> Option<String> {
         let line_index = LineIndex::new(text);
         let offset = line_index.offset(line_index::LineCol {
@@ -361,6 +479,7 @@ impl Backend {
         None
     }
 
+    /// Converts a text range (syntax-level) to an LSP location.
     fn range_to_location(&self, uri: &Url, range: ferrotex_syntax::TextRange) -> Option<Location> {
         let text = self.get_text(uri)?;
         let line_index = LineIndex::new(&text);
@@ -382,7 +501,7 @@ impl Backend {
         })
     }
 
-    // Helper to get text for a URI (open or read from disk)
+    /// Helper to get text for a URI (open or read from disk)
     fn get_text(&self, uri: &Url) -> Option<String> {
         if let Some(text) = self.documents.get(uri) {
             Some(text.clone())
@@ -394,6 +513,7 @@ impl Backend {
     }
 }
 
+/// Core logic for aggregating and publishing diagnostics.
 async fn publish_diagnostics_logic(
     client: &Client,
     workspace: &Workspace,
@@ -403,6 +523,7 @@ async fn publish_diagnostics_logic(
     // 1. Collect all project-level diagnostics
     let cycles = workspace.detect_cycles();
     let label_errors = workspace.validate_labels();
+    let citation_errors = workspace.validate_citations();
 
     // Group by URI: Map<Url, Vec<(Range, Message, Source)>>
     let mut project_diags: std::collections::HashMap<
@@ -421,6 +542,12 @@ async fn publish_diagnostics_logic(
             .entry(uri)
             .or_default()
             .push((range, msg, "ferrotex-labels".into()));
+    }
+    for (uri, range, msg) in citation_errors {
+        project_diags
+            .entry(uri)
+            .or_default()
+            .push((range, msg, "ferrotex-citations".into()));
     }
 
     // 2. Prepare diagnostics for all OPEN documents
@@ -578,6 +705,12 @@ fn to_document_symbol(node: &SyntaxNode, line_index: &LineIndex) -> Option<Docum
     }
 }
 
+/// Watches the workspace for changes and updates the index.
+///
+/// This function:
+/// 1. Scans the workspace directory for existing `.tex` and `.bib` files.
+/// 2. Sets up a file watcher to react to `Create`, `Modify`, and `Remove` events.
+/// 3. Parses log files to provide real-time feedback (if a log file is tracked).
 async fn watch_workspace(
     client: Client,
     root_uri: Arc<Mutex<Option<Url>>>,
@@ -636,16 +769,23 @@ async fn watch_workspace(
                         stack.push(path);
                     }
                 } else if let Some(ext) = path.extension() {
-                    if ext == "tex" {
-                        if let Ok(uri) = Url::from_file_path(&path) {
-                            // Only index if not already open (though at startup, usually nothing is open yet)
-                            if !documents.contains_key(&uri) {
-                                if let Ok(text) = std::fs::read_to_string(&path) {
-                                    workspace.update(&uri, &text);
-                                    scan_count += 1;
-                                }
-                            }
+                    if ext == "tex"
+                        && let Ok(uri) = Url::from_file_path(&path)
+                    {
+                        // Only index if not already open (though at startup, usually nothing is open yet)
+                        if !documents.contains_key(&uri)
+                            && let Ok(text) = std::fs::read_to_string(&path)
+                        {
+                            workspace.update(&uri, &text);
+                            scan_count += 1;
                         }
+                    } else if ext == "bib"
+                        && let Ok(uri) = Url::from_file_path(&path)
+                        && !documents.contains_key(&uri)
+                        && let Ok(text) = std::fs::read_to_string(&path)
+                    {
+                        workspace.update_bib(&uri, &text);
+                        scan_count += 1;
                     }
                 }
             }
@@ -675,24 +815,54 @@ async fn watch_workspace(
                         match event.kind {
                             EventKind::Create(_) | EventKind::Modify(_) => {
                                 // If file is open in editor, ignore disk events (editor handles it)
-                                if !documents.contains_key(&uri) {
-                                    if let Ok(text) = tokio::fs::read_to_string(&path).await {
-                                        workspace.update(&uri, &text);
-                                        // Re-validate workspace
-                                        publish_diagnostics_logic(
-                                            &client,
-                                            &workspace,
-                                            &documents,
-                                            &syntax_diagnostics,
-                                        )
-                                        .await;
-                                    }
+                                if !documents.contains_key(&uri)
+                                    && let Ok(text) = tokio::fs::read_to_string(&path).await
+                                {
+                                    workspace.update(&uri, &text);
+                                    // Re-validate workspace
+                                    publish_diagnostics_logic(
+                                        &client,
+                                        &workspace,
+                                        &documents,
+                                        &syntax_diagnostics,
+                                    )
+                                    .await;
                                 }
                             }
                             EventKind::Remove(_) => {
                                 // Remove from workspace index
                                 workspace.remove(&uri);
                                 // Re-validate workspace
+                                publish_diagnostics_logic(
+                                    &client,
+                                    &workspace,
+                                    &documents,
+                                    &syntax_diagnostics,
+                                )
+                                .await;
+                            }
+                            _ => {}
+                        }
+                    }
+                } else if ext == "bib" {
+                    if let Ok(uri) = Url::from_file_path(&path) {
+                        match event.kind {
+                            EventKind::Create(_) | EventKind::Modify(_) => {
+                                if !documents.contains_key(&uri)
+                                    && let Ok(text) = tokio::fs::read_to_string(&path).await
+                                {
+                                    workspace.update_bib(&uri, &text);
+                                    publish_diagnostics_logic(
+                                        &client,
+                                        &workspace,
+                                        &documents,
+                                        &syntax_diagnostics,
+                                    )
+                                    .await;
+                                }
+                            }
+                            EventKind::Remove(_) => {
+                                workspace.remove(&uri);
                                 publish_diagnostics_logic(
                                     &client,
                                     &workspace,
@@ -717,65 +887,57 @@ async fn watch_workspace(
 
                         if tracked_log.as_ref() == Some(&path) {
                             // Read and parse
-                            if let Ok(mut file) = tokio::fs::File::open(&path).await {
-                                if let Ok(metadata) = file.metadata().await {
-                                    let current_len = metadata.len();
+                            if let Ok(mut file) = tokio::fs::File::open(&path).await
+                                && let Ok(metadata) = file.metadata().await
+                            {
+                                let current_len = metadata.len();
 
-                                    if current_len > file_offset {
-                                        use tokio::io::{AsyncReadExt, AsyncSeekExt};
-                                        if (file.seek(std::io::SeekFrom::Start(file_offset)).await)
-                                            .is_ok()
-                                        {
-                                            let mut buffer = String::new();
-                                            if (file.read_to_string(&mut buffer).await).is_ok() {
-                                                let events = parser.update(&buffer);
-                                                file_offset = current_len;
+                                if current_len > file_offset {
+                                    use tokio::io::{AsyncReadExt, AsyncSeekExt};
+                                    if (file.seek(std::io::SeekFrom::Start(file_offset)).await)
+                                        .is_ok()
+                                    {
+                                        let mut buffer = String::new();
+                                        if (file.read_to_string(&mut buffer).await).is_ok() {
+                                            let events = parser.update(&buffer);
+                                            file_offset = current_len;
 
-                                                let mut diagnostics = Vec::new();
+                                            let mut diagnostics = Vec::new();
 
-                                                for event in events {
-                                                    match event.payload {
-                                                        EventPayload::Warning { message } => {
-                                                            diagnostics.push(Diagnostic {
-                                                                range: Range::default(),
-                                                                severity: Some(
-                                                                    DiagnosticSeverity::WARNING,
-                                                                ),
-                                                                message,
-                                                                source: Some(
-                                                                    "ferrotexd".to_string(),
-                                                                ),
-                                                                ..Default::default()
-                                                            });
-                                                        }
-                                                        EventPayload::ErrorStart { message } => {
-                                                            diagnostics.push(Diagnostic {
-                                                                range: Range::default(),
-                                                                severity: Some(
-                                                                    DiagnosticSeverity::ERROR,
-                                                                ),
-                                                                message,
-                                                                source: Some(
-                                                                    "ferrotexd".to_string(),
-                                                                ),
-                                                                ..Default::default()
-                                                            });
-                                                        }
-                                                        _ => {}
+                                            for event in events {
+                                                match event.payload {
+                                                    EventPayload::Warning { message } => {
+                                                        diagnostics.push(Diagnostic {
+                                                            range: Range::default(),
+                                                            severity: Some(
+                                                                DiagnosticSeverity::WARNING,
+                                                            ),
+                                                            message,
+                                                            source: Some("ferrotexd".to_string()),
+                                                            ..Default::default()
+                                                        });
                                                     }
-                                                }
-
-                                                if !diagnostics.is_empty() {
-                                                    if let Ok(uri) = Url::from_file_path(&path) {
-                                                        client
-                                                            .publish_diagnostics(
-                                                                uri,
-                                                                diagnostics,
-                                                                None,
-                                                            )
-                                                            .await;
+                                                    EventPayload::ErrorStart { message } => {
+                                                        diagnostics.push(Diagnostic {
+                                                            range: Range::default(),
+                                                            severity: Some(
+                                                                DiagnosticSeverity::ERROR,
+                                                            ),
+                                                            message,
+                                                            source: Some("ferrotexd".to_string()),
+                                                            ..Default::default()
+                                                        });
                                                     }
+                                                    _ => {}
                                                 }
+                                            }
+
+                                            if !diagnostics.is_empty()
+                                                && let Ok(uri) = Url::from_file_path(&path)
+                                            {
+                                                client
+                                                    .publish_diagnostics(uri, diagnostics, None)
+                                                    .await;
                                             }
                                         }
                                     }

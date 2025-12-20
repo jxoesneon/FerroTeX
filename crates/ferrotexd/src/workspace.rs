@@ -1,60 +1,119 @@
 use dashmap::DashMap;
-use ferrotex_syntax::{parse, SyntaxKind, TextRange};
+use ferrotex_syntax::{SyntaxKind, TextRange, parse};
 use std::collections::{HashMap, HashSet};
 use tower_lsp::lsp_types::Url;
 
+/// The central workspace manager for the LSP server.
+///
+/// It maintains an in-memory index of all tracked TeX and BibTeX files.
 #[derive(Debug, Default)]
 pub struct Workspace {
-    /// Per-file index
+    /// Per-file index containing includes, definitions, citations, etc.
     indices: DashMap<Url, FileIndex>,
+    /// Bibliography index containing parsed BibTeX entries.
+    bib_indices: DashMap<Url, ferrotex_syntax::bibtex::BibFile>,
 }
 
+/// The index data for a single TeX file.
 #[derive(Debug, Default, Clone)]
+#[allow(dead_code)]
 pub struct FileIndex {
+    /// List of included files (e.g., `\input{...}`).
     pub includes: Vec<IncludeRef>,
+    /// List of label definitions (e.g., `\label{...}`).
     pub definitions: Vec<LabelDef>,
+    /// List of label references (e.g., `\ref{...}`).
     pub references: Vec<LabelRef>,
+    /// List of citations (e.g., `\cite{...}`).
+    pub citations: Vec<CitationRef>,
+    /// List of bibliography references (e.g., `\bibliography{...}`).
+    pub bibliographies: Vec<BibRef>,
 }
 
+/// Represents an included file reference.
 #[derive(Debug, Clone)]
 pub struct IncludeRef {
+    /// The path to the included file (as written in the source).
     pub path: String,
+    /// The range of the path string in the source file.
     pub range: TextRange,
 }
 
+/// Represents a label definition.
 #[derive(Debug, Clone)]
 pub struct LabelDef {
+    /// The label name.
     pub name: String,
+    /// The range of the label name in the source file.
     pub range: TextRange,
 }
 
+/// Represents a reference to a label.
 #[derive(Debug, Clone)]
 pub struct LabelRef {
+    /// The referenced label name.
     pub name: String,
+    /// The range of the reference name in the source file.
+    pub range: TextRange,
+}
+
+/// Represents a citation.
+#[derive(Debug, Clone)]
+pub struct CitationRef {
+    /// The citation key.
+    pub key: String,
+    /// The range of the citation key in the source file.
+    pub range: TextRange,
+}
+
+/// Represents a bibliography file reference.
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub struct BibRef {
+    /// The path to the bibliography file.
+    pub path: String,
+    /// The range of the path string in the source file.
     pub range: TextRange,
 }
 
 impl Workspace {
+    /// Creates a new, empty workspace.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Updates the index for a given TeX file.
+    ///
+    /// Parses the file content and extracts includes, labels, citations, etc.
     pub fn update(&self, uri: &Url, text: &str) {
-        let (includes, definitions, references) = scan_file(text);
+        let (includes, definitions, references, citations, bibliographies) = scan_file(text);
         self.indices.insert(
             uri.clone(),
             FileIndex {
                 includes,
                 definitions,
                 references,
+                citations,
+                bibliographies,
             },
         );
     }
 
-    pub fn remove(&self, uri: &Url) {
-        self.indices.remove(uri);
+    /// Updates the index for a given BibTeX file.
+    ///
+    /// Parses the BibTeX content and extracts entries.
+    pub fn update_bib(&self, uri: &Url, text: &str) {
+        let bib_file = ferrotex_syntax::bibtex::parse_bibtex(text);
+        self.bib_indices.insert(uri.clone(), bib_file);
     }
 
+    /// Removes a file from the workspace index.
+    pub fn remove(&self, uri: &Url) {
+        self.indices.remove(uri);
+        self.bib_indices.remove(uri);
+    }
+
+    /// Retrieves the list of included files for a given document URI.
     pub fn get_includes(&self, uri: &Url) -> Vec<IncludeRef> {
         self.indices
             .get(uri)
@@ -62,8 +121,54 @@ impl Workspace {
             .unwrap_or_default()
     }
 
+    /// Retrieves the list of bibliography references for a given document URI.
+    #[allow(dead_code)]
+    pub fn get_bibliographies(&self, uri: &Url) -> Vec<BibRef> {
+        self.indices
+            .get(uri)
+            .map(|v| v.bibliographies.clone())
+            .unwrap_or_default()
+    }
+
     // --- Index Queries ---
 
+    /// Returns all citation keys defined in all indexed BibTeX files.
+    pub fn get_all_citation_keys(&self) -> Vec<String> {
+        let mut keys = Vec::new();
+        for entry in self.bib_indices.iter() {
+            for bib_entry in &entry.value().entries {
+                keys.push(bib_entry.key.clone());
+            }
+        }
+        keys
+    }
+
+    /// Returns all label names defined in all indexed TeX files.
+    pub fn get_all_labels(&self) -> Vec<String> {
+        let mut labels = HashSet::new();
+        for entry in self.indices.iter() {
+            for def in &entry.value().definitions {
+                labels.insert(def.name.clone());
+            }
+        }
+        labels.into_iter().collect()
+    }
+
+    /// Checks if a citation key exists in the workspace.
+    pub fn has_citation_key(&self, key: &str) -> bool {
+        for entry in self.bib_indices.iter() {
+            for bib_entry in &entry.value().entries {
+                if bib_entry.key == key {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    /// Finds all definitions of a label by name.
+    ///
+    /// Returns a list of (File URI, Range) pairs.
     pub fn find_definitions(&self, name: &str) -> Vec<(Url, TextRange)> {
         let mut results = Vec::new();
         for entry in self.indices.iter() {
@@ -76,6 +181,9 @@ impl Workspace {
         results
     }
 
+    /// Finds all references to a label by name.
+    ///
+    /// Returns a list of (File URI, Range) pairs.
     pub fn find_references(&self, name: &str) -> Vec<(Url, TextRange)> {
         let mut results = Vec::new();
         for entry in self.indices.iter() {
@@ -90,6 +198,31 @@ impl Workspace {
 
     // --- Diagnostics ---
 
+    /// Validates citations across the workspace.
+    ///
+    /// Returns a list of diagnostics for undefined citations.
+    pub fn validate_citations(&self) -> Vec<(Url, TextRange, String)> {
+        let mut diagnostics = Vec::new();
+
+        // Check for undefined citations
+        for entry in self.indices.iter() {
+            for cite in &entry.value().citations {
+                if !self.has_citation_key(&cite.key) {
+                    diagnostics.push((
+                        entry.key().clone(),
+                        cite.range,
+                        format!("Undefined citation: '{}'", cite.key),
+                    ));
+                }
+            }
+        }
+
+        diagnostics
+    }
+
+    /// Validates labels across the workspace.
+    ///
+    /// Checks for duplicate label definitions and undefined references.
     pub fn validate_labels(&self) -> Vec<(Url, TextRange, String)> {
         let mut diagnostics = Vec::new();
 
@@ -133,6 +266,9 @@ impl Workspace {
         diagnostics
     }
 
+    /// Detects inclusion cycles in the workspace.
+    ///
+    /// Performs a DFS on the inclusion graph to find cycles.
     pub fn detect_cycles(&self) -> Vec<(Url, TextRange, String)> {
         let mut cycles = Vec::new();
         // Snapshot of the graph to avoid locking issues during traversal
@@ -206,12 +342,22 @@ impl Workspace {
     }
 }
 
-fn scan_file(text: &str) -> (Vec<IncludeRef>, Vec<LabelDef>, Vec<LabelRef>) {
+type ScanResult = (
+    Vec<IncludeRef>,
+    Vec<LabelDef>,
+    Vec<LabelRef>,
+    Vec<CitationRef>,
+    Vec<BibRef>,
+);
+
+fn scan_file(text: &str) -> ScanResult {
     let parse = parse(text);
     let root = parse.syntax();
     let mut includes = Vec::new();
     let mut defs = Vec::new();
     let mut refs = Vec::new();
+    let mut citations = Vec::new();
+    let mut bibs = Vec::new();
 
     for node in root.descendants() {
         match node.kind() {
@@ -239,10 +385,38 @@ fn scan_file(text: &str) -> (Vec<IncludeRef>, Vec<LabelDef>, Vec<LabelRef>) {
                     });
                 }
             }
+            SyntaxKind::Citation => {
+                if let Some((keys, range)) = extract_label_data(&node) {
+                    // Split keys by comma
+                    for key in keys.split(',') {
+                        let trimmed = key.trim();
+                        if !trimmed.is_empty() {
+                            citations.push(CitationRef {
+                                key: trimmed.to_string(),
+                                range, // Note: This uses the full range for now, we might want sub-ranges later
+                            });
+                        }
+                    }
+                }
+            }
+            SyntaxKind::Bibliography => {
+                if let Some((paths, range)) = extract_label_data(&node) {
+                    // Split paths by comma (usually bibliography takes comma-separated list)
+                    for path in paths.split(',') {
+                        let trimmed = path.trim();
+                        if !trimmed.is_empty() {
+                            bibs.push(BibRef {
+                                path: trimmed.to_string(),
+                                range,
+                            });
+                        }
+                    }
+                }
+            }
             _ => {}
         }
     }
-    (includes, defs, refs)
+    (includes, defs, refs, citations, bibs)
 }
 
 pub fn extract_group_text(node: &ferrotex_syntax::SyntaxNode) -> Option<String> {

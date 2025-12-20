@@ -1,13 +1,20 @@
-use crate::{lexer::Lexer, SyntaxKind, SyntaxNode};
+use crate::{SyntaxKind, SyntaxNode, lexer::Lexer};
 use rowan::{GreenNode, GreenNodeBuilder, TextRange, TextSize};
 use std::iter::Peekable;
 
+/// Represents an error encountered during parsing.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct SyntaxError {
+    /// The error message.
     pub message: String,
+    /// The range in the source text where the error occurred.
     pub range: TextRange,
 }
 
+/// The FerroTeX parser.
+///
+/// It takes a string input and produces a GreenNode (untyped syntax tree) and a list of errors.
+/// It uses a recursive descent approach.
 pub struct Parser<'a> {
     lexer: Peekable<Lexer<'a>>,
     builder: GreenNodeBuilder<'static>,
@@ -16,6 +23,7 @@ pub struct Parser<'a> {
 }
 
 impl<'a> Parser<'a> {
+    /// Creates a new `Parser` for the given input string.
     pub fn new(input: &'a str) -> Self {
         Self {
             lexer: Lexer::new(input).peekable(),
@@ -25,6 +33,7 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// Parses the input and returns the result.
     pub fn parse(mut self) -> ParseResult {
         self.builder.start_node(SyntaxKind::Root.into());
         while self.peek() != SyntaxKind::Eof {
@@ -97,18 +106,15 @@ impl<'a> Parser<'a> {
 
     fn parse_command_or_environment(&mut self) {
         let cmd_type = if let Some((SyntaxKind::Command, text)) = self.lexer.peek() {
-            if *text == "\\begin" {
-                1 // Begin
-            } else if *text == "\\section" {
-                2 // Section
-            } else if *text == "\\input" || *text == "\\include" {
-                3 // Include
-            } else if *text == "\\label" {
-                4 // Label
-            } else if *text == "\\ref" {
-                5 // Ref
-            } else {
-                0 // Other
+            match *text {
+                "\\begin" => 1,
+                "\\section" => 2,
+                "\\input" | "\\include" => 3,
+                "\\label" => 4,
+                "\\ref" => 5,
+                "\\cite" => 6,
+                "\\bibliography" | "\\addbibresource" => 7,
+                _ => 0,
             }
         } else {
             0
@@ -120,8 +126,53 @@ impl<'a> Parser<'a> {
             3 => self.parse_include(),
             4 => self.parse_label(),
             5 => self.parse_ref(),
+            6 => self.parse_citation(),
+            7 => self.parse_bibliography(),
             _ => self.bump(),
         }
+    }
+
+    fn parse_citation(&mut self) {
+        self.builder.start_node(SyntaxKind::Citation.into());
+        self.bump(); // Consume \cite
+
+        // Optional argument [ ... ]
+        if self.peek() == SyntaxKind::LBracket {
+            self.builder.token(SyntaxKind::LBracket.into(), "[");
+            self.bump(); // consume [
+            while self.peek() != SyntaxKind::Eof && self.peek() != SyntaxKind::RBracket {
+                self.parse_element();
+            }
+            if self.peek() == SyntaxKind::RBracket {
+                self.builder.token(SyntaxKind::RBracket.into(), "]");
+                self.bump(); // consume ]
+            } else {
+                self.error("Expected ']'".into());
+            }
+        }
+
+        // Expect {keys}
+        if self.peek() == SyntaxKind::LBrace {
+            self.parse_group();
+        } else {
+            self.error("Expected '{' after \\cite".into());
+        }
+
+        self.builder.finish_node();
+    }
+
+    fn parse_bibliography(&mut self) {
+        self.builder.start_node(SyntaxKind::Bibliography.into());
+        self.bump(); // Consume command
+
+        // Expect {path}
+        if self.peek() == SyntaxKind::LBrace {
+            self.parse_group();
+        } else {
+            self.error("Expected '{' after bibliography command".into());
+        }
+
+        self.builder.finish_node();
     }
 
     fn parse_label(&mut self) {
@@ -338,5 +389,27 @@ mod tests {
         assert_eq!(children.len(), 3);
         assert_eq!(children[1].kind(), SyntaxKind::LabelDefinition);
         assert_eq!(children[2].kind(), SyntaxKind::LabelReference);
+    }
+
+    #[test]
+    fn test_citation() {
+        let input = r"\cite{key1,key2} \cite[p. 23]{key3}";
+        let parse = parse(input);
+        let node = parse.syntax();
+        let children: Vec<_> = node.children().collect();
+        assert_eq!(children.len(), 2);
+        assert_eq!(children[0].kind(), SyntaxKind::Citation);
+        assert_eq!(children[1].kind(), SyntaxKind::Citation);
+    }
+
+    #[test]
+    fn test_bibliography() {
+        let input = r"\bibliography{refs} \addbibresource{refs.bib}";
+        let parse = parse(input);
+        let node = parse.syntax();
+        let children: Vec<_> = node.children().collect();
+        assert_eq!(children.len(), 2);
+        assert_eq!(children[0].kind(), SyntaxKind::Bibliography);
+        assert_eq!(children[1].kind(), SyntaxKind::Bibliography);
     }
 }
