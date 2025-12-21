@@ -6,6 +6,29 @@ The format is based on **Keep a Changelog**, and this project intends to follow 
 
 ## [Unreleased]
 
+## [0.13.0] - 2025-12-20
+
+### Added
+
+- **Integrated Environment**:
+  - **PDF Viewer**: Built-in PDF previewer (`ferrotex.pdfPreview`) with:
+    - Zoom controls and Toolbar.
+    - SyncTeX inverse search (Ctrl+Click).
+  - **SyncTeX Forward Search**: New `ferrotex.syncToPdf` command navigates from code to PDF.
+  - **Math Hover**: Preview math equations and inline math rendered via Markdown/MathJax.
+- **Smart Diagnostics**:
+  - **Missing Package Detection**: Auto-detects `! LaTeX Error: File 'foo.sty' not found` and prompts for installation using `tlmgr`.
+
+## [0.12.0] - 2025-12-20
+
+### Added
+
+- **UX Polish (Delighters)**:
+  - **Status Bar Integration**: Visual feedback ("Building...") via `$/progress` notifications during compilation.
+  - **Notifications**: Toast notifications for build success/failure (`window/showMessage`) with clear outcomes.
+  - **Magic Comments**: Support for `%!TEX root = ...` to transparently redirect builds from sub-files to the main document.
+  - **Image Paste Wizard**: Pasting an image into the editor prompts for a filename, saves it, and inserts `\includegraphics{...}`.
+
 ## [0.11.0] - 2025-12-20
 
 ### Added
