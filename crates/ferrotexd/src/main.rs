@@ -1,7 +1,8 @@
 mod build;
+mod completer;
 mod fmt;
-mod workspace;
 mod hover;
+mod workspace;
 
 mod synctex;
 
@@ -472,7 +473,7 @@ impl LanguageServer for Backend {
                 Ok(Some(CompletionResponse::Array(items)))
             }
             CompletionKind::Environment => {
-                let items: Vec<CompletionItem> = ENVIRONMENTS
+                let mut items: Vec<CompletionItem> = ENVIRONMENTS
                     .iter()
                     .map(|&env| CompletionItem {
                         label: env.to_string(),
@@ -481,10 +482,16 @@ impl LanguageServer for Backend {
                         ..Default::default()
                     })
                     .collect();
+
+                // Dynamic Package Completions (CS-3)
+                let packages = self.workspace.get_packages(&uri);
+                let (_, dyn_envs) = completer::get_package_completions(&packages);
+                items.extend(dyn_envs);
+
                 Ok(Some(CompletionResponse::Array(items)))
             }
             CompletionKind::Command => {
-                let items: Vec<CompletionItem> = COMMANDS
+                let mut items: Vec<CompletionItem> = COMMANDS
                     .iter()
                     .map(|&cmd| CompletionItem {
                         label: format!("\\{}", cmd),
@@ -493,6 +500,12 @@ impl LanguageServer for Backend {
                         ..Default::default()
                     })
                     .collect();
+
+                // Dynamic Package Completions (CS-3)
+                let packages = self.workspace.get_packages(&uri);
+                let (dyn_cmds, _) = completer::get_package_completions(&packages);
+                items.extend(dyn_cmds);
+
                 Ok(Some(CompletionResponse::Array(items)))
             }
             CompletionKind::File => {
@@ -631,6 +644,7 @@ impl LanguageServer for Backend {
              let col = args[2].as_u64().unwrap_or(0) as u32;
              let pdf_uri_str = args[3].as_str().unwrap_or_default();
              
+             #[allow(clippy::collapsible_if)]
              if let Ok(tex_url) = Url::parse(tex_uri_str) {
                  if let Ok(pdf_url) = Url::parse(pdf_uri_str) {
                      if let (Ok(tex_path), Ok(pdf_path)) = (tex_url.to_file_path(), pdf_url.to_file_path()) {
@@ -650,6 +664,7 @@ impl LanguageServer for Backend {
              let x = args[2].as_f64().unwrap_or(0.0);
              let y = args[3].as_f64().unwrap_or(0.0);
              
+             #[allow(clippy::collapsible_if)]
              if let Ok(pdf_url) = Url::parse(pdf_uri_str) {
                  if let Ok(pdf_path) = pdf_url.to_file_path() {
                      if let Some(res) = synctex::inverse_search(&pdf_path, page, x, y) {
@@ -718,25 +733,25 @@ impl LanguageServer for Backend {
             // ---------------------------------
 
             // --- Magic Comment Detection (UX-2) ---
+            // --- Magic Comment Detection (UX-2) --
+            // Refactored to use Workspace Index (v0.15.0)
             let mut build_uri = uri.clone();
-            if let Some(text) = self.get_text(&uri) {
-                if let Some(magic_path) = detect_magic_root(&text) {
-                    if let Ok(file_path) = uri.to_file_path() {
-                        if let Some(parent) = file_path.parent() {
-                            let new_path = parent.join(&magic_path);
-                            // Normalize if possible, but for now strict join
-                            if let Ok(new_uri) = Url::from_file_path(&new_path) {
-                                self.client
-                                    .log_message(
-                                        MessageType::INFO,
-                                        format!(
-                                            "Magic Root detected: Redirecting build to {}",
-                                            new_uri
-                                        ),
-                                    )
-                                    .await;
-                                build_uri = new_uri;
-                            }
+            #[allow(clippy::collapsible_if)]
+            if let Some(magic_path) = self.workspace.get_explicit_root(&uri) {
+                if let Ok(file_path) = uri.to_file_path() {
+                     if let Some(parent) = file_path.parent() {
+                        let new_path = parent.join(&magic_path);
+                        if let Ok(new_uri) = Url::from_file_path(&new_path) {
+                            self.client
+                                .log_message(
+                                    MessageType::INFO,
+                                    format!(
+                                        "Magic Root detected (Index): Redirecting build to {}",
+                                        new_uri
+                                    ),
+                                )
+                                .await;
+                            build_uri = new_uri;
                         }
                     }
                 }
@@ -790,6 +805,7 @@ impl LanguageServer for Backend {
                                 Some(vec![MessageActionItem { title: format!("Install {}", pkg), properties: Default::default() }])
                             ).await;
                             
+                            #[allow(clippy::collapsible_if)]
                             if let Ok(Some(item)) = action {
                                 if item.title.starts_with("Install") {
                                     self.client.show_message(MessageType::INFO, "Installing package... Check logs.").await;
@@ -1598,85 +1614,6 @@ async fn watch_workspace(
 }
 
 /// Scans the first 5 lines of the document for a magic comment like `%!TEX root = ...`.
-///
-/// Returns the path relative to the current file if found.
-#[allow(dead_code)]
-fn detect_magic_root(text: &str) -> Option<std::path::PathBuf> {
-    for line in text.lines().take(5) {
-        let line = line.trim_start();
-        if line.starts_with('%') {
-            // Strip %
-            let content = line[1..].trim_start();
-            // Check for !TEX root or ! TeX root
-            if content.starts_with('!') {
-                let content = content[1..].trim_start();
-                if content.to_ascii_lowercase().starts_with("tex root") {
-                    // Extract value after =
-                    if let Some(eq_idx) = content.find('=') {
-                        let path_str = content[eq_idx + 1..].trim();
-                        if !path_str.is_empty() {
-                            return Some(std::path::PathBuf::from(path_str));
-                        }
-                    }
-                }
-            }
-        }
-    }
-    None
-}
-
-#[tokio::main]
-async fn main() {
-    let stdin = tokio::io::stdin();
-    let stdout = tokio::io::stdout();
-
-    let (service, socket) = LspService::new(|client| Backend {
-        client,
-        documents: Arc::new(DashMap::new()),
-        workspace: Arc::new(Workspace::new()),
-        root_uri: Arc::new(Mutex::new(None)),
-        syntax_diagnostics: Arc::new(DashMap::new()),
-    });
-    Server::new(stdin, stdout, socket).serve(service).await;
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_magic_root_detection() {
-        let cases = vec![
-            ("%!TEX root = ../main.tex", Some("../main.tex")),
-            ("% !TeX root=  main.tex", Some("main.tex")),
-            ("%!TEX root=subdir/main.tex", Some("subdir/main.tex")),
-            ("% Regular comment", None),
-            ("No comment at all", None),
-        ];
-
-        for (input, expected) in cases {
-            assert_eq!(
-                detect_magic_root(input).map(|p| p.to_string_lossy().to_string()),
-                expected.map(|s| s.to_string())
-            );
-        }
-    }
-
-    #[test]
-    fn test_magic_root_limit() {
-        // Line 1-5 (first 5 lines) are safe. Line 6 is ignored.
-        // lines() iterator: 1, 2, 3, 4, 5. So text with 5 leading newlines means the magic comment is on 6th line.
-        let text = "\n\n\n\n\n%!TEX root = hidden.tex";
-        assert_eq!(detect_magic_root(text), None);
-
-        let valid_text = "\n\n\n\n%!TEX root = visible.tex"; // On 5th line
-        assert_eq!(
-            detect_magic_root(valid_text).map(|p| p.to_string_lossy().to_string()),
-            Some("visible.tex".to_string())
-        );
-    }
-}
-
 /// Analyzes the build log to identify a missing LaTeX package.
 ///
 /// Looks for the standard `! LaTeX Error: File 'foo.sty' not found.` pattern.
@@ -1724,4 +1661,24 @@ async fn install_package(client: &Client, package: &str) -> bool {
          client.log_message(MessageType::ERROR, format!("tlmgr failed: {}", stderr)).await;
          false
     }
+}
+
+#[tokio::main]
+async fn main() {
+    let stdin = tokio::io::stdin();
+    let stdout = tokio::io::stdout();
+
+    let (service, socket) = LspService::new(|client| Backend {
+        client,
+        documents: Arc::new(DashMap::new()),
+        workspace: Arc::new(Workspace::new()),
+        root_uri: Arc::new(Mutex::new(None)),
+        syntax_diagnostics: Arc::new(DashMap::new()),
+    });
+    Server::new(stdin, stdout, socket).serve(service).await;
+}
+
+#[cfg(test)]
+mod tests {
+    // use super::*; // Unused
 }
