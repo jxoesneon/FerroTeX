@@ -28,7 +28,7 @@ jobs:
         run: npm ci
 
       - name: Lint Extension
-        run: npm run lint
+        run: npm run lint:yaml && npm run lint:md && npm run lint:prettier
 
       # Safeguard: Test Rust Codebase
       - name: Setup Rust
