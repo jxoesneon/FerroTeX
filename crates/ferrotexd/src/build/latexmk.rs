@@ -4,6 +4,9 @@ use async_trait::async_trait;
 use std::process::Stdio;
 use tokio::process::Command;
 
+/// Implementation of `BuildEngine` using the `latexmk` command-line tool.
+///
+/// Handles spawning `latexmk` with appropriate flags for PDF generation and interaction modes.
 pub struct LatexmkAdapter;
 
 #[async_trait]

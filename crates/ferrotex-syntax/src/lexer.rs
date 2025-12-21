@@ -64,6 +64,10 @@ impl<'a> Lexer<'a> {
                 self.position += c.len_utf8();
                 SyntaxKind::RBracket
             }
+            '$' => {
+                self.position += c.len_utf8();
+                SyntaxKind::Dollar
+            }
             '%' => {
                 // Comment
                 self.position += c.len_utf8();
@@ -91,7 +95,7 @@ impl<'a> Lexer<'a> {
                 self.position += c.len_utf8();
                 while let Some(n) = self.input[self.position..].chars().next() {
                     match n {
-                        '\\' | '{' | '}' | '[' | ']' | '%' => break,
+                        '\\' | '{' | '}' | '[' | ']' | '%' | '$' => break,
                         c if c.is_whitespace() => break,
                         _ => self.position += n.len_utf8(),
                     }

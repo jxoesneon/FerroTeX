@@ -28,6 +28,8 @@ pub enum SyntaxKind {
     RBracket,
     /// A LaTeX command starting with `\` (e.g., `\section`, `\item`, `\%`)
     Command, // \section, \item
+    /// Dollar sign `$` for inline math
+    Dollar, // $
     /// Whitespace characters
     Whitespace,
     /// Comment starting with `%`

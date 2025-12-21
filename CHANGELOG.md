@@ -6,6 +6,19 @@ The format is based on **Keep a Changelog**, and this project intends to follow 
 
 ## [Unreleased]
 
+## [0.13.0] - 2025-12-20
+
+### Added
+
+- **Integrated Environment**:
+  - **PDF Viewer**: Built-in PDF previewer (`ferrotex.pdfPreview`) with:
+    - Zoom controls and Toolbar.
+    - SyncTeX inverse search (Ctrl+Click).
+  - **SyncTeX Forward Search**: New `ferrotex.syncToPdf` command navigates from code to PDF.
+  - **Math Hover**: Preview math equations and inline math rendered via Markdown/MathJax.
+- **Smart Diagnostics**:
+  - **Missing Package Detection**: Auto-detects `! LaTeX Error: File 'foo.sty' not found` and prompts for installation using `tlmgr`.
+
 ## [0.12.0] - 2025-12-20
 
 ### Added

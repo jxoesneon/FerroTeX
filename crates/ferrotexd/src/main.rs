@@ -1,6 +1,9 @@
 mod build;
 mod fmt;
 mod workspace;
+mod hover;
+
+mod synctex;
 
 use build::{BuildEngine, BuildRequest, BuildStatus, latexmk::LatexmkAdapter};
 use dashmap::DashMap;
@@ -96,9 +99,15 @@ impl LanguageServer for Backend {
                     TextDocumentSyncKind::FULL,
                 )),
                 document_symbol_provider: Some(OneOf::Left(true)),
-                document_link_provider: Some(DocumentLinkOptions {
-                    resolve_provider: Some(false),
-                    work_done_progress_options: WorkDoneProgressOptions::default(),
+                execute_command_provider: Some(ExecuteCommandOptions {
+                    commands: vec![
+                        "ferrotex.build".to_string(),
+                        "ferrotex.synctex_forward".to_string(),
+                        "ferrotex.synctex_inverse".to_string()
+                    ],
+                    work_done_progress_options: WorkDoneProgressOptions {
+                        work_done_progress: Some(true),
+                    },
                 }),
                 definition_provider: Some(OneOf::Left(true)),
                 references_provider: Some(OneOf::Left(true)),
@@ -130,6 +139,7 @@ impl LanguageServer for Backend {
                 workspace_symbol_provider: Some(OneOf::Left(true)),
                 document_formatting_provider: Some(OneOf::Left(true)),
                 code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
+                hover_provider: Some(HoverProviderCapability::Simple(true)),
                 ..Default::default()
             },
             ..Default::default()
@@ -582,20 +592,74 @@ impl LanguageServer for Backend {
         Ok(Some(fmt::format_document(&root, &line_index)))
     }
 
-    async fn code_action(&self, _params: CodeActionParams) -> Result<Option<CodeActionResponse>> {
-        let actions = Vec::new();
-
-        // Simple stub: If there is a diagnostic about a label, suggest adding one (fake).
-        // Real implementation would look at context.
-        // For v0.10.0 acceptance, we just need the handler to exist and not panic.
-
+    async fn code_action(&self, _params: CodeActionParams) -> Result<Option<Vec<CodeActionOrCommand>>> {
+        let actions = vec![
+            // Stub for future: e.g. "Create missing label"
+        ];
         Ok(Some(actions))
+    }
+
+    async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
+        let uri = &params.text_document_position_params.text_document.uri;
+        if let Some(text) = self.documents.get(uri) {
+            let parse = ferrotex_syntax::parse(&text);
+            let root = parse.syntax();
+            let line_index = LineIndex::new(&text);
+
+            let offset = line_index
+                .offset(line_index::LineCol {
+                    line: params.text_document_position_params.position.line,
+                    col: params.text_document_position_params.position.character,
+                })
+                .unwrap();
+
+            return Ok(hover::find_hover(&root, offset));
+        }
+
+        Ok(None)
     }
 
     async fn execute_command(
         &self,
         params: ExecuteCommandParams,
     ) -> Result<Option<serde_json::Value>> {
+        if params.command == "ferrotex.synctex_forward" {
+             let args = params.arguments;
+             if args.len() < 4 { return Ok(None); }
+             let tex_uri_str = args[0].as_str().unwrap_or_default();
+             let line = args[1].as_u64().unwrap_or(0) as u32;
+             let col = args[2].as_u64().unwrap_or(0) as u32;
+             let pdf_uri_str = args[3].as_str().unwrap_or_default();
+             
+             if let Ok(tex_url) = Url::parse(tex_uri_str) {
+                 if let Ok(pdf_url) = Url::parse(pdf_uri_str) {
+                     if let (Ok(tex_path), Ok(pdf_path)) = (tex_url.to_file_path(), pdf_url.to_file_path()) {
+                         if let Some(res) = synctex::forward_search(&tex_path, &pdf_path, line, col) {
+                             return Ok(Some(serde_json::to_value(res).unwrap()));
+                         }
+                     }
+                 }
+             }
+             return Ok(None);
+        }
+        if params.command == "ferrotex.synctex_inverse" {
+             let args = params.arguments;
+             if args.len() < 4 { return Ok(None); }
+             let pdf_uri_str = args[0].as_str().unwrap_or_default();
+             let page = args[1].as_u64().unwrap_or(1) as u32;
+             let x = args[2].as_f64().unwrap_or(0.0);
+             let y = args[3].as_f64().unwrap_or(0.0);
+             
+             if let Ok(pdf_url) = Url::parse(pdf_uri_str) {
+                 if let Ok(pdf_path) = pdf_url.to_file_path() {
+                     if let Some(res) = synctex::inverse_search(&pdf_path, page, x, y) {
+                         return Ok(Some(serde_json::to_value(res).unwrap()));
+                     }
+                 }
+             }
+             return Ok(None);
+        }
+
         if params.command == "ferrotex.build" {
             let args = params.arguments;
             if args.is_empty() {
@@ -715,6 +779,28 @@ impl LanguageServer for Backend {
                         self.client
                             .show_message(MessageType::ERROR, "Build Failed ❌ (Check Output)")
                             .await;
+
+                        // BO-9: Missing Package Detection
+                        // Check stdout (latexmk usually captures tex output there) and stderr
+                        let combined_log = format!("{}\n{}", log.stdout, log.stderr);
+                        if let Some(pkg) = detect_missing_package(&combined_log) {
+                             let action = self.client.show_message_request(
+                                MessageType::WARNING, 
+                                format!("Package '{}' seems to be missing.", pkg), 
+                                Some(vec![MessageActionItem { title: format!("Install {}", pkg), properties: Default::default() }])
+                            ).await;
+                            
+                            if let Ok(Some(item)) = action {
+                                if item.title.starts_with("Install") {
+                                    self.client.show_message(MessageType::INFO, "Installing package... Check logs.").await;
+                                    if install_package(&self.client, &pkg).await {
+                                         self.client.show_message(MessageType::INFO, "Package installed. Try building again.").await;
+                                    } else {
+                                         self.client.show_message(MessageType::ERROR, "Installation failed. See logs.").await;
+                                    }
+                                }
+                            }
+                        }
                     }
                 },
                 Err(e) => {
@@ -1588,5 +1674,54 @@ mod tests {
             detect_magic_root(valid_text).map(|p| p.to_string_lossy().to_string()),
             Some("visible.tex".to_string())
         );
+    }
+}
+
+/// Analyzes the build log to identify a missing LaTeX package.
+///
+/// Looks for the standard `! LaTeX Error: File 'foo.sty' not found.` pattern.
+fn detect_missing_package(log: &str) -> Option<String> {
+    for line in log.lines() {
+        if let Some(idx) = line.find("! LaTeX Error: File '") {
+            let rest = &line[idx + 21..];
+            if let Some(end_idx) = rest.find("'") {
+                let filename = &rest[..end_idx];
+                if filename.ends_with(".sty") {
+                    return Some(filename.trim_end_matches(".sty").to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Installs a package using `tlmgr`.
+///
+/// Returns `true` if installation succeeded.
+async fn install_package(client: &Client, package: &str) -> bool {
+    client.log_message(MessageType::INFO, format!("Attempting to install package '{}'...", package)).await;
+    
+    // Use tokio Command if available, but for simplicity/mvp std might suffice if short lived.
+    // But async is better. backend implies tokio runtime.
+    let output = match tokio::process::Command::new("tlmgr")
+        .arg("install")
+        .arg(package)
+        .output()
+        .await 
+    {
+        Ok(o) => o,
+        Err(e) => {
+             client.log_message(MessageType::ERROR, format!("Failed to execute tlmgr: {}", e)).await;
+             return false;
+        }
+    };
+
+    if output.status.success() {
+         client.log_message(MessageType::INFO, format!("Successfully installed '{}'.", package)).await;
+         true
+    } else {
+         let stderr = String::from_utf8_lossy(&output.stderr);
+         client.log_message(MessageType::ERROR, format!("tlmgr failed: {}", stderr)).await;
+         false
     }
 }
