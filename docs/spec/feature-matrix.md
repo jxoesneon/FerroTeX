@@ -18,7 +18,8 @@ The roadmap MUST account for every item listed here.
 - **LP-1**: Fault-tolerant LaTeX lexer
 - **LP-2**: Fault-tolerant CST for incomplete documents
 - **LP-3**: Incremental reparse for `didChange`
-- **LP-4**: Basic environment/group structure recovery
+- [ ] LP-4: Basic environment/group structure recovery
+- [ ] LP-5: Deep math semantics (matrix validation, math mode structure)
 
 ### 1.2 Project Model
 
@@ -99,7 +100,7 @@ The roadmap MUST account for every item listed here.
 
 ## 3. Build Observability (Engine/Log)
 
-- **BO-1**: Runner adapters (at least latexmk + one alternative)
+- **BO-1**: Runner adapters (latexmk, tectonic). Tectonic MUST be supported for zero-config workflows.
 - **BO-2**: Streaming `.log` follow
 - **BO-3**: Structured parsing of `!` error blocks
 - **BO-4**: Structured parsing of common warnings
@@ -109,13 +110,18 @@ The roadmap MUST account for every item listed here.
 ### 3.0 Build Orchestration
 
 - **BO-7**: Multi-phase build sessions (latexmk delegated mode + explicit pipeline mode)
-- **BO-8**: Bibliography and index tool support (biber/bibtex, makeindex/xindy) with rerun caps
+- [ ] BO-8: Bibliography and index tool support (biber/bibtex, makeindex/xindy) with rerun caps
+- [ ] BO-9: Package manager integration (auto-install missing packages via tlmgr/miktex)
 
 ### 3.1 Export / Build Outputs
 
 - **EX-1**: Explicit build target selection (pdf/dvi/ps/html/svg)
-- **EX-2**: Artifact discovery and reporting as structured events
-- **EX-3**: Ability to open/reveal primary artifact from the editor
+- [ ] EX-2: Artifact discovery and reporting as structured events
+- [ ] EX-3: Ability to open/reveal primary artifact from the editor
+- [ ] EX-4: Integrated PDF Viewer (Webview-based) with SyncTeX support
+- [ ] UX-1: Math Hover Preview (render equations in tooltip without full compilation)
+- [ ] UX-2: Input Delighters (Magic Comments `%!TEX`, Auto-Fraction, Bracket Matching)
+- [ ] UX-3: Image Paste Wizard (Clipboard -> File + \includegraphics)
 
 ### 3.2 SyncTeX (PDF Preview Workflow)
 
