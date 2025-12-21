@@ -368,6 +368,7 @@ Each release below includes:
 - **Real-Time Log Streaming**: Migrate build adapter from buffered output to real-time `stdout`/`stderr` streaming (BO-2).
 - **Human-Readable Errors**: Translation layer for common TeX log errors (UX-5).
 - **Rich Hovers**: MathJax-rendered previews for equations and citations (UX-1).
+- **Marketplace Overhaul**: Redesign Open VSX page with Hero banner, GIFs, and badge system (UX-6).
 
 **Acceptance criteria**
 
