@@ -129,6 +129,12 @@ The roadmap MUST account for every item listed here.
 - **SX-2**: Forward search (source → PDF) command
 - **SX-3**: Inverse search (PDF → source) best-effort integration
 
+### 3.3 UX & Feedback (Visuals)
+
+- **UX-4**: Status Bar Element (Spinning icon + "Building..." text) for active builds.
+- **UX-5**: Build Failure Notification (Toast with "Open Logs" action) for fatal errors.
+- **EX-4**: Integrated PDF Viewer via VS Code **Custom Editor API** (Webview-based) with SyncTeX.
+
 ## 4. Quality Gates
 
 - **QG-1**: Golden tests for representative fixtures
