@@ -44,21 +44,61 @@
 
   // --- Math Operations ---
   "Fraction": { "prefix": "frac", "body": "\\frac{$1}{$2}$0", "description": "Fraction" },
-  "Display Fraction": { "prefix": "dfrac", "body": "\\dfrac{$1}{$2}$0", "description": "Display Fraction" },
+  "Display Fraction": {
+    "prefix": "dfrac",
+    "body": "\\dfrac{$1}{$2}$0",
+    "description": "Display Fraction"
+  },
   "Sum": { "prefix": "sum", "body": "\\sum_{${1:i=1}}^{${2:n}} $0", "description": "Summation" },
-  "Product": { "prefix": "prod", "body": "\\prod_{${1:i=1}}^{${2:n}} $0", "description": "Product" },
-  "Indefinite Integral": { "prefix": "int", "body": "\\int $1 \\,d${2:x}$0", "description": "Indefinite Integral" },
-  "Definite Integral": { "prefix": "dint", "body": "\\int_{${1:a}}^{${2:b}} $3 \\,d${4:x}$0", "description": "Definite Integral" },
-  "Limit": { "prefix": "lim", "body": "\\lim_{${1:x} \\to ${2:\\infty}} $0", "description": "Limit" },
+  "Product": {
+    "prefix": "prod",
+    "body": "\\prod_{${1:i=1}}^{${2:n}} $0",
+    "description": "Product"
+  },
+  "Indefinite Integral": {
+    "prefix": "int",
+    "body": "\\int $1 \\,d${2:x}$0",
+    "description": "Indefinite Integral"
+  },
+  "Definite Integral": {
+    "prefix": "dint",
+    "body": "\\int_{${1:a}}^{${2:b}} $3 \\,d${4:x}$0",
+    "description": "Definite Integral"
+  },
+  "Limit": {
+    "prefix": "lim",
+    "body": "\\lim_{${1:x} \\to ${2:\\infty}} $0",
+    "description": "Limit"
+  },
   "Square Root": { "prefix": "sqrt", "body": "\\sqrt{$1}$0", "description": "Square Root" },
   "Nth Root": { "prefix": "nroot", "body": "\\sqrt[$1]{$2}$0", "description": "Nth Root" },
 
   // --- Delimiters (Auto-Sizing) ---
-  "Left/Right Parentheses": { "prefix": "lr(", "body": "\\left( $1 \\right)$0", "description": "Auto-sizing ()" },
-  "Left/Right Brackets": { "prefix": "lr[", "body": "\\left[ $1 \\right]$0", "description": "Auto-sizing []" },
-  "Left/Right Braces": { "prefix": "lr{", "body": "\\left\\{ $1 \\right\\}$0", "description": "Auto-sizing {}" },
-  "Left/Right Angle": { "prefix": "lr<", "body": "\\left\\langle $1 \\right\\rangle$0", "description": "Auto-sizing <>" },
-  "Left/Right Pipe": { "prefix": "lr|", "body": "\\left| $1 \\right|$0", "description": "Auto-sizing ||" },
+  "Left/Right Parentheses": {
+    "prefix": "lr(",
+    "body": "\\left( $1 \\right)$0",
+    "description": "Auto-sizing ()"
+  },
+  "Left/Right Brackets": {
+    "prefix": "lr[",
+    "body": "\\left[ $1 \\right]$0",
+    "description": "Auto-sizing []"
+  },
+  "Left/Right Braces": {
+    "prefix": "lr{",
+    "body": "\\left\\{ $1 \\right\\}$0",
+    "description": "Auto-sizing {}"
+  },
+  "Left/Right Angle": {
+    "prefix": "lr<",
+    "body": "\\left\\langle $1 \\right\\rangle$0",
+    "description": "Auto-sizing <>"
+  },
+  "Left/Right Pipe": {
+    "prefix": "lr|",
+    "body": "\\left| $1 \\right|$0",
+    "description": "Auto-sizing ||"
+  },
 
   // --- Logic & Set Theory ---
   "For All": { "prefix": "forall", "body": "\\forall", "description": "∀" },
@@ -74,15 +114,51 @@
   "Infinity": { "prefix": "infty", "body": "\\infty", "description": "∞" },
 
   // --- Environments ---
-  "Equation": { "prefix": "eq", "body": "\\begin{equation}\n\t$1\n\\end{equation}", "description": "Equation environment" },
-  "Align": { "prefix": "al", "body": "\\begin{align}\n\t$1\n\\end{align}", "description": "Align environment" },
-  "Align Star": { "prefix": "als", "body": "\\begin{align*}\n\t$1\n\\end{align*}", "description": "Align* environment" },
-  "Cases": { "prefix": "cases", "body": "\\begin{cases}\n\t$1 & \\text{if } $2 \\\\\n\t$3 & \\text{otherwise}\n\\end{cases}", "description": "Cases environment" },
-  "Matrix (p)": { "prefix": "pmat", "body": "\\begin{pmatrix}\n\t$1\n\\end{pmatrix}", "description": "( Matrix )" },
-  "Matrix (b)": { "prefix": "bmat", "body": "\\begin{bmatrix}\n\t$1\n\\end{bmatrix}", "description": "[ Matrix ]" },
-  "Matrix (v)": { "prefix": "vmat", "body": "\\begin{vmatrix}\n\t$1\n\\end{vmatrix}", "description": "| Matrix |" },
-  "Theorem": { "prefix": "thm", "body": "\\begin{theorem}\n\t$1\n\\end{theorem}", "description": "Theorem environment" },
-  "Proof": { "prefix": "proof", "body": "\\begin{proof}\n\t$1\n\\end{proof}", "description": "Proof environment" },
+  "Equation": {
+    "prefix": "eq",
+    "body": "\\begin{equation}\n\t$1\n\\end{equation}",
+    "description": "Equation environment"
+  },
+  "Align": {
+    "prefix": "al",
+    "body": "\\begin{align}\n\t$1\n\\end{align}",
+    "description": "Align environment"
+  },
+  "Align Star": {
+    "prefix": "als",
+    "body": "\\begin{align*}\n\t$1\n\\end{align*}",
+    "description": "Align* environment"
+  },
+  "Cases": {
+    "prefix": "cases",
+    "body": "\\begin{cases}\n\t$1 & \\text{if } $2 \\\\\n\t$3 & \\text{otherwise}\n\\end{cases}",
+    "description": "Cases environment"
+  },
+  "Matrix (p)": {
+    "prefix": "pmat",
+    "body": "\\begin{pmatrix}\n\t$1\n\\end{pmatrix}",
+    "description": "( Matrix )"
+  },
+  "Matrix (b)": {
+    "prefix": "bmat",
+    "body": "\\begin{bmatrix}\n\t$1\n\\end{bmatrix}",
+    "description": "[ Matrix ]"
+  },
+  "Matrix (v)": {
+    "prefix": "vmat",
+    "body": "\\begin{vmatrix}\n\t$1\n\\end{vmatrix}",
+    "description": "| Matrix |"
+  },
+  "Theorem": {
+    "prefix": "thm",
+    "body": "\\begin{theorem}\n\t$1\n\\end{theorem}",
+    "description": "Theorem environment"
+  },
+  "Proof": {
+    "prefix": "proof",
+    "body": "\\begin{proof}\n\t$1\n\\end{proof}",
+    "description": "Proof environment"
+  },
 
   // --- Structure ---
   "Part": { "prefix": "part", "body": "\\part{$1}", "description": "Part" },
@@ -90,7 +166,11 @@
   "Section": { "prefix": "sec", "body": "\\section{$1}", "description": "Section" },
   "Section*": { "prefix": "secs", "body": "\\section*{$1}", "description": "Section*" },
   "Subsection": { "prefix": "sub", "body": "\\subsection{$1}", "description": "Subsection" },
-  "Subsubsection": { "prefix": "subsub", "body": "\\subsubsection{$1}", "description": "Subsubsection" },
+  "Subsubsection": {
+    "prefix": "subsub",
+    "body": "\\subsubsection{$1}",
+    "description": "Subsubsection"
+  },
   "Paragraph": { "prefix": "par", "body": "\\paragraph{$1}", "description": "Paragraph" },
 
   // --- Fonts & Styles ---
@@ -105,38 +185,106 @@
   "Math Frak": { "prefix": "mfrak", "body": "\\mathfrak{$1}$0", "description": "Fraktur Math" },
 
   // --- Lists ---
-  "Itemize": { "prefix": "item", "body": "\\begin{itemize}\n\t\\item $1\n\\end{itemize}", "description": "Itemize list" },
-  "Enumerate": { "prefix": "enum", "body": "\\begin{enumerate}\n\t\\item $1\n\\end{enumerate}", "description": "Enumerate list" },
-  "Description": { "prefix": "desc", "body": "\\begin{description}\n\t\\item[$1] $2\n\\end{description}", "description": "Description list" },
+  "Itemize": {
+    "prefix": "item",
+    "body": "\\begin{itemize}\n\t\\item $1\n\\end{itemize}",
+    "description": "Itemize list"
+  },
+  "Enumerate": {
+    "prefix": "enum",
+    "body": "\\begin{enumerate}\n\t\\item $1\n\\end{enumerate}",
+    "description": "Enumerate list"
+  },
+  "Description": {
+    "prefix": "desc",
+    "body": "\\begin{description}\n\t\\item[$1] $2\n\\end{description}",
+    "description": "Description list"
+  },
   "Item": { "prefix": "it", "body": "\\item $1", "description": "\\item" },
 
   // --- Code & Verbatim ---
-  "Listing": { "prefix": "lst", "body": "\\begin{lstlisting}[language=${1:Python}]\n$2\n\\end{lstlisting}", "description": "Code Listing" },
-  "Verbatim": { "prefix": "verb", "body": "\\begin{verbatim}\n$1\n\\end{verbatim}", "description": "Verbatim Environment" },
+  "Listing": {
+    "prefix": "lst",
+    "body": "\\begin{lstlisting}[language=${1:Python}]\n$2\n\\end{lstlisting}",
+    "description": "Code Listing"
+  },
+  "Verbatim": {
+    "prefix": "verb",
+    "body": "\\begin{verbatim}\n$1\n\\end{verbatim}",
+    "description": "Verbatim Environment"
+  },
   "Inline Verb": { "prefix": "v", "body": "\\verb|$1|$0", "description": "Inline Verbatim" },
 
   // --- TikZ ---
-  "TikZ Picture": { "prefix": "tikz", "body": "\\begin{tikzpicture}\n\t$1\n\\end{tikzpicture}", "description": "TikZ Picture" },
+  "TikZ Picture": {
+    "prefix": "tikz",
+    "body": "\\begin{tikzpicture}\n\t$1\n\\end{tikzpicture}",
+    "description": "TikZ Picture"
+  },
   "Draw": { "prefix": "draw", "body": "\\draw ($1) -- ($2);", "description": "TikZ Draw" },
-  "Node": { "prefix": "node", "body": "\\node (${1:name}) at (${2:0,0}) {$3};", "description": "TikZ Node" },
+  "Node": {
+    "prefix": "node",
+    "body": "\\node (${1:name}) at (${2:0,0}) {$3};",
+    "description": "TikZ Node"
+  },
 
   // --- Beamer ---
-  "Frame": { "prefix": "frame", "body": "\\begin{frame}\n\t\\frametitle{$1}\n\t$0\n\\end{frame}", "description": "Beamer Frame" },
-  "Block": { "prefix": "block", "body": "\\begin{block}{$1}\n\t$2\n\\end{block}", "description": "Beamer Block" },
-  "Alert Block": { "prefix": "alertblock", "body": "\\begin{alertblock}{$1}\n\t$2\n\\end{alertblock}", "description": "Beamer Alert Block" },
-  "Columns": { "prefix": "cols", "body": "\\begin{columns}\n\t\\begin{column}{0.5\\textwidth}\n\t\t$1\n\t\\end{column}\n\t\\begin{column}{0.5\\textwidth}\n\t\t$2\n\t\\end{column}\n\\end{columns}", "description": "Beamer Columns" },
+  "Frame": {
+    "prefix": "frame",
+    "body": "\\begin{frame}\n\t\\frametitle{$1}\n\t$0\n\\end{frame}",
+    "description": "Beamer Frame"
+  },
+  "Block": {
+    "prefix": "block",
+    "body": "\\begin{block}{$1}\n\t$2\n\\end{block}",
+    "description": "Beamer Block"
+  },
+  "Alert Block": {
+    "prefix": "alertblock",
+    "body": "\\begin{alertblock}{$1}\n\t$2\n\\end{alertblock}",
+    "description": "Beamer Alert Block"
+  },
+  "Columns": {
+    "prefix": "cols",
+    "body": "\\begin{columns}\n\t\\begin{column}{0.5\\textwidth}\n\t\t$1\n\t\\end{column}\n\t\\begin{column}{0.5\\textwidth}\n\t\t$2\n\t\\end{column}\n\\end{columns}",
+    "description": "Beamer Columns"
+  },
 
   // --- BibTeX ---
-  "Bib Article": { "prefix": "article", "body": "@article{${1:key},\n\tauthor = {$2},\n\ttitle = {$3},\n\tjournal = {$4},\n\tyear = {$5},\n\tvolume = {$6},\n\tnumber = {$7},\n\tpages = {$8}\n}", "description": "BibTeX Article" },
-  "Bib Book": { "prefix": "book", "body": "@book{${1:key},\n\tauthor = {$2},\n\ttitle = {$3},\n\tpublisher = {$4},\n\tyear = {$5}\n}", "description": "BibTeX Book" },
+  "Bib Article": {
+    "prefix": "article",
+    "body": "@article{${1:key},\n\tauthor = {$2},\n\ttitle = {$3},\n\tjournal = {$4},\n\tyear = {$5},\n\tvolume = {$6},\n\tnumber = {$7},\n\tpages = {$8}\n}",
+    "description": "BibTeX Article"
+  },
+  "Bib Book": {
+    "prefix": "book",
+    "body": "@book{${1:key},\n\tauthor = {$2},\n\ttitle = {$3},\n\tpublisher = {$4},\n\tyear = {$5}\n}",
+    "description": "BibTeX Book"
+  },
 
   // --- Meta & Links ---
-  "Include Graphic": { "prefix": "inc", "body": "\\includegraphics[width=${1:0.8}\\textwidth]{$2}", "description": "Include Graphics" },
+  "Include Graphic": {
+    "prefix": "inc",
+    "body": "\\includegraphics[width=${1:0.8}\\textwidth]{$2}",
+    "description": "Include Graphics"
+  },
   "Label": { "prefix": "lbl", "body": "\\label{$1}", "description": "Label" },
   "Ref": { "prefix": "ref", "body": "\\ref{$1}", "description": "Reference" },
   "Cite": { "prefix": "cite", "body": "\\cite{$1}", "description": "Citation" },
-  "Hyperlink (href)": { "prefix": "href", "body": "\\href{${1:url}}{${2:text}}$0", "description": "Hyperlink with text" },
+  "Hyperlink (href)": {
+    "prefix": "href",
+    "body": "\\href{${1:url}}{${2:text}}$0",
+    "description": "Hyperlink with text"
+  },
   "URL": { "prefix": "url", "body": "\\url{${1:url}}$0", "description": "Raw URL" },
-  "Header": { "prefix": "head", "body": "\\documentclass[${1:11pt}]{${2:article}}\n\\usepackage[utf8]{inputenc}\n\\usepackage{amsmath, amssymb, amsthm}\n\\usepackage{graphicx}\n\n\\begin{document}\n\n$0\n\n\\end{document}", "description": "Full Document Header" },
-  "New Command": { "prefix": "ncmd", "body": "\\newcommand{\\${1:cmd}}[${2:args}]{${3:def}}", "description": "New Command" }
+  "Header": {
+    "prefix": "head",
+    "body": "\\documentclass[${1:11pt}]{${2:article}}\n\\usepackage[utf8]{inputenc}\n\\usepackage{amsmath, amssymb, amsthm}\n\\usepackage{graphicx}\n\n\\begin{document}\n\n$0\n\n\\end{document}",
+    "description": "Full Document Header"
+  },
+  "New Command": {
+    "prefix": "ncmd",
+    "body": "\\newcommand{\\${1:cmd}}[${2:args}]{${3:def}}",
+    "description": "New Command"
+  }
 }
