@@ -39,7 +39,7 @@
     "onLanguage:latex",
     "onLanguage:tex"
   ],
-  "main": "./out/extension.js",
+  "main": "./dist/extension.js",
   "contributes": {
     "configuration": {
       "type": "object",
@@ -84,11 +84,12 @@
     ]
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
+    "vscode:prepublish": "npm run check-types && node esbuild.js --production",
+    "compile": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
     "package": "vsce package --out ferrotex.vsix",
-    "test": "node ./out/test/runTest.js"
+    "check-types": "tsc --noEmit",
+    "test": "npm run check-types && npm run compile && node ./out/test/runTest.js"
   },
   "devDependencies": {
     "@types/glob": "^8.0.0",
@@ -97,6 +98,7 @@
     "@types/vscode": "^1.75.0",
     "@vscode/test-electron": "^2.3.0",
     "@vscode/vsce": "^2.22.0",
+    "esbuild": "^0.27.2",
     "glob": "^10.0.0",
     "mocha": "^10.2.0",
     "typescript": "^4.9.0"

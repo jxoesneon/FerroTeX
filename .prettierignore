@@ -3,3 +3,4 @@ _site
 build
 **/out
 **/*.golden.json
+**/dist
