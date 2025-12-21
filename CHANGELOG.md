@@ -6,6 +6,15 @@ The format is based on **Keep a Changelog**, and this project intends to follow 
 
 ## [Unreleased]
 
+## [0.15.0] - 2025-12-21
+
+### Added
+
+- **Snippet Pack**: Added 130+ LaTeX snippets for Math, Greek, and Environments (UX-2).
+- **Magic Comments**: Added support for `%!TEX root = ...` to override build root (PM-Override).
+- **Dynamic Package Metadata**: Added context-aware auto-completion for `amsmath`, `tikz`, `geometry`, `hyperref`, and `graphicx` (CS-3).
+- **Linting**: Fixed various clippy lints (`collapsible_if`, `unused_imports`) in the codebase.
+
 ## [0.14.0] - 2025-12-21
 
 ### Added

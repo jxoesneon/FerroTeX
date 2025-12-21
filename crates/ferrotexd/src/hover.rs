@@ -84,6 +84,7 @@ pub fn find_hover(root: &SyntaxNode, offset: TextSize) -> Option<Hover> {
         if let Some(idx) = children.iter().position(|it| it.as_token() == Some(&token)) {
              // Scan left
              for i in (0..idx).rev() {
+                 #[allow(clippy::collapsible_if)]
                  if let Some(t) = children[i].as_token() {
                      if t.kind() == SyntaxKind::Dollar {
                          left_dollar = Some(t.text_range());
@@ -96,7 +97,9 @@ pub fn find_hover(root: &SyntaxNode, offset: TextSize) -> Option<Hover> {
              }
 
              // Scan right
+             #[allow(clippy::needless_range_loop)]
              for i in idx..children.len() {
+                 #[allow(clippy::collapsible_if)]
                  if let Some(t) = children[i].as_token() {
                      if t.kind() == SyntaxKind::Dollar {
                         right_dollar = Some(t.text_range());

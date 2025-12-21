@@ -1,5 +1,6 @@
 use dashmap::DashMap;
 use ferrotex_syntax::{SyntaxKind, TextRange, parse};
+use regex::Regex;
 use std::collections::{HashMap, HashSet};
 use tower_lsp::lsp_types::{SymbolKind, Url};
 
@@ -12,6 +13,8 @@ pub struct Workspace {
     indices: DashMap<Url, FileIndex>,
     /// Bibliography index containing parsed BibTeX entries.
     bib_indices: DashMap<Url, ferrotex_syntax::bibtex::BibFile>,
+    /// Explicit root overrides from `%!TEX root` comments.
+    explicit_roots: DashMap<Url, String>,
 }
 
 /// The index data for a single TeX file.
@@ -26,10 +29,12 @@ pub struct FileIndex {
     pub references: Vec<LabelRef>,
     /// List of citations (e.g., `\cite{...}`).
     pub citations: Vec<CitationRef>,
-    /// List of bibliography references (e.g., `\bibliography{...}`).
+    /// List of bibliographies (e.g., `\bibliography{...}`).
     pub bibliographies: Vec<BibRef>,
     /// List of sections (e.g., `\section{...}`).
     pub sections: Vec<SectionDef>,
+    /// List of used packages (e.g., `\usepackage{...}`).
+    pub packages: Vec<String>,
 }
 
 /// Represents an included file reference.
@@ -97,8 +102,15 @@ impl Workspace {
     ///
     /// Parses the file content and extracts includes, labels, citations, etc.
     pub fn update(&self, uri: &Url, text: &str) {
-        let (includes, definitions, references, citations, bibliographies, sections) =
+        let (includes, definitions, references, citations, bibliographies, sections, packages, magic_root) =
             scan_file(text);
+
+        if let Some(root_path) = magic_root {
+            self.explicit_roots.insert(uri.clone(), root_path);
+        } else {
+            self.explicit_roots.remove(uri);
+        }
+
         self.indices.insert(
             uri.clone(),
             FileIndex {
@@ -108,6 +120,7 @@ impl Workspace {
                 citations,
                 bibliographies,
                 sections,
+                packages,
             },
         );
     }
@@ -132,6 +145,41 @@ impl Workspace {
             .get(uri)
             .map(|v| v.includes.clone())
             .unwrap_or_default()
+    }
+
+    /// Retrieves the explicit root override for a given document URI, if any.
+    pub fn get_explicit_root(&self, uri: &Url) -> Option<String> {
+        self.explicit_roots.get(uri).map(|v| v.value().clone())
+    }
+
+    /// Retrieves the list of used packages for a given document URI.
+    ///
+    /// If an explicit root is set, it also includes packages from the root.
+    pub fn get_packages(&self, uri: &Url) -> Vec<String> {
+        let mut packages = HashSet::new();
+
+        // 1. Get packages from current file
+        if let Some(idx) = self.indices.get(uri) {
+            packages.extend(idx.packages.clone());
+        }
+
+        // 2. Get packages from explicit root (if any)
+        if let Some(root_path) = self.get_explicit_root(uri) {
+            #[allow(clippy::collapsible_if)]
+            if let Ok(file_path) = uri.to_file_path() {
+                if let Some(parent) = file_path.parent() {
+                    let root_buf = parent.join(&root_path);
+                    if let Ok(root_uri) = Url::from_file_path(root_buf) {
+                        #[allow(clippy::collapsible_if)]
+                        if let Some(idx) = self.indices.get(&root_uri) {
+                            packages.extend(idx.packages.clone());
+                        }
+                    }
+                }
+            }
+        }
+
+        packages.into_iter().collect()
     }
 
     /// Retrieves the list of bibliography references for a given document URI.
@@ -459,6 +507,7 @@ impl Workspace {
         unique_cycles
     }
 
+    #[allow(clippy::only_used_in_recursion)]
     fn check_cycle_dfs(
         &self,
         current: &Url,
@@ -497,9 +546,23 @@ type ScanResult = (
     Vec<CitationRef>,
     Vec<BibRef>,
     Vec<SectionDef>,
+    Vec<String>, // packages
+    Option<String>, // magic_root
 );
 
 fn scan_file(text: &str) -> ScanResult {
+    // Scan for magic comments in the first 1KB
+    let head = if text.len() > 1024 {
+        &text[..1024]
+    } else {
+        text
+    };
+    
+    // Pattern: %!TEX root = <path>
+    // Handles optional spaces around = and leading whitespace
+    let re = Regex::new(r"(?m)^%\s*!TEX\s+root\s*=\s*(.+)$").unwrap();
+    let magic_root = re.captures(head).map(|cap| cap[1].trim().to_string());
+
     let parse = parse(text);
     let root = parse.syntax();
     let mut includes = Vec::new();
@@ -571,7 +634,20 @@ fn scan_file(text: &str) -> ScanResult {
             _ => {}
         }
     }
-    (includes, defs, refs, citations, bibs, sections)
+    // Scan for packages
+    // Pattern: \usepackage[opt]{pkg} or \RequirePackage[opt]{pkg}
+    // We ignore options for now.
+    // Captures: 1=pkg
+    let pkg_re = Regex::new(r"(?m)\\(?:usepackage|RequirePackage)(?:\[[^\]]*\])?\{([^}]+)\}").unwrap();
+    let mut packages = Vec::new();
+    for cap in pkg_re.captures_iter(text) {
+        // Packages can be comma separated: \usepackage{tikz, amsmath}
+        for pkg in cap[1].split(',') {
+            packages.push(pkg.trim().to_string());
+        }
+    }
+
+    (includes, defs, refs, citations, bibs, sections, packages, magic_root)
 }
 
 pub fn extract_group_text(node: &ferrotex_syntax::SyntaxNode) -> Option<String> {
