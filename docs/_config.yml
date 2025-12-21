@@ -1,12 +1,24 @@
 title: FerroTeX
-description: FerroTeX specifications and project documentation
-theme: minima
-markdown: kramdown
-kramdown:
-  input: GFM
+description: A high-performance LaTeX language platform
+remote_theme: just-the-docs/just-the-docs
+
+color_scheme: dark
+
+search_enabled: true
+search.button: true
+
+nav_sort: case_insensitive
+
+aux_links:
+  "GitHub": "https://github.com/jxoesneon/FerroTeX"
+
+footer_content: "Copyright &copy; 2024-2025 FerroTeX Contributors. Distributed under Apache-2.0 or MIT license."
 
 exclude:
   - "vendor"
   - "node_modules"
   - "_site"
   - "build"
+
+kramdown:
+  input: GFM

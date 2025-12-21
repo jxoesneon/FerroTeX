@@ -1,3 +1,10 @@
+---
+layout: default
+title: Setup
+parent: Development
+nav_order: 1
+---
+
 # Development Setup
 
 This document describes a development environment suitable for implementing FerroTeX.
