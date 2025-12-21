@@ -300,6 +300,8 @@ Each release below includes:
   - provenance view ergonomics
   - **Image Paste Wizard**: Handle clipboard image paste events.
   - **Magic Comments**: Respect `%!TEX root` and `%!TEX program`.
+  - **Status Bar Integration**: Visual feedback for build state (`UX-4`).
+  - **Notifications**: Actionable toasts for build failures (`UX-5`).
 
 **Acceptance criteria**
 
