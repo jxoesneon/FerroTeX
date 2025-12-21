@@ -47,7 +47,7 @@ refactor_plan.md
 demo/
 
 # Images (often generated/temporary)
-editors/vscode/images/
+# editors/vscode/images/ # Re-enabled for marketplace feature images
 
 # Compiled binaries
 /ferrotexd
