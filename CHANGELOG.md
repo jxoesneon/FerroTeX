@@ -6,6 +6,16 @@ The format is based on **Keep a Changelog**, and this project intends to follow 
 
 ## [Unreleased]
 
+## [0.11.0] - 2025-12-20
+
+### Added
+
+- **Build Orchestration**: Introduced `ferrotexd/src/build` module to orchestrate compiler execution.
+  - **Latexmk Adapter**: Default build engine uses `latexmk` for robust, multi-pass compilation.
+  - **LSP Integration**: New `ferrotex.build` command triggers builds from the editor.
+  - **Client**: Added `FerroTeX: Build Document` command (Ctrl+Alt+B / Cmd+Alt+B).
+- **Architecture**: Defined `BuildEngine` trait for future extensibility (e.g., Tectonic).
+
 ## [0.10.0] - 2025-12-20
 
 ### Added

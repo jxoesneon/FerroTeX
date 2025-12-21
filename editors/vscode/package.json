@@ -2,7 +2,7 @@
   "name": "ferrotex",
   "displayName": "FerroTeX",
   "description": "FerroTeX Language Server Client",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "publisher": "ferrotex",
   "engines": {
     "vscode": "^1.75.0"
@@ -26,7 +26,21 @@
           "description": "Path to the ferrotexd executable"
         }
       }
-    }
+    },
+    "commands": [
+      {
+        "command": "ferrotex.build",
+        "title": "FerroTeX: Build Document"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "ferrotex.build",
+        "key": "ctrl+alt+b",
+        "mac": "cmd+alt+b",
+        "when": "editorTextFocus && resourceLangId == latex"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
