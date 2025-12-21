@@ -1,15 +1,13 @@
-# Feature Matrix (Target: v1.0.0)
+# Feature Matrix (v1.0.0)
 
 ## Status
 
-- **Type:** Normative (for v1.0.0 scope)
-- **Stability:** Draft
+- **Type:** Normative
+- **Stability:** Stable (v1.0.0 Frozen)
 
 ## Purpose
 
-This document enumerates the **minimum industry-standard feature set** required for FerroTeX `v1.0.0`.
-
-The roadmap MUST account for every item listed here.
+Define the **official feature set** for FerroTeX `v1.0.0`.
 
 ## 1. Language Platform (Source Analysis)
 
@@ -18,8 +16,6 @@ The roadmap MUST account for every item listed here.
 - **LP-1**: Fault-tolerant LaTeX lexer
 - **LP-2**: Fault-tolerant CST for incomplete documents
 - **LP-3**: Incremental reparse for `didChange`
-- [ ] LP-4: Basic environment/group structure recovery
-- [ ] LP-5: Deep math semantics (matrix validation, math mode structure)
 
 ### 1.2 Project Model
 
@@ -110,18 +106,10 @@ The roadmap MUST account for every item listed here.
 ### 3.0 Build Orchestration
 
 - **BO-7**: Multi-phase build sessions (latexmk delegated mode + explicit pipeline mode)
-- [ ] BO-8: Bibliography and index tool support (biber/bibtex, makeindex/xindy) with rerun caps
-- [ ] BO-9: Package manager integration (auto-install missing packages via tlmgr/miktex)
 
 ### 3.1 Export / Build Outputs
 
 - **EX-1**: Explicit build target selection (pdf/dvi/ps/html/svg)
-- [ ] EX-2: Artifact discovery and reporting as structured events
-- [ ] EX-3: Ability to open/reveal primary artifact from the editor
-- [ ] EX-4: Integrated PDF Viewer (Webview-based) with SyncTeX support
-- [ ] UX-1: Math Hover Preview (render equations in tooltip without full compilation)
-- [ ] UX-2: Input Delighters (Magic Comments `%!TEX`, Auto-Fraction, Bracket Matching)
-- [ ] UX-3: Image Paste Wizard (Clipboard -> File + \includegraphics)
 
 ### 3.2 SyncTeX (PDF Preview Workflow)
 
@@ -135,11 +123,6 @@ The roadmap MUST account for every item listed here.
 - **UX-5**: Build Failure Notification (Toast with "Open Logs" action) for fatal errors.
 - **EX-4**: Integrated PDF Viewer via VS Code **Custom Editor API** (Webview-based) with SyncTeX.
 
-## 4. Quality Gates
-
-- **QG-1**: Golden tests for representative fixtures
-- **QG-2**: Fuzz target(s) demonstrating panic-free parsing
-- **QG-3**: Benchmark suite (documented baselines)
 - **QG-4**: Deterministic output for exported schemas
 
 ### 4.1 Performance
@@ -153,3 +136,29 @@ The roadmap MUST account for every item listed here.
 - **OC-2**: Documented configuration keys and stability policy
 - **OC-3**: Documented supported engines/runners and known limitations
 - **OC-4**: Published compatibility matrix for engines/runners/targets/platforms
+
+## 6. Future Scope (Post-v1.0.0)
+
+The following features are deferred to future major/minor versions (e.g., v1.1.0+):
+
+### Language Platform
+
+- **LP-4**: Basic environment/group structure recovery
+- **LP-5**: Deep math semantics (matrix validation, math mode structure)
+
+### Build Orchestration
+
+- **BO-8**: Bibliography and index tool support (biber/bibtex, makeindex/xindy) with rerun caps
+- **BO-9**: Package manager integration (auto-install missing packages via tlmgr/miktex)
+
+### Export / Build Outputs
+
+- **EX-2**: Artifact discovery and reporting as structured events
+- **EX-3**: Ability to open/reveal primary artifact from the editor
+- **EX-4**: Integrated PDF Viewer (Webview-based) with SyncTeX support
+
+### UX & Delighters
+
+- **UX-1**: Math Hover Preview (render equations in tooltip without full compilation)
+- **UX-2**: Input Delighters (Magic Comments `%!TEX`, Auto-Fraction, Bracket Matching)
+- **UX-3**: Image Paste Wizard (Clipboard -> File + \includegraphics)
