@@ -1,0 +1,354 @@
+// FerroTeX Custom Theme
+// Academic-inspired, publication-quality design
+
+// =============================================================================
+// COLOR PALETTE
+// =============================================================================
+
+// Primary colors - Deep scholarly indigo
+$primary-color: #6366f1;
+$primary-hover: #818cf8;
+$primary-dark: #4f46e5;
+
+// Accent - Warm amber for highlights
+$accent-color: #f59e0b;
+$accent-hover: #fbbf24;
+
+// Backgrounds - Rich dark theme
+$bg-dark: #0f172a;
+$bg-darker: #020617;
+$bg-card: #1e293b;
+$bg-card-hover: #334155;
+
+// Text colors
+$text-primary: #f1f5f9;
+$text-secondary: #94a3b8;
+$text-muted: #64748b;
+
+// Semantic colors
+$success: #10b981;
+$warning: #f59e0b;
+$error: #ef4444;
+$info: #3b82f6;
+
+// =============================================================================
+// TYPOGRAPHY
+// =============================================================================
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+
+$font-family-base:
+  "Inter",
+  -apple-system,
+  BlinkMacSystemFont,
+  "Segoe UI",
+  Roboto,
+  sans-serif;
+$font-family-mono: "JetBrains Mono", "Fira Code", "Consolas", monospace;
+
+// =============================================================================
+// GLOBAL OVERRIDES
+// =============================================================================
+
+.main-content {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+// Headings with subtle styling
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: $font-family-base;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: $text-primary;
+}
+
+h1 {
+  font-size: 2.5rem;
+  margin-bottom: 1.5rem;
+  background: linear-gradient(135deg, $primary-color, $accent-color);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+h2 {
+  font-size: 1.75rem;
+  margin-top: 3rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid $bg-card;
+}
+
+// =============================================================================
+// HERO SECTION
+// =============================================================================
+
+.hero {
+  text-align: center;
+  padding: 4rem 2rem;
+  background: linear-gradient(180deg, $bg-card 0%, $bg-dark 100%);
+  border-radius: 1rem;
+  margin-bottom: 3rem;
+  border: 1px solid $bg-card-hover;
+
+  h1 {
+    font-size: 3.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .tagline {
+    font-size: 1.25rem;
+    color: $text-secondary;
+    max-width: 600px;
+    margin: 0 auto 2rem;
+    line-height: 1.6;
+  }
+
+  .badges {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 1.5rem;
+  }
+}
+
+// =============================================================================
+// FEATURE CARDS
+// =============================================================================
+
+.features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin: 3rem 0;
+}
+
+.feature-card {
+  background: $bg-card;
+  border: 1px solid $bg-card-hover;
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  transition: all 0.2s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    border-color: $primary-color;
+    box-shadow: 0 8px 30px rgba($primary-color, 0.15);
+  }
+
+  .icon {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+  }
+
+  h3 {
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+    color: $text-primary;
+  }
+
+  p {
+    color: $text-secondary;
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+}
+
+// =============================================================================
+// CODE BLOCKS
+// =============================================================================
+
+code {
+  font-family: $font-family-mono;
+  font-size: 0.875em;
+  background: $bg-card;
+  padding: 0.2em 0.4em;
+  border-radius: 4px;
+  color: $accent-color;
+}
+
+pre {
+  background: $bg-darker !important;
+  border: 1px solid $bg-card;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  overflow-x: auto;
+
+  code {
+    background: transparent;
+    padding: 0;
+    color: $text-primary;
+  }
+}
+
+// =============================================================================
+// CALLOUT BLOCKS
+// =============================================================================
+
+.callout {
+  padding: 1rem 1.25rem;
+  border-radius: 0.5rem;
+  margin: 1.5rem 0;
+  border-left: 4px solid;
+
+  &.note {
+    background: rgba($info, 0.1);
+    border-color: $info;
+  }
+
+  &.tip {
+    background: rgba($success, 0.1);
+    border-color: $success;
+  }
+
+  &.warning {
+    background: rgba($warning, 0.1);
+    border-color: $warning;
+  }
+
+  &.danger {
+    background: rgba($error, 0.1);
+    border-color: $error;
+  }
+
+  .callout-title {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+}
+
+// =============================================================================
+// BUTTONS
+// =============================================================================
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.2s ease;
+
+  &.btn-primary {
+    background: linear-gradient(135deg, $primary-color, $primary-dark);
+    color: white;
+    border: none;
+
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 15px rgba($primary-color, 0.4);
+    }
+  }
+
+  &.btn-secondary {
+    background: transparent;
+    color: $text-primary;
+    border: 1px solid $bg-card-hover;
+
+    &:hover {
+      background: $bg-card;
+      border-color: $primary-color;
+    }
+  }
+}
+
+// =============================================================================
+// TABLES
+// =============================================================================
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+
+  th,
+  td {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid $bg-card;
+  }
+
+  th {
+    background: $bg-card;
+    font-weight: 600;
+    color: $text-primary;
+  }
+
+  tr:hover td {
+    background: rgba($primary-color, 0.05);
+  }
+}
+
+// =============================================================================
+// SIDEBAR ENHANCEMENTS
+// =============================================================================
+
+.side-bar {
+  background: $bg-darker;
+  border-right: 1px solid $bg-card;
+}
+
+.nav-list-link {
+  &:hover {
+    background: $bg-card;
+  }
+
+  &.active {
+    background: linear-gradient(90deg, transparent, rgba($primary-color, 0.2));
+    border-left: 3px solid $primary-color;
+  }
+}
+
+// =============================================================================
+// SEARCH
+// =============================================================================
+
+.search-input {
+  background: $bg-card !important;
+  border: 1px solid $bg-card-hover !important;
+  border-radius: 0.5rem !important;
+
+  &:focus {
+    border-color: $primary-color !important;
+    box-shadow: 0 0 0 3px rgba($primary-color, 0.2) !important;
+  }
+}
+
+// =============================================================================
+// FOOTER
+// =============================================================================
+
+.site-footer {
+  background: $bg-darker;
+  border-top: 1px solid $bg-card;
+  padding: 2rem;
+  text-align: center;
+  color: $text-muted;
+  font-size: 0.875rem;
+}
+
+// =============================================================================
+// RESPONSIVE
+// =============================================================================
+
+@media (max-width: 768px) {
+  .hero h1 {
+    font-size: 2.5rem;
+  }
+
+  .features {
+    grid-template-columns: 1fr;
+  }
+}
