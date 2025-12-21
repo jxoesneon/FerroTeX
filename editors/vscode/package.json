@@ -2,7 +2,7 @@
   "name": "ferrotex",
   "displayName": "FerroTeX",
   "description": "FerroTeX Language Server Client",
-  "version": "0.11.0",
+  "version": "0.13.0",
   "publisher": "ferrotex",
   "engines": {
     "vscode": "^1.75.0"
@@ -31,6 +31,10 @@
       {
         "command": "ferrotex.build",
         "title": "FerroTeX: Build Document"
+      },
+      {
+        "command": "ferrotex.syncToPdf",
+        "title": "FerroTeX: Sync to PDF"
       }
     ],
     "keybindings": [
@@ -39,6 +43,18 @@
         "key": "ctrl+alt+b",
         "mac": "cmd+alt+b",
         "when": "editorTextFocus && resourceLangId == latex"
+      }
+    ],
+    "customEditors": [
+      {
+        "viewType": "ferrotex.pdfPreview",
+        "displayName": "FerroTeX PDF Preview",
+        "selector": [
+          {
+            "filenamePattern": "*.pdf"
+          }
+        ],
+        "priority": "default"
       }
     ]
   },
@@ -53,6 +69,7 @@
     "typescript": "^4.9.0"
   },
   "dependencies": {
+    "pdfjs-dist": "^5.4.449",
     "vscode-languageclient": "^8.1.0"
   }
 }

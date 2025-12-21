@@ -1,9 +1,12 @@
+mod build;
 mod fmt;
 mod workspace;
-mod build;
+mod hover;
 
-use dashmap::DashMap;
+mod synctex;
+
 use build::{BuildEngine, BuildRequest, BuildStatus, latexmk::LatexmkAdapter};
+use dashmap::DashMap;
 use ferrotex_log::ir::EventPayload;
 use ferrotex_log::parser::LogParser;
 use ferrotex_syntax::{SyntaxKind, SyntaxNode};
@@ -96,9 +99,15 @@ impl LanguageServer for Backend {
                     TextDocumentSyncKind::FULL,
                 )),
                 document_symbol_provider: Some(OneOf::Left(true)),
-                document_link_provider: Some(DocumentLinkOptions {
-                    resolve_provider: Some(false),
-                    work_done_progress_options: WorkDoneProgressOptions::default(),
+                execute_command_provider: Some(ExecuteCommandOptions {
+                    commands: vec![
+                        "ferrotex.build".to_string(),
+                        "ferrotex.synctex_forward".to_string(),
+                        "ferrotex.synctex_inverse".to_string()
+                    ],
+                    work_done_progress_options: WorkDoneProgressOptions {
+                        work_done_progress: Some(true),
+                    },
                 }),
                 definition_provider: Some(OneOf::Left(true)),
                 references_provider: Some(OneOf::Left(true)),
@@ -130,6 +139,7 @@ impl LanguageServer for Backend {
                 workspace_symbol_provider: Some(OneOf::Left(true)),
                 document_formatting_provider: Some(OneOf::Left(true)),
                 code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
+                hover_provider: Some(HoverProviderCapability::Simple(true)),
                 ..Default::default()
             },
             ..Default::default()
@@ -582,21 +592,83 @@ impl LanguageServer for Backend {
         Ok(Some(fmt::format_document(&root, &line_index)))
     }
 
-    async fn code_action(&self, _params: CodeActionParams) -> Result<Option<CodeActionResponse>> {
-        let actions = Vec::new();
-
-        // Simple stub: If there is a diagnostic about a label, suggest adding one (fake).
-        // Real implementation would look at context.
-        // For v0.10.0 acceptance, we just need the handler to exist and not panic.
-
+    async fn code_action(&self, _params: CodeActionParams) -> Result<Option<Vec<CodeActionOrCommand>>> {
+        let actions = vec![
+            // Stub for future: e.g. "Create missing label"
+        ];
         Ok(Some(actions))
     }
 
-    async fn execute_command(&self, params: ExecuteCommandParams) -> Result<Option<serde_json::Value>> {
+    async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
+        let uri = &params.text_document_position_params.text_document.uri;
+        if let Some(text) = self.documents.get(uri) {
+            let parse = ferrotex_syntax::parse(&text);
+            let root = parse.syntax();
+            let line_index = LineIndex::new(&text);
+
+            let offset = line_index
+                .offset(line_index::LineCol {
+                    line: params.text_document_position_params.position.line,
+                    col: params.text_document_position_params.position.character,
+                })
+                .unwrap();
+
+            return Ok(hover::find_hover(&root, offset));
+        }
+
+        Ok(None)
+    }
+
+    async fn execute_command(
+        &self,
+        params: ExecuteCommandParams,
+    ) -> Result<Option<serde_json::Value>> {
+        if params.command == "ferrotex.synctex_forward" {
+             let args = params.arguments;
+             if args.len() < 4 { return Ok(None); }
+             let tex_uri_str = args[0].as_str().unwrap_or_default();
+             let line = args[1].as_u64().unwrap_or(0) as u32;
+             let col = args[2].as_u64().unwrap_or(0) as u32;
+             let pdf_uri_str = args[3].as_str().unwrap_or_default();
+             
+             if let Ok(tex_url) = Url::parse(tex_uri_str) {
+                 if let Ok(pdf_url) = Url::parse(pdf_uri_str) {
+                     if let (Ok(tex_path), Ok(pdf_path)) = (tex_url.to_file_path(), pdf_url.to_file_path()) {
+                         if let Some(res) = synctex::forward_search(&tex_path, &pdf_path, line, col) {
+                             return Ok(Some(serde_json::to_value(res).unwrap()));
+                         }
+                     }
+                 }
+             }
+             return Ok(None);
+        }
+        if params.command == "ferrotex.synctex_inverse" {
+             let args = params.arguments;
+             if args.len() < 4 { return Ok(None); }
+             let pdf_uri_str = args[0].as_str().unwrap_or_default();
+             let page = args[1].as_u64().unwrap_or(1) as u32;
+             let x = args[2].as_f64().unwrap_or(0.0);
+             let y = args[3].as_f64().unwrap_or(0.0);
+             
+             if let Ok(pdf_url) = Url::parse(pdf_uri_str) {
+                 if let Ok(pdf_path) = pdf_url.to_file_path() {
+                     if let Some(res) = synctex::inverse_search(&pdf_path, page, x, y) {
+                         return Ok(Some(serde_json::to_value(res).unwrap()));
+                     }
+                 }
+             }
+             return Ok(None);
+        }
+
         if params.command == "ferrotex.build" {
             let args = params.arguments;
             if args.is_empty() {
-                self.client.log_message(MessageType::ERROR, "Build command missing file URI argument").await;
+                self.client
+                    .log_message(
+                        MessageType::ERROR,
+                        "Build command missing file URI argument",
+                    )
+                    .await;
                 return Ok(None);
             }
 
@@ -605,12 +677,71 @@ impl LanguageServer for Backend {
             let uri = match Url::parse(uri_str) {
                 Ok(u) => u,
                 Err(_) => {
-                    self.client.log_message(MessageType::ERROR, "Invalid URI argument").await;
+                    self.client
+                        .log_message(MessageType::ERROR, "Invalid URI argument")
+                        .await;
                     return Ok(None);
                 }
             };
 
-            self.client.log_message(MessageType::INFO, format!("Starting build for: {}", uri)).await;
+            self.client
+                .log_message(MessageType::INFO, format!("Starting build for: {}", uri))
+                .await;
+
+            // --- Status Bar: Begin Progress (UX-4) ---
+            let token = NumberOrString::String("ferrotex-build".to_string());
+
+            // 1. Create Progress
+            let create_params = WorkDoneProgressCreateParams {
+                token: token.clone(),
+            };
+            let _ = self
+                .client
+                .send_request::<request::WorkDoneProgressCreate>(create_params)
+                .await;
+
+            // 2. Begin Progress
+            let begin_params = ProgressParams {
+                token: token.clone(),
+                value: ProgressParamsValue::WorkDone(WorkDoneProgress::Begin(
+                    WorkDoneProgressBegin {
+                        title: "Building PDF...".to_string(),
+                        cancellable: Some(false),
+                        message: Some("Resolving root...".to_string()),
+                        percentage: None,
+                    },
+                )),
+            };
+            self.client
+                .send_notification::<notification::Progress>(begin_params)
+                .await;
+            // ---------------------------------
+
+            // --- Magic Comment Detection (UX-2) ---
+            let mut build_uri = uri.clone();
+            if let Some(text) = self.get_text(&uri) {
+                if let Some(magic_path) = detect_magic_root(&text) {
+                    if let Ok(file_path) = uri.to_file_path() {
+                        if let Some(parent) = file_path.parent() {
+                            let new_path = parent.join(&magic_path);
+                            // Normalize if possible, but for now strict join
+                            if let Ok(new_uri) = Url::from_file_path(&new_path) {
+                                self.client
+                                    .log_message(
+                                        MessageType::INFO,
+                                        format!(
+                                            "Magic Root detected: Redirecting build to {}",
+                                            new_uri
+                                        ),
+                                    )
+                                    .await;
+                                build_uri = new_uri;
+                            }
+                        }
+                    }
+                }
+            }
+            // --------------------------------------
 
             // Resolve workspace root
             let root_path = {
@@ -619,33 +750,79 @@ impl LanguageServer for Backend {
             };
 
             let req = BuildRequest {
-                document_uri: uri.clone(),
+                document_uri: build_uri,
                 workspace_root: root_path,
             };
 
             let engine = LatexmkAdapter;
-            match engine.build(&req).await {
+            let result = engine.build(&req).await;
+
+            match result {
                 Ok(status) => match status {
                     BuildStatus::Success(artifact) => {
                         let msg = format!("Build Succeeded! Artifact: {:?}", artifact);
-                        self.client.show_message(MessageType::INFO, &msg).await;
-                        self.client.log_message(MessageType::INFO, msg).await;
+                        self.client.log_message(MessageType::INFO, &msg).await;
+                        // UX-5: Success Notification
+                        self.client
+                            .show_message(MessageType::INFO, "Build Succeeded 🎉")
+                            .await;
                     }
                     BuildStatus::Failure(log) => {
-                        self.client.log_message(MessageType::ERROR, "Build Failed").await;
+                        self.client
+                            .log_message(MessageType::ERROR, "Build Failed")
+                            .await;
                         // Stream stderr to log
                         for line in log.stderr.lines() {
                             self.client.log_message(MessageType::ERROR, line).await;
                         }
-                        self.client.show_message(MessageType::ERROR, "Build Failed. Check logs.").await;
+                        // UX-5: Failure Notification
+                        self.client
+                            .show_message(MessageType::ERROR, "Build Failed ❌ (Check Output)")
+                            .await;
+
+                        // BO-9: Missing Package Detection
+                        // Check stdout (latexmk usually captures tex output there) and stderr
+                        let combined_log = format!("{}\n{}", log.stdout, log.stderr);
+                        if let Some(pkg) = detect_missing_package(&combined_log) {
+                             let action = self.client.show_message_request(
+                                MessageType::WARNING, 
+                                format!("Package '{}' seems to be missing.", pkg), 
+                                Some(vec![MessageActionItem { title: format!("Install {}", pkg), properties: Default::default() }])
+                            ).await;
+                            
+                            if let Ok(Some(item)) = action {
+                                if item.title.starts_with("Install") {
+                                    self.client.show_message(MessageType::INFO, "Installing package... Check logs.").await;
+                                    if install_package(&self.client, &pkg).await {
+                                         self.client.show_message(MessageType::INFO, "Package installed. Try building again.").await;
+                                    } else {
+                                         self.client.show_message(MessageType::ERROR, "Installation failed. See logs.").await;
+                                    }
+                                }
+                            }
+                        }
                     }
                 },
                 Err(e) => {
                     let err_msg = format!("Build execution error: {}", e);
                     self.client.log_message(MessageType::ERROR, &err_msg).await;
-                    self.client.show_message(MessageType::ERROR, err_msg).await;
+                    self.client
+                        .show_message(MessageType::ERROR, "Build Error 💥")
+                        .await;
                 }
             }
+
+            // --- Status Bar: End Progress ---
+            let end_params = ProgressParams {
+                token: token.clone(),
+                value: ProgressParamsValue::WorkDone(WorkDoneProgress::End(WorkDoneProgressEnd {
+                    message: None,
+                })),
+            };
+            self.client
+                .send_notification::<notification::Progress>(end_params)
+                .await;
+            // -------------------------------
         }
         Ok(None)
     }
@@ -1420,6 +1597,34 @@ async fn watch_workspace(
     Ok(())
 }
 
+/// Scans the first 5 lines of the document for a magic comment like `%!TEX root = ...`.
+///
+/// Returns the path relative to the current file if found.
+#[allow(dead_code)]
+fn detect_magic_root(text: &str) -> Option<std::path::PathBuf> {
+    for line in text.lines().take(5) {
+        let line = line.trim_start();
+        if line.starts_with('%') {
+            // Strip %
+            let content = line[1..].trim_start();
+            // Check for !TEX root or ! TeX root
+            if content.starts_with('!') {
+                let content = content[1..].trim_start();
+                if content.to_ascii_lowercase().starts_with("tex root") {
+                    // Extract value after =
+                    if let Some(eq_idx) = content.find('=') {
+                        let path_str = content[eq_idx + 1..].trim();
+                        if !path_str.is_empty() {
+                            return Some(std::path::PathBuf::from(path_str));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
 #[tokio::main]
 async fn main() {
     let stdin = tokio::io::stdin();
@@ -1433,4 +1638,90 @@ async fn main() {
         syntax_diagnostics: Arc::new(DashMap::new()),
     });
     Server::new(stdin, stdout, socket).serve(service).await;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_magic_root_detection() {
+        let cases = vec![
+            ("%!TEX root = ../main.tex", Some("../main.tex")),
+            ("% !TeX root=  main.tex", Some("main.tex")),
+            ("%!TEX root=subdir/main.tex", Some("subdir/main.tex")),
+            ("% Regular comment", None),
+            ("No comment at all", None),
+        ];
+
+        for (input, expected) in cases {
+            assert_eq!(
+                detect_magic_root(input).map(|p| p.to_string_lossy().to_string()),
+                expected.map(|s| s.to_string())
+            );
+        }
+    }
+
+    #[test]
+    fn test_magic_root_limit() {
+        // Line 1-5 (first 5 lines) are safe. Line 6 is ignored.
+        // lines() iterator: 1, 2, 3, 4, 5. So text with 5 leading newlines means the magic comment is on 6th line.
+        let text = "\n\n\n\n\n%!TEX root = hidden.tex";
+        assert_eq!(detect_magic_root(text), None);
+
+        let valid_text = "\n\n\n\n%!TEX root = visible.tex"; // On 5th line
+        assert_eq!(
+            detect_magic_root(valid_text).map(|p| p.to_string_lossy().to_string()),
+            Some("visible.tex".to_string())
+        );
+    }
+}
+
+/// Analyzes the build log to identify a missing LaTeX package.
+///
+/// Looks for the standard `! LaTeX Error: File 'foo.sty' not found.` pattern.
+fn detect_missing_package(log: &str) -> Option<String> {
+    for line in log.lines() {
+        if let Some(idx) = line.find("! LaTeX Error: File '") {
+            let rest = &line[idx + 21..];
+            if let Some(end_idx) = rest.find("'") {
+                let filename = &rest[..end_idx];
+                if filename.ends_with(".sty") {
+                    return Some(filename.trim_end_matches(".sty").to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Installs a package using `tlmgr`.
+///
+/// Returns `true` if installation succeeded.
+async fn install_package(client: &Client, package: &str) -> bool {
+    client.log_message(MessageType::INFO, format!("Attempting to install package '{}'...", package)).await;
+    
+    // Use tokio Command if available, but for simplicity/mvp std might suffice if short lived.
+    // But async is better. backend implies tokio runtime.
+    let output = match tokio::process::Command::new("tlmgr")
+        .arg("install")
+        .arg(package)
+        .output()
+        .await 
+    {
+        Ok(o) => o,
+        Err(e) => {
+             client.log_message(MessageType::ERROR, format!("Failed to execute tlmgr: {}", e)).await;
+             return false;
+        }
+    };
+
+    if output.status.success() {
+         client.log_message(MessageType::INFO, format!("Successfully installed '{}'.", package)).await;
+         true
+    } else {
+         let stderr = String::from_utf8_lossy(&output.stderr);
+         client.log_message(MessageType::ERROR, format!("tlmgr failed: {}", stderr)).await;
+         false
+    }
 }
