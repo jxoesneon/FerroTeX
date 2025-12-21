@@ -9,3 +9,13 @@ pub mod ir;
 pub mod parser;
 
 pub use parser::LogParser;
+
+/// Schema version for the log event IR.
+///
+/// This version follows semantic versioning:
+/// - MAJOR: Breaking changes to event structure
+/// - MINOR: New optional fields or event types
+/// - PATCH: Bug fixes to parsing behavior
+///
+/// Starting with 1.0.0, backward compatibility is guaranteed within major versions.
+pub const SCHEMA_VERSION: &str = "1.0.0";

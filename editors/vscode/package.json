@@ -2,7 +2,7 @@
   "name": "ferrotex",
   "displayName": "FerroTeX",
   "description": "FerroTeX Language Server Client",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "publisher": "ferrotex",
   "engines": {
     "vscode": "^1.75.0"
@@ -61,11 +61,19 @@
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./"
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package --out ferrotex.vsix",
+    "test": "node ./out/test/runTest.js"
   },
   "devDependencies": {
+    "@types/glob": "^8.0.0",
+    "@types/mocha": "^10.0.0",
     "@types/node": "^18.0.0",
     "@types/vscode": "^1.75.0",
+    "@vscode/test-electron": "^2.3.0",
+    "@vscode/vsce": "^2.22.0",
+    "glob": "^10.0.0",
+    "mocha": "^10.2.0",
     "typescript": "^4.9.0"
   },
   "dependencies": {

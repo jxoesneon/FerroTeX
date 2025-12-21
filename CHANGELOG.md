@@ -6,6 +6,27 @@ The format is based on **Keep a Changelog**, and this project intends to follow 
 
 ## [Unreleased]
 
+## [0.14.0] - 2025-12-21
+
+### Added
+
+- **Schema Stabilization**:
+  - Introduced `ferrotex_log::SCHEMA_VERSION = "1.0.0"` constant for log event IR.
+  - Updated `docs/spec/log-event-ir.md` with compatibility guarantees.
+- **Test Coverage**:
+  - Added `coverage.yml` GitHub Actions workflow with cargo-tarpaulin.
+  - Integrated Codecov for coverage reporting.
+  - Added CI/coverage badges to README.
+- **Extension Testing**:
+  - Added VS Code extension test suite with mocha framework.
+  - Added `@vscode/test-electron` for automated extension testing.
+- **VSIX Packaging**:
+  - Added `vsce` and `npm run package` script for VSIX builds.
+  - Added `extension` CI job to build VSIX artifacts.
+- **Documentation**:
+  - Premium documentation design with Just the Docs theme.
+  - Wiki automation (`wiki-sync.yml`).
+
 ## [0.13.0] - 2025-12-20
 
 ### Added
