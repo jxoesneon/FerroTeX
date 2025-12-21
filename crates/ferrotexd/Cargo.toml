@@ -1,6 +1,6 @@
 [package]
 name = "ferrotexd"
-version = "0.10.0"
+version = "0.11.0"
 edition = "2024"
 description = "LSP implementation for FerroTeX"
 license = "Apache-2.0 OR MIT"
@@ -14,10 +14,11 @@ serde_json = "1.0"
 anyhow = "1.0"
 notify = "6.0"
 dashmap = "5.5"
-ferrotex-log = { path = "../ferrotex-log", version = "0.10.0" }
-ferrotex-syntax = { path = "../ferrotex-syntax", version = "0.10.0" }
+ferrotex-log = { path = "../ferrotex-log", version = "0.11.0" }
+ferrotex-syntax = { path = "../ferrotex-syntax", version = "0.11.0" }
 line-index = "0.1"
 rowan = "0.15"
+async-trait = "0.1.89"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }
