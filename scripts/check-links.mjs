@@ -7,7 +7,13 @@ const repoRoot = process.cwd();
 async function* walk(dir) {
   const entries = await fs.readdir(dir, { withFileTypes: true });
   for (const entry of entries) {
-    if (entry.name === "node_modules" || entry.name === "_site" || entry.name === "build") continue;
+    if (
+      entry.name === "node_modules" ||
+      entry.name === "_site" ||
+      entry.name === "build" ||
+      entry.name === "wiki"
+    )
+      continue;
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       yield* walk(fullPath);
