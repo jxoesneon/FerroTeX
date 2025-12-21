@@ -1,17 +1,19 @@
 name: Release
 
-"on":
+on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  github-release:
-    name: GitHub Release
+  release:
+    name: Build, Test & Release
     runs-on: ubuntu-latest
+    # environment: release # NOTE: Requires repo environment configuration
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -22,32 +24,44 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Install
+      - name: Install Node Dependencies
         run: npm ci
 
-      - name: Lint
+      - name: Lint Extension
         run: npm run lint
 
-      - name: TeX Live smoke build
+      # Safeguard: Test Rust Codebase
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+      - name: Build Rust Crates
+        run: cargo build --verbose --workspace
+      - name: Test Rust Crates
+        run: cargo test --verbose --workspace
+
+      # Safeguard: TeX Live Smoke Test
+      - name: TeX Live Smoke Build
         uses: xu-cheng/texlive-action@v3
         with:
           scheme: full
           run: |
             latexmk -pdf -interaction=nonstopmode -halt-on-error -file-line-error -output-directory=build tests/tex/smoke/main.tex
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+      # Build Artifact
+      - name: Package VSIX
+        working-directory: editors/vscode
+        run: npm run package
 
-      - name: Rust Cache
-        uses: Swatinem/rust-cache@v2
+      # Publish to Open VSX
+      - name: Publish to Open VSX
+        working-directory: editors/vscode
+        run: npx ovsx publish ferrotex-*.vsix -p ${{ secrets.OVSX_TOKEN }}
+        continue-on-error: true # Prevent failure if version already exists (idempotency)
 
-      - name: Build Rust Crates
-        run: cargo build --verbose --workspace
-
-      - name: Test Rust Crates
-        run: cargo test --verbose --workspace
-
+      # Create GitHub Release
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          files: editors/vscode/ferrotex-*.vsix
           generate_release_notes: true

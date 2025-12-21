@@ -2,7 +2,7 @@
   "name": "ferrotex",
   "displayName": "FerroTeX",
   "description": "High-performance LaTeX language support with IDE features, PDF preview, and intelligent diagnostics.",
-  "version": "0.14.0",
+  "version": "0.16.0",
   "publisher": "ferrotex",
   "license": "Apache-2.0",
   "repository": {
@@ -48,7 +48,316 @@
         "ferrotex.serverPath": {
           "type": "string",
           "default": "ferrotexd",
-          "description": "Path to the ferrotexd executable"
+          "markdownDescription": "Path to the ferrotexd executable. Leave as `ferrotexd` to use bundled binary or system PATH.",
+          "scope": "machine-overridable",
+          "order": 0
+        },
+        "ferrotex.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "markdownDescription": "⚙️ **Advanced**: Traces communication between VS Code and the language server for debugging.",
+          "scope": "window",
+          "order": 99
+        },
+        "ferrotex.build.autoBuildOnSave": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "⚡ Automatically rebuild PDF when saving LaTeX files (enables live preview).",
+          "scope": "resource",
+          "order": 10
+        },
+        "ferrotex.build.engine": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "tectonic",
+            "latexmk",
+            "pdflatex",
+            "xelatex",
+            "lualatex"
+          ],
+          "enumDescriptions": [
+            "Automatically select best available engine (tries Tectonic first)",
+            "Use Tectonic (modern, self-contained LaTeX engine)",
+            "Use latexmk (handles multiple passes automatically)",
+            "Use pdflatex (traditional LaTeX → PDF)",
+            "Use XeLaTeX (Unicode and system fonts)",
+            "Use LuaLaTeX (Lua scripting support)"
+          ],
+          "default": "auto",
+          "markdownDescription": "LaTeX build engine to use. `auto` tries Tectonic first, then falls back to latexmk.",
+          "scope": "resource",
+          "order": 11
+        },
+        "ferrotex.build.outputDirectory": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "⚙️ **Advanced**: Custom output directory for build artifacts (relative to source file). Leave empty to use source directory.",
+          "scope": "resource",
+          "order": 12
+        },
+        "ferrotex.build.cleanAuxiliaryFiles": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "⚙️ **Advanced**: Clean auxiliary files (.aux, .log, etc.) after successful build.",
+          "scope": "resource",
+          "order": 13
+        },
+        "ferrotex.build.showOutputPanel": {
+          "type": "string",
+          "enum": [
+            "always",
+            "onError",
+            "never"
+          ],
+          "enumDescriptions": [
+            "Always show build output panel",
+            "Show only when build fails",
+            "Never show automatically"
+          ],
+          "default": "onError",
+          "markdownDescription": "When to automatically show the build output panel.",
+          "scope": "window",
+          "order": 14
+        },
+        "ferrotex.build.tectonicPath": {
+          "type": "string",
+          "default": "tectonic",
+          "markdownDescription": "⚙️ **Advanced**: Custom path to Tectonic executable. Leave as `tectonic` to use bundled or system PATH.",
+          "scope": "machine-overridable",
+          "order": 15
+        },
+        "ferrotex.build.latexmkPath": {
+          "type": "string",
+          "default": "latexmk",
+          "markdownDescription": "⚙️ **Advanced**: Custom path to latexmk executable. Leave as `latexmk` to use system PATH.",
+          "scope": "machine-overridable",
+          "order": 16
+        },
+        "ferrotex.build.pdflatexPath": {
+          "type": "string",
+          "default": "pdflatex",
+          "markdownDescription": "⚙️ **Advanced**: Custom path to pdflatex executable. Leave as `pdflatex` to use system PATH.",
+          "scope": "machine-overridable",
+          "order": 17
+        },
+        "ferrotex.build.xelatexPath": {
+          "type": "string",
+          "default": "xelatex",
+          "markdownDescription": "⚙️ **Advanced**: Custom path to XeLaTeX executable. Leave as `xelatex` to use system PATH.",
+          "scope": "machine-overridable",
+          "order": 18
+        },
+        "ferrotex.build.lualatexPath": {
+          "type": "string",
+          "default": "lualatex",
+          "markdownDescription": "⚙️ **Advanced**: Custom path to LuaLaTeX executable. Leave as `lualatex` to use system PATH.",
+          "scope": "machine-overridable",
+          "order": 19
+        },
+        "ferrotex.lint.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "🔍 Enable live LaTeX linting and diagnostics.",
+          "scope": "resource",
+          "order": 20
+        },
+        "ferrotex.lint.onType": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Show lint diagnostics while typing (may impact performance on large files).",
+          "scope": "resource",
+          "order": 21
+        },
+        "ferrotex.lint.deprecatedCommands": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Warn about deprecated LaTeX commands (e.g., `\\bf`, `\\it`, `\\sc`).",
+          "scope": "resource",
+          "order": 22
+        },
+        "ferrotex.lint.obsoletePackages": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Warn about obsolete LaTeX packages (e.g., `times`, `a4wide`, `epsfig`).",
+          "scope": "resource",
+          "order": 23
+        },
+        "ferrotex.lint.displayMathDelimiters": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Warn about deprecated `$$...$$` display math delimiters (LaTeX2e recommends `\\[...\\]`).",
+          "scope": "resource",
+          "order": 24
+        },
+        "ferrotex.preview.syncToSource": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "📄 Enable SyncTeX integration for bidirectional source ↔ PDF navigation.",
+          "scope": "resource",
+          "order": 30
+        },
+        "ferrotex.preview.defaultZoom": {
+          "type": "number",
+          "default": 100,
+          "minimum": 25,
+          "maximum": 500,
+          "markdownDescription": "Default zoom level for PDF preview (%).",
+          "scope": "window",
+          "order": 31
+        },
+        "ferrotex.preview.scrollMode": {
+          "type": "string",
+          "enum": [
+            "vertical",
+            "horizontal",
+            "wrapped"
+          ],
+          "enumDescriptions": [
+            "Vertical scrolling (default)",
+            "Horizontal scrolling",
+            "Wrapped page layout"
+          ],
+          "default": "vertical",
+          "markdownDescription": "PDF page scroll mode.",
+          "scope": "window",
+          "order": 32
+        },
+        "ferrotex.completion.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "💡 Enable LaTeX command and environment autocompletion.",
+          "scope": "resource",
+          "order": 40
+        },
+        "ferrotex.completion.packages": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show package suggestions from CTAN metadata.",
+          "scope": "resource",
+          "order": 41
+        },
+        "ferrotex.completion.citations": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Enable BibTeX citation completion from `.bib` files.",
+          "scope": "resource",
+          "order": 42
+        },
+        "ferrotex.format.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "✨ Enable automatic LaTeX code formatting.",
+          "scope": "resource",
+          "order": 50
+        },
+        "ferrotex.format.onSave": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Automatically format document when saving.",
+          "scope": "resource",
+          "order": 51
+        },
+        "ferrotex.format.indentSize": {
+          "type": "number",
+          "default": 2,
+          "minimum": 1,
+          "maximum": 8,
+          "markdownDescription": "Number of spaces per indentation level.",
+          "scope": "resource",
+          "order": 52
+        },
+        "ferrotex.imagePaste.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "🖼️ Enable image paste wizard for clipboard images.",
+          "scope": "resource",
+          "order": 60
+        },
+        "ferrotex.imagePaste.defaultDirectory": {
+          "type": "string",
+          "default": "figures",
+          "markdownDescription": "Default directory for pasted images (relative to source file).",
+          "scope": "resource",
+          "order": 61
+        },
+        "ferrotex.imagePaste.filenamePattern": {
+          "type": "string",
+          "default": "image-{timestamp}",
+          "markdownDescription": "⚙️ **Advanced**: Filename pattern for pasted images. Available variables: `{timestamp}`, `{uuid}`, `{counter}`.",
+          "scope": "resource",
+          "order": 62
+        },
+        "ferrotex.hover.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "📚 Show hover information for LaTeX commands and packages.",
+          "scope": "resource",
+          "order": 70
+        },
+        "ferrotex.hover.citations": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show rich citation details on hover (requires `.bib` files).",
+          "scope": "resource",
+          "order": 71
+        },
+        "ferrotex.hover.previewMath": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "🔮 **Experimental**: Show rendered math in hover tooltips (requires KaTeX).",
+          "scope": "resource",
+          "order": 72
+        },
+        "ferrotex.workspace.scanOnStartup": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "🔄 Scan workspace for LaTeX files on startup for comprehensive linting.",
+          "scope": "window",
+          "order": 80
+        },
+        "ferrotex.workspace.maxFileSize": {
+          "type": "number",
+          "default": 10,
+          "minimum": 1,
+          "maximum": 100,
+          "markdownDescription": "⚙️ **Advanced**: Maximum file size for indexing (MB). Larger files are skipped.",
+          "scope": "window",
+          "order": 81
+        },
+        "ferrotex.workspace.excludePatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "**/build/**",
+            "**/out/**",
+            "**/.git/**",
+            "**/node_modules/**"
+          ],
+          "markdownDescription": "⚙️ **Advanced**: Glob patterns to exclude from workspace indexing.",
+          "scope": "resource",
+          "order": 82
+        },
+        "ferrotex.diagnostics.humanReadableErrors": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "🎯 Show human-readable error explanations for common LaTeX errors.",
+          "scope": "resource",
+          "order": 90
+        },
+        "ferrotex.diagnostics.showCode": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show error codes in diagnostics messages.",
+          "scope": "resource",
+          "order": 91
         }
       }
     },
@@ -58,10 +367,24 @@
         "title": "FerroTeX: Build Document"
       },
       {
+        "command": "ferrotex.openPreview",
+        "title": "FerroTeX: Open PDF Preview",
+        "icon": "$(open-preview)"
+      },
+      {
         "command": "ferrotex.syncToPdf",
         "title": "FerroTeX: Sync to PDF"
       }
     ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "ferrotex.openPreview",
+          "when": "editorLangId == latex || editorLangId == tex",
+          "group": "navigation"
+        }
+      ]
+    },
     "keybindings": [
       {
         "command": "ferrotex.build",
@@ -81,15 +404,25 @@
         ],
         "priority": "default"
       }
+    ],
+    "snippets": [
+      {
+        "language": "latex",
+        "path": "./snippets/latex.json"
+      },
+      {
+        "language": "tex",
+        "path": "./snippets/latex.json"
+      }
     ]
   },
   "scripts": {
     "vscode:prepublish": "npm run check-types && node esbuild.js --production",
     "compile": "node esbuild.js",
     "watch": "node esbuild.js --watch",
-    "package": "vsce package --out ferrotex.vsix",
+    "package": "vsce package",
     "check-types": "tsc --noEmit",
-    "test": "npm run check-types && npm run compile && node ./out/test/runTest.js"
+    "test": "tsc -p ./ && npm run compile && node ./out/test/runTest.js"
   },
   "devDependencies": {
     "@types/glob": "^8.0.0",

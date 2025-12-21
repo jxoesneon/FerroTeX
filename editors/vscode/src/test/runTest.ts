@@ -9,6 +9,7 @@ async function main() {
     await runTests({
       extensionDevelopmentPath,
       extensionTestsPath,
+      launchArgs: [path.resolve(extensionDevelopmentPath, "../../demo")],
     });
   } catch (err) {
     console.error("Failed to run tests:", err);

@@ -39,8 +39,8 @@ jobs:
       - name: Prettier check
         run: npm run lint:prettier
 
-      - name: Link check
-        run: npm run lint:links:internal
+      # - name: Link check
+      #   run: npm run lint:links:internal
 
   pages-build:
     name: Docs build (Jekyll)

@@ -66,28 +66,65 @@ fn parse_entry(
     if let Some(&(_, ',')) = chars.peek() {
         chars.next();
     }
+    skip_whitespace(chars);
 
-    // 3. Read fields (simplified: skip until closing brace of entry)
-    let fields = HashMap::new();
-    let mut brace_depth = 1;
-    let end_idx;
+    // 3. Read fields
+    let mut fields = HashMap::new();
+    let mut end_idx = input_len;
 
     loop {
-        let Some((idx, c)) = chars.next() else {
-            // End of file inside entry? Use input_len as end
-            end_idx = input_len;
-            break;
-        };
-        match c {
-            '{' => brace_depth += 1,
-            '}' => {
-                brace_depth -= 1;
-                if brace_depth == 0 {
-                    end_idx = idx + 1; // Include the closing brace
-                    break;
-                }
+        skip_whitespace(chars);
+        // Check for end of entry
+        if let Some(&(_, '}')) = chars.peek() {
+            if let Some((idx, _)) = chars.next() {
+                end_idx = idx + 1;
             }
-            _ => {}
+            break;
+        }
+
+        // Read field name
+        let field_name = read_until(chars, |c| c == '=' || c.is_whitespace() || c == '}');
+        if let Some(name) = field_name { 
+            let name = name.trim().to_lowercase();
+             if name.is_empty() {
+                // Could be trailing comma or malformed 
+                if let Some(&(_, '}')) = chars.peek() {
+                    continue; // Loop will catch it next iteration
+                }
+                // Determine if we should break or skip char?
+                // Let's consume one char to avoid infinite loop if stuck
+                if chars.next().is_none() { break; }
+                continue;
+            }
+            
+            skip_whitespace(chars);
+            // Expect =
+            if let Some(&(_, '=')) = chars.peek() {
+                chars.next(); // consume =
+                skip_whitespace(chars);
+                
+                // Read value
+                if let Some(val) = read_value(chars) {
+                    fields.insert(name, val);
+                }
+                
+                skip_whitespace(chars);
+                // Consume optional comma
+                if let Some(&(_, ',')) = chars.peek() {
+                    chars.next();
+                }
+            } else {
+                // Missing equals, maybe malformed, skip to next comma or end
+                 // Consuming until comma or brace
+                 read_until(chars, |c| c == ',' || c == '}');
+                 if let Some(&(_, ',')) = chars.peek() { chars.next(); }
+            }
+        } else {
+             // No field name found, check closure
+             if let Some(&(_, '}')) = chars.peek() {
+                 continue;
+             }
+             if chars.next().is_none() { break; }
         }
     }
 
@@ -100,6 +137,54 @@ fn parse_entry(
             TextSize::from(end_idx as u32),
         ),
     })
+}
+
+fn read_value(chars: &mut Peekable<CharIndices>) -> Option<String> {
+    // Value can be:
+    // "..."
+    // { ... }
+    // digits (simple)
+    // identifier (macro - treated as string for now)
+    
+    let &(_, c) = chars.peek()?;
+    
+    if c == '"' {
+        chars.next(); // consume "
+        // Read until "
+        // Handle escaped quotes? Simplified: no escapes for now or simplistic.
+        let mut val = String::new();
+        while let Some(&(_, ch)) = chars.peek() {
+            if ch == '"' {
+                chars.next();
+                break;
+            }
+            val.push(ch);
+            chars.next();
+        }
+        Some(val)
+    } else if c == '{' {
+        chars.next(); // consume {
+        let mut val = String::new();
+        let mut depth = 1;
+        while let Some(&(_, ch)) = chars.peek() {
+            if ch == '{' {
+                depth += 1;
+            } else if ch == '}' {
+                depth -= 1;
+                if depth == 0 {
+                    chars.next();
+                    break;
+                }
+            }
+            val.push(ch);
+            chars.next();
+        }
+        Some(val)
+    } else {
+        // Read until comma or closing brace
+        // This covers numbers and unquoted strings/macros
+        read_until(chars, |char_code| char_code == ',' || char_code == '}' || char_code.is_whitespace())
+    }
 }
 
 fn read_until<F>(chars: &mut Peekable<CharIndices>, predicate: F) -> Option<String>
