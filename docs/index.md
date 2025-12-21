@@ -25,9 +25,9 @@ FerroTeX provides industry-standard IDE features via the Language Server Protoco
 
 ## Quick Links
 
-- [Getting Started](development/setup) — Set up your development environment
-- [Architecture Overview](architecture/overview) — Understand the system design
-- [LSP Specification](spec/lsp) — Language Server Protocol features
+- [Getting Started](development/setup.md) — Set up your development environment
+- [Architecture Overview](architecture/overview.md) — Understand the system design
+- [LSP Specification](spec/lsp.md) — Language Server Protocol features
 - [Roadmap](https://github.com/jxoesneon/FerroTeX/blob/main/ROADMAP.md) — What's coming next
 
 ---
