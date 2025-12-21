@@ -1,6 +1,6 @@
 {
   "globs": ["**/*.md"],
-  "ignores": ["**/node_modules/**", "**/_site/**", "**/build/**", "**/target/**"],
+  "ignores": ["**/node_modules/**", "**/_site/**", "**/build/**", "**/target/**", "**/.agent/**"],
   "config": {
     "MD013": false,
     "MD025": false,
