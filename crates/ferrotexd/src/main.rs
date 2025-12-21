@@ -1511,6 +1511,9 @@ async fn watch_workspace(
     Ok(())
 }
 
+/// Scans the first 5 lines of the document for a magic comment like `%!TEX root = ...`.
+///
+/// Returns the path relative to the current file if found.
 #[allow(dead_code)]
 fn detect_magic_root(text: &str) -> Option<std::path::PathBuf> {
     for line in text.lines().take(5) {

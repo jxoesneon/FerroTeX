@@ -57,6 +57,13 @@ export function deactivate(): Thenable<void> | undefined {
   return client.stop();
 }
 
+/**
+ * Handles pasting of image data from the clipboard.
+ * 
+ * - Prompts the user for a filename.
+ * - Saves the image file relative to the document.
+ * - Inserts an `\includegraphics{...}` snippet.
+ */
 class ImagePasteProvider implements vscode.DocumentPasteEditProvider {
     async provideDocumentPasteEdits(
         document: vscode.TextDocument,
