@@ -6,6 +6,21 @@ The format is based on **Keep a Changelog**, and this project intends to follow 
 
 ## [Unreleased]
 
+## [0.10.0] - 2025-12-20
+
+### Added
+
+- **Formatting**: Introduced `ferrotexd/src/fmt.rs`, a conservative structural formatter for LaTeX documents.
+  - Automatically corrects indentation for nested environments.
+  - Supports `\begin{...}` and `\end{...}` blocks.
+  - Does not alter line breaks or reflow text to ensure data safety.
+- **LSP Features**:
+  - Implemented `textDocument/formatting` handler.
+  - Implemented `textDocument/codeAction` stub (foundation for Quick Fixes).
+- **Client**:
+  - Registered `ferrotex.build` command foundation (stashed for v0.11.0).
+  - Cleaned up dependency versions.
+
 ## [0.9.0] - 2025-12-20
 
 ### Added

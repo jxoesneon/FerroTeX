@@ -1,9 +1,10 @@
 node_modules
 _site
-build
+/build
 .DS_Store
 .windsurf/*
 /target
 Cargo.locktest.log
 refactor_plan.md
 *plan*.md
+.agent/*
