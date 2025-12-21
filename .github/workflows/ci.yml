@@ -87,3 +87,34 @@ jobs:
 
       - name: Test
         run: cargo test --verbose
+
+  extension:
+    name: VS Code Extension
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: editors/vscode
+
+      - name: Compile
+        run: npm run compile
+        working-directory: editors/vscode
+
+      - name: Package VSIX
+        run: npm run package
+        working-directory: editors/vscode
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ferrotex-vsix
+          path: editors/vscode/ferrotex.vsix
+          retention-days: 30
