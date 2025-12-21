@@ -3,6 +3,7 @@
 [![CI](https://github.com/jxoesneon/FerroTeX/actions/workflows/ci.yml/badge.svg)](https://github.com/jxoesneon/FerroTeX/actions/workflows/ci.yml)
 [![Coverage](https://codecov.io/gh/jxoesneon/FerroTeX/branch/main/graph/badge.svg)](https://codecov.io/gh/jxoesneon/FerroTeX)
 [![License](https://img.shields.io/badge/license-Apache--2.0%20%2F%20MIT-blue)](LICENSE-CHOICE.md)
+[![Ko-fi](https://img.shields.io/badge/Donate-Ko--fi-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/jxoesneon)
 
 **FerroTeX** is a research-driven, high-performance, type-safe **LaTeX language platform** for modern editors.
 
