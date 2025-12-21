@@ -1,93 +1,101 @@
-import * as vscode from 'vscode';
-import { LanguageClient } from 'vscode-languageclient/node';
+import * as vscode from "vscode";
+import { LanguageClient } from "vscode-languageclient/node";
 
 /**
  * integrated PDF Viewer provider for FerroTeX.
- * 
+ *
  * Uses `pdfjs-dist` to render PDFs in a Webview.
  * Supports SyncTeX (Forward and Inverse).
  */
 export class PdfPreviewProvider implements vscode.CustomReadonlyEditorProvider {
-    public static readonly viewType = 'ferrotex.pdfPreview';
-    private readonly panels = new Map<string, vscode.WebviewPanel>();
+  public static readonly viewType = "ferrotex.pdfPreview";
+  private readonly panels = new Map<string, vscode.WebviewPanel>();
 
-    constructor(
-        private readonly extensionUri: vscode.Uri,
-        private readonly client: LanguageClient
-    ) {}
+  constructor(
+    private readonly extensionUri: vscode.Uri,
+    private readonly client: LanguageClient,
+  ) {}
 
-    openCustomDocument(
-        uri: vscode.Uri,
-        _openContext: vscode.CustomDocumentOpenContext,
-        _token: vscode.CancellationToken
-    ): vscode.CustomDocument {
-        return { uri, dispose: () => {} };
-    }
+  openCustomDocument(
+    uri: vscode.Uri,
+    _openContext: vscode.CustomDocumentOpenContext,
+    _token: vscode.CancellationToken,
+  ): vscode.CustomDocument {
+    return { uri, dispose: () => {} };
+  }
 
-    async resolveCustomEditor(
-        document: vscode.CustomDocument,
-        webviewPanel: vscode.WebviewPanel,
-        _token: vscode.CancellationToken
-    ): Promise<void> {
-        this.panels.set(document.uri.toString(), webviewPanel);
-        
-        webviewPanel.onDidDispose(() => {
-            this.panels.delete(document.uri.toString());
-        });
+  async resolveCustomEditor(
+    document: vscode.CustomDocument,
+    webviewPanel: vscode.WebviewPanel,
+    _token: vscode.CancellationToken,
+  ): Promise<void> {
+    this.panels.set(document.uri.toString(), webviewPanel);
 
-        webviewPanel.webview.options = { 
-            enableScripts: true,
-            localResourceRoots: [
-                vscode.Uri.joinPath(this.extensionUri, 'node_modules'),
-                vscode.Uri.file(document.uri.path).with({ path: document.uri.path.substring(0, document.uri.path.lastIndexOf('/') + 1) })
-            ]
-        };
+    webviewPanel.onDidDispose(() => {
+      this.panels.delete(document.uri.toString());
+    });
 
-        webviewPanel.webview.html = this.getHtmlForWebview(webviewPanel.webview, document.uri);
+    webviewPanel.webview.options = {
+      enableScripts: true,
+      localResourceRoots: [
+        vscode.Uri.joinPath(this.extensionUri, "node_modules"),
+        vscode.Uri.file(document.uri.path).with({
+          path: document.uri.path.substring(0, document.uri.path.lastIndexOf("/") + 1),
+        }),
+      ],
+    };
 
-        webviewPanel.webview.onDidReceiveMessage(async e => {
-            if (e.command === 'synctex_inverse') {
-                const args = [ document.uri.toString(), e.page, e.x, e.y ];
-                const result = await this.client.sendRequest('workspace/executeCommand', {
-                    command: 'ferrotex.synctex_inverse',
-                    arguments: args
-                }) as any;
+    webviewPanel.webview.html = this.getHtmlForWebview(webviewPanel.webview, document.uri);
 
-                if (result) {
-                    const fileUri = vscode.Uri.file(result.file);
-                    const doc = await vscode.workspace.openTextDocument(fileUri);
-                    const editor = await vscode.window.showTextDocument(doc, vscode.ViewColumn.One);
-                    const pos = new vscode.Position(result.line, 0);
-                    editor.selection = new vscode.Selection(pos, pos);
-                    editor.revealRange(new vscode.Range(pos, pos), vscode.TextEditorRevealType.InCenter);
-                }
-            }
-        });
-    }
+    webviewPanel.webview.onDidReceiveMessage(async (e) => {
+      if (e.command === "synctex_inverse") {
+        const args = [document.uri.toString(), e.page, e.x, e.y];
+        const result = (await this.client.sendRequest("workspace/executeCommand", {
+          command: "ferrotex.synctex_inverse",
+          arguments: args,
+        })) as any;
 
-    /**
-     * Reveals a specific location in the PDF.
-     * Used for SyncTeX Forward Search.
-     */
-    public reveal(pdfUri: vscode.Uri, page: number, x: number, y: number) {
-        const panel = this.panels.get(pdfUri.toString());
-        if (panel) {
-            panel.reveal();
-            panel.webview.postMessage({ command: 'synctex_forward', page, x, y });
+        if (result) {
+          const fileUri = vscode.Uri.file(result.file);
+          const doc = await vscode.workspace.openTextDocument(fileUri);
+          const editor = await vscode.window.showTextDocument(doc, vscode.ViewColumn.One);
+          const pos = new vscode.Position(result.line, 0);
+          editor.selection = new vscode.Selection(pos, pos);
+          editor.revealRange(new vscode.Range(pos, pos), vscode.TextEditorRevealType.InCenter);
         }
+      }
+    });
+  }
+
+  /**
+   * Reveals a specific location in the PDF.
+   * Used for SyncTeX Forward Search.
+   */
+  public reveal(pdfUri: vscode.Uri, page: number, x: number, y: number) {
+    const panel = this.panels.get(pdfUri.toString());
+    if (panel) {
+      panel.reveal();
+      panel.webview.postMessage({ command: "synctex_forward", page, x, y });
     }
+  }
 
-    private getHtmlForWebview(webview: vscode.Webview, pdfUri: vscode.Uri): string {
-        const pdfJsUri = webview.asWebviewUri(
-            vscode.Uri.joinPath(this.extensionUri, 'node_modules', 'pdfjs-dist', 'build', 'pdf.mjs')
-        );
-        const pdfWorkerUri = webview.asWebviewUri(
-            vscode.Uri.joinPath(this.extensionUri, 'node_modules', 'pdfjs-dist', 'build', 'pdf.worker.mjs')
-        );
+  private getHtmlForWebview(webview: vscode.Webview, pdfUri: vscode.Uri): string {
+    const pdfJsUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, "node_modules", "pdfjs-dist", "build", "pdf.mjs"),
+    );
+    const pdfWorkerUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(
+        this.extensionUri,
+        "node_modules",
+        "pdfjs-dist",
+        "build",
+        "pdf.worker.mjs",
+      ),
+    );
 
-        const pdfContentUri = webview.asWebviewUri(pdfUri);
+    const pdfContentUri = webview.asWebviewUri(pdfUri);
 
-        return `<!DOCTYPE html>
+    return `<!DOCTYPE html>
         <html lang="en">
         <head>
             <meta charset="UTF-8">
@@ -267,5 +275,5 @@ export class PdfPreviewProvider implements vscode.CustomReadonlyEditorProvider {
             </script>
         </body>
         </html>`;
-    }
+  }
 }

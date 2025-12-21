@@ -9,61 +9,73 @@ const vscode = require("vscode");
  * Supports SyncTeX (Forward and Inverse).
  */
 class PdfPreviewProvider {
-    constructor(extensionUri, client) {
-        this.extensionUri = extensionUri;
-        this.client = client;
-        this.panels = new Map();
-    }
-    openCustomDocument(uri, _openContext, _token) {
-        return { uri, dispose: () => { } };
-    }
-    async resolveCustomEditor(document, webviewPanel, _token) {
-        this.panels.set(document.uri.toString(), webviewPanel);
-        webviewPanel.onDidDispose(() => {
-            this.panels.delete(document.uri.toString());
+  constructor(extensionUri, client) {
+    this.extensionUri = extensionUri;
+    this.client = client;
+    this.panels = new Map();
+  }
+  openCustomDocument(uri, _openContext, _token) {
+    return { uri, dispose: () => {} };
+  }
+  async resolveCustomEditor(document, webviewPanel, _token) {
+    this.panels.set(document.uri.toString(), webviewPanel);
+    webviewPanel.onDidDispose(() => {
+      this.panels.delete(document.uri.toString());
+    });
+    webviewPanel.webview.options = {
+      enableScripts: true,
+      localResourceRoots: [
+        vscode.Uri.joinPath(this.extensionUri, "node_modules"),
+        vscode.Uri.file(document.uri.path).with({
+          path: document.uri.path.substring(0, document.uri.path.lastIndexOf("/") + 1),
+        }),
+      ],
+    };
+    webviewPanel.webview.html = this.getHtmlForWebview(webviewPanel.webview, document.uri);
+    webviewPanel.webview.onDidReceiveMessage(async (e) => {
+      if (e.command === "synctex_inverse") {
+        const args = [document.uri.toString(), e.page, e.x, e.y];
+        const result = await this.client.sendRequest("workspace/executeCommand", {
+          command: "ferrotex.synctex_inverse",
+          arguments: args,
         });
-        webviewPanel.webview.options = {
-            enableScripts: true,
-            localResourceRoots: [
-                vscode.Uri.joinPath(this.extensionUri, 'node_modules'),
-                vscode.Uri.file(document.uri.path).with({ path: document.uri.path.substring(0, document.uri.path.lastIndexOf('/') + 1) })
-            ]
-        };
-        webviewPanel.webview.html = this.getHtmlForWebview(webviewPanel.webview, document.uri);
-        webviewPanel.webview.onDidReceiveMessage(async (e) => {
-            if (e.command === 'synctex_inverse') {
-                const args = [document.uri.toString(), e.page, e.x, e.y];
-                const result = await this.client.sendRequest('workspace/executeCommand', {
-                    command: 'ferrotex.synctex_inverse',
-                    arguments: args
-                });
-                if (result) {
-                    const fileUri = vscode.Uri.file(result.file);
-                    const doc = await vscode.workspace.openTextDocument(fileUri);
-                    const editor = await vscode.window.showTextDocument(doc, vscode.ViewColumn.One);
-                    const pos = new vscode.Position(result.line, 0);
-                    editor.selection = new vscode.Selection(pos, pos);
-                    editor.revealRange(new vscode.Range(pos, pos), vscode.TextEditorRevealType.InCenter);
-                }
-            }
-        });
-    }
-    /**
-     * Reveals a specific location in the PDF.
-     * Used for SyncTeX Forward Search.
-     */
-    reveal(pdfUri, page, x, y) {
-        const panel = this.panels.get(pdfUri.toString());
-        if (panel) {
-            panel.reveal();
-            panel.webview.postMessage({ command: 'synctex_forward', page, x, y });
+        if (result) {
+          const fileUri = vscode.Uri.file(result.file);
+          const doc = await vscode.workspace.openTextDocument(fileUri);
+          const editor = await vscode.window.showTextDocument(doc, vscode.ViewColumn.One);
+          const pos = new vscode.Position(result.line, 0);
+          editor.selection = new vscode.Selection(pos, pos);
+          editor.revealRange(new vscode.Range(pos, pos), vscode.TextEditorRevealType.InCenter);
         }
+      }
+    });
+  }
+  /**
+   * Reveals a specific location in the PDF.
+   * Used for SyncTeX Forward Search.
+   */
+  reveal(pdfUri, page, x, y) {
+    const panel = this.panels.get(pdfUri.toString());
+    if (panel) {
+      panel.reveal();
+      panel.webview.postMessage({ command: "synctex_forward", page, x, y });
     }
-    getHtmlForWebview(webview, pdfUri) {
-        const pdfJsUri = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'node_modules', 'pdfjs-dist', 'build', 'pdf.mjs'));
-        const pdfWorkerUri = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'node_modules', 'pdfjs-dist', 'build', 'pdf.worker.mjs'));
-        const pdfContentUri = webview.asWebviewUri(pdfUri);
-        return `<!DOCTYPE html>
+  }
+  getHtmlForWebview(webview, pdfUri) {
+    const pdfJsUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, "node_modules", "pdfjs-dist", "build", "pdf.mjs"),
+    );
+    const pdfWorkerUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(
+        this.extensionUri,
+        "node_modules",
+        "pdfjs-dist",
+        "build",
+        "pdf.worker.mjs",
+      ),
+    );
+    const pdfContentUri = webview.asWebviewUri(pdfUri);
+    return `<!DOCTYPE html>
         <html lang="en">
         <head>
             <meta charset="UTF-8">
@@ -243,8 +255,8 @@ class PdfPreviewProvider {
             </script>
         </body>
         </html>`;
-    }
+  }
 }
 exports.PdfPreviewProvider = PdfPreviewProvider;
-PdfPreviewProvider.viewType = 'ferrotex.pdfPreview';
+PdfPreviewProvider.viewType = "ferrotex.pdfPreview";
 //# sourceMappingURL=pdfPreview.js.map
