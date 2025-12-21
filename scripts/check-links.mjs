@@ -11,7 +11,8 @@ async function* walk(dir) {
       entry.name === "node_modules" ||
       entry.name === "_site" ||
       entry.name === "build" ||
-      entry.name === "wiki"
+      entry.name === "wiki" ||
+      entry.name === "design"
     )
       continue;
     const fullPath = path.join(dir, entry.name);
