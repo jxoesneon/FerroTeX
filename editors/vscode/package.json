@@ -27,6 +27,29 @@
     "synctex",
     "typesetting"
   ],
+  "badges": [
+    {
+      "url": "https://img.shields.io/open-vsx/v/ferrotex/ferrotex",
+      "href": "https://open-vsx.org/extension/ferrotex/ferrotex",
+      "description": "Open VSX Version"
+    },
+    {
+      "url": "https://img.shields.io/open-vsx/dt/ferrotex/ferrotex",
+      "href": "https://open-vsx.org/extension/ferrotex/ferrotex",
+      "description": "Downloads"
+    },
+    {
+      "url": "https://img.shields.io/github/license/jxoesneon/FerroTeX",
+      "href": "https://github.com/jxoesneon/FerroTeX/blob/main/LICENSE",
+      "description": "License"
+    },
+    {
+      "url": "https://img.shields.io/badge/Donate-Ko--fi-FF5E5B?logo=ko-fi&logoColor=white",
+      "href": "https://ko-fi.com/jxoesneon",
+      "description": "Support on Ko-fi"
+    }
+  ],
+  "qna": "https://github.com/jxoesneon/FerroTeX/discussions",
   "engines": {
     "vscode": "^1.75.0"
   },
