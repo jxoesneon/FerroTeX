@@ -1,0 +1,21 @@
+# Exclude source files (compiled output is in out/)
+src/**
+*.ts
+!*.d.ts
+tsconfig.json
+*.map
+
+# Exclude dev files
+node_modules/@types/**
+node_modules/@vscode/test-electron/**
+node_modules/@vscode/vsce/**
+node_modules/mocha/**
+node_modules/glob/**
+.vscode/**
+.vscode-test/**
+.gitignore
+package-lock.json
+ferrotex.vsix
+
+# Exclude test output
+out/test/**
