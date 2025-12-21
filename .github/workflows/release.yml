@@ -13,7 +13,7 @@ jobs:
   release:
     name: Build, Test & Release
     runs-on: ubuntu-latest
-    environment: release # SAFEGUARD: Configurable manual approval in GitHub Settings
+    # environment: release # NOTE: Requires repo environment configuration
     steps:
       - name: Checkout
         uses: actions/checkout@v6

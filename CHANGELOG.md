@@ -6,6 +6,8 @@ The format is based on **Keep a Changelog**, and this project intends to follow 
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-01-XX
+
 ## [0.15.0] - 2025-12-21
 
 ### Added
