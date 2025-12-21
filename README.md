@@ -1,5 +1,9 @@
 # FerroTeX
 
+[![CI](https://github.com/jxoesneon/FerroTeX/actions/workflows/ci.yml/badge.svg)](https://github.com/jxoesneon/FerroTeX/actions/workflows/ci.yml)
+[![Coverage](https://codecov.io/gh/jxoesneon/FerroTeX/branch/main/graph/badge.svg)](https://codecov.io/gh/jxoesneon/FerroTeX)
+[![License](https://img.shields.io/badge/license-Apache--2.0%20%2F%20MIT-blue)](LICENSE-CHOICE.md)
+
 **FerroTeX** is a research-driven, high-performance, type-safe **LaTeX language platform** for modern editors.
 
 It closes two long-standing gaps in the TeX ecosystem:

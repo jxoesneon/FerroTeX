@@ -3,7 +3,16 @@
 ## Status
 
 - **Type:** Normative
-- **Stability:** Draft (breaking changes allowed until first stable schema release)
+- **Stability:** Stable (v1.0.0)
+- **Schema Version:** `1.0.0`
+
+## Compatibility Guarantees
+
+Starting with schema version `1.0.0`:
+
+- **Backward Compatibility**: Consumers written for version `1.x` MUST be able to parse output from any `1.y` where `y >= x`.
+- **Forward Compatibility**: New optional fields MAY be added in minor versions. Consumers MUST ignore unknown fields.
+- **Breaking Changes**: Removal or semantic changes to existing fields require a major version bump.
 
 ## Design Requirements
 
@@ -19,11 +28,13 @@
 
 ## Schema Versioning
 
-The IR MUST include:
+The IR MUST include in JSON output:
 
-- `schema_version: "0.x"`
+```json
+{ "schema_version": "1.0.0" }
+```
 
-A stable release will define a `1.0` schema with compatibility guarantees.
+The version string follows semantic versioning. The constant is defined in `ferrotex_log::SCHEMA_VERSION`.
 
 ## Core Types
 
