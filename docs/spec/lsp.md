@@ -1,3 +1,10 @@
+---
+layout: default
+title: LSP Contract
+parent: Specifications
+nav_order: 1
+---
+
 # Language Server Protocol (LSP) Contract
 
 ## Status
