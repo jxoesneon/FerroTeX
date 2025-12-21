@@ -1,14 +1,39 @@
 {
   "name": "ferrotex",
   "displayName": "FerroTeX",
-  "description": "FerroTeX Language Server Client",
+  "description": "High-performance LaTeX language support with IDE features, PDF preview, and intelligent diagnostics.",
   "version": "0.14.0",
   "publisher": "ferrotex",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jxoesneon/FerroTeX"
+  },
+  "homepage": "https://jxoesneon.github.io/FerroTeX/",
+  "bugs": {
+    "url": "https://github.com/jxoesneon/FerroTeX/issues"
+  },
+  "icon": "icon.png",
+  "galleryBanner": {
+    "color": "#0f172a",
+    "theme": "dark"
+  },
+  "keywords": [
+    "latex",
+    "tex",
+    "lsp",
+    "language server",
+    "pdf",
+    "synctex",
+    "typesetting"
+  ],
   "engines": {
     "vscode": "^1.75.0"
   },
   "categories": [
-    "Programming Languages"
+    "Programming Languages",
+    "Linters",
+    "Formatters"
   ],
   "activationEvents": [
     "onLanguage:latex",
