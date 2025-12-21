@@ -1,6 +1,7 @@
 import * as path from "path";
 import * as vscode from "vscode";
 import { LanguageClient, LanguageClientOptions, ServerOptions } from "vscode-languageclient/node";
+import { PdfPreviewProvider } from "./pdfPreview";
 
 let client: LanguageClient;
 
@@ -46,6 +47,49 @@ export function activate(context: vscode.ExtensionContext) {
         )
     );
   }
+
+  // EX-4: Integrated PDF Viewer
+  // EX-4: Integrated PDF Viewer
+  const pdfProvider = new PdfPreviewProvider(context.extensionUri, client);
+  context.subscriptions.push(
+      vscode.window.registerCustomEditorProvider(
+          PdfPreviewProvider.viewType,
+          pdfProvider
+      )
+  );
+
+  // SX-2: SyncTeX Forward Search
+  context.subscriptions.push(vscode.commands.registerCommand('ferrotex.syncToPdf', async () => {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor) return;
+      if (editor.document.languageId !== 'latex' && editor.document.languageId !== 'tex') return;
+
+      const uri = editor.document.uri;
+      const position = editor.selection.active;
+
+      // Heuristic: PDF is in the same directory with .pdf extension
+      // This is basic but works for standard builds.
+      const pdfUri = uri.with({ path: uri.path.replace(/\.(tex|latex)$/i, '.pdf') });
+
+      try {
+        const result: any = await client.sendRequest('workspace/executeCommand', {
+            command: 'ferrotex.synctex_forward',
+            arguments: [
+                uri.toString(),
+                position.line,
+                position.character,
+                pdfUri.toString()
+            ]
+        });
+
+        if (result) {
+            // { page, x, y }
+            pdfProvider.reveal(pdfUri, result.page, result.x, result.y);
+        }
+      } catch (e) {
+          console.error('SyncTeX Forward failed:', e);
+      }
+  }));
 
   client.start();
 }
