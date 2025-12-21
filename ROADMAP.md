@@ -341,71 +341,75 @@ Each release below includes:
 - EX-4
 - SX-2, SX-3 (Integrated)
 
-### v1.0.0 — Stable 1.0 Release (Industry-Standard Baseline)
+### v0.15.0 — The "Intelligence" Update (Writing Experience)
 
 **Scope**
 
-- Publish `schema_version: 1.0` for:
-  - build/log event IR
-  - diagnostic records
-- Stable configuration keys and behaviors.
-- Core language features (minimum 1.0 set):
-  - parsing (fault-tolerant, incremental)
-  - project model (entrypoints + include graph)
-  - indexing (labels + citations)
-  - diagnostics (source + build)
-  - completion (commands/environments/labels/citations)
-  - definition/references/rename (labels, and citations where safe)
-  - document symbols + folding
-  - semantic tokens
-  - formatting (conservative, idempotent)
-- Build observability features:
-  - streaming `.log` ingestion
-  - robust error/warning parsing
-  - provenance log excerpts
-- Quality and operations:
-  - golden tests + fuzzing + documented benchmark baselines
-  - clear extension/server version compatibility policy
+- **Snippet Pack**: Comprehensive library of Math/Greek/Environment snippets (UX-2).
+- **Magic Comments**: Support for `%!TEX root` and `%!TEX program` (PM-Override).
+- **Dynamic Package Metadata**: Index loaded packages and provide completions from a structured database (CS-3).
 
 **Acceptance criteria**
 
-- Feature matrix for 1.0 is fully implemented and documented.
-- Published compatibility guarantees:
-  - schema versioning
-  - configuration stability
-  - supported engines/runners list
-- Performance and robustness gates met on representative corpora.
+- `\alpha` tab-expands to `α`.
+- `%!TEX root = ../main.tex` is respected without configuration.
+- `\usepackage{tikz}` enables `\node` completions.
 
 **Feature Matrix coverage**
 
-- LP-1..LP-4
-- PM-1..PM-4
-- IDX-1..IDX-5
-- SD-1..SD-4
+- UX-2
+- PM-Override
+- CS-3
 
-- LSP-1..LSP-16
-- LSP-17..LSP-19
+### v0.16.0 — The "Observability" Update (Feedback Loop)
 
-- BO-1..BO-6
+**Scope**
 
-- BO-7..BO-8
+- **Real-Time Log Streaming**: Migrate build adapter from buffered output to real-time `stdout`/`stderr` streaming (BO-2).
+- **Human-Readable Errors**: Translation layer for common TeX log errors (UX-5).
+- **Rich Hovers**: MathJax-rendered previews for equations and citations (UX-1).
 
-- EX-1..EX-3
+**Acceptance criteria**
 
-- SX-1..SX-3
+- Build logs appear line-by-line in the output panel.
+- "Underfull \hbox" is explained as "Bad line break".
+- Hovering `\begin{equation}` shows rendered math.
 
-- TP-1..TP-3
+**Feature Matrix coverage**
 
-- FW-1..FW-2
+- BO-2
+- UX-5
+- UX-1
 
-- CS-1..CS-3
+### v0.17.0 — The "Ecosystem" Update (Deep Integration)
 
-- FB-1..FB-2
+**Scope**
 
-- QG-1..QG-4
+- **Package Manager Integration**: Detect missing packages and offer `tlmgr install` actions (BO-9).
+- **Math Mode Semantics**: Deep parsing for matrix/align environments with validation (LP-5).
 
-- PF-1..PF-2
+**Acceptance criteria**
 
-- OC-1..OC-3
+- Missing package error offers "Install" button.
+- Mismatched matrix delimiters are flagged.
 
-- OC-4
+**Feature Matrix coverage**
+
+- BO-9
+- LP-5
+
+### v1.0.0 — The "Gold" Release (Ceremonial)
+
+**Scope**
+
+- **Final Stability Audit**: Zero critical bugs for 2 weeks.
+- **Documentation Polish**: "Enjoy!" update to README.
+- **SemVer Guarantee**: 1.0.0 schema lock.
+
+**Acceptance criteria**
+
+- Deployment of the "Cherry on top".
+
+**Feature Matrix coverage**
+
+- All previous.
