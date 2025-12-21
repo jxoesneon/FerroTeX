@@ -1,21 +1,19 @@
-# Exclude source files (compiled output is in out/)
+# Exclude source files
 src/**
 *.ts
 !*.d.ts
 tsconfig.json
 *.map
+esbuild.js
 
-# Exclude dev files
-node_modules/@types/**
-node_modules/@vscode/test-electron/**
-node_modules/@vscode/vsce/**
-node_modules/mocha/**
-node_modules/glob/**
+# Exclude dev files & node_modules (bundled)
+node_modules/**
 .vscode/**
 .vscode-test/**
 .gitignore
 package-lock.json
 ferrotex.vsix
+out/**
 
-# Exclude test output
-out/test/**
+# Keep dist
+!dist/**
