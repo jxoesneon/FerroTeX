@@ -12,8 +12,10 @@ node_modules/**
 .vscode-test/**
 .gitignore
 package-lock.json
+package-lock.json
 ferrotex.vsix
 out/**
+*.log
 
 # Keep dist
 !dist/**

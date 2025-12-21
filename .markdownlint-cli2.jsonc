@@ -1,6 +1,13 @@
 {
   "globs": ["**/*.md"],
-  "ignores": ["**/node_modules/**", "**/_site/**", "**/build/**", "**/target/**", "**/.agent/**"],
+  "ignores": [
+    "**/node_modules/**",
+    "**/_site/**",
+    "**/build/**",
+    "**/target/**",
+    "**/.agent/**",
+    "**/.vscode-test/**",
+  ],
   "config": {
     "MD013": false,
     "MD025": false,

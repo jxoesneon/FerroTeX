@@ -1,10 +1,55 @@
-node_modules
-_site
+# JavaScript/Node
+node_modules/
+*.log
+npm-debug.log*
+
+# Build outputs
 /build
-.DS_Store
-.windsurf/*
 /target
-Cargo.locktest.log
-refactor_plan.md
-*plan*.md
+/dist
+editors/vscode/out/
+editors/vscode/dist/
+
+# Rust
+Cargo.lock
+*.pdb
+
+# VS Code Extension
+editors/vscode/.vscode-test/
+editors/vscode/bin/
+editors/vscode/*.vsix
+*.vsix
+
+# Test outputs
+**/test_output*.log
+**/regression*.log
+**/*_test.log
+**/*_debug.log
+
+# macOS
+.DS_Store
+
+# IDE
+.windsurf/*
+.vscode/
+.idea/
+
+# Artifacts (user workspace)
 .agent/*
+.gemini/*
+
+# Documentation drafts
+design/*
+*plan*.md
+refactor_plan.md
+
+# Demo directory (temporary test files)
+demo/
+
+# Images (often generated/temporary)
+editors/vscode/images/
+
+# Compiled binaries
+/ferrotexd
+editors/vscode/bin/ferrotexd
+*.exe

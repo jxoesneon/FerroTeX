@@ -6,7 +6,16 @@ The format is based on **Keep a Changelog**, and this project intends to follow 
 
 ## [Unreleased]
 
-## [0.16.0] - 2026-01-XX
+## [0.16.0] - 2025-12-21
+
+### Added
+
+- **Zero-Config Build**: Automatically downloads and installs **Tectonic** if no TeX engine is found (UX-ZeroConfig).
+- **Self-Contained PDF Viewer**: Bundled PDF.js directly into the extension, resolving empty preview issues on offline/restricted environments.
+- **Rich Hovers**: Added math formatting and citation detail previews on hover (UX-1).
+- **Human-Readable Error Index**: Expanded error database to translate common LaTeX errors into actionable advice (UX-5).
+- **Marketplace Overhaul**: New branding assets, hero banner, and feature-focused README.
+- **Comprehensive Settings System**: Fully configurable build engines (`build.engine`), linting rules, and preview behavior (UX-7).
 
 ## [0.15.0] - 2025-12-21
 

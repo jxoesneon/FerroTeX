@@ -17,9 +17,9 @@ A sleek, dark-mode banner at the very top.
 
 Instead of bullet points, we will use optimized GIFs to demonstrate the "Intelligence" features:
 
-1.  **"Smart Completion"**: Showing `\usepackage{tikz}` -> `\node` completion.
-2.  **"Magic Comments"**: Typing `%!TEX root` and seeing the build target change.
-3.  **"Snippet Pack"**: Expanding `@g` to `\gamma` and `pmat` to a matrix.
+1. **"Smart Completion"**: Showing `\usepackage{tikz}` -> `\node` completion.
+2. **"Magic Comments"**: Typing `%!TEX root` and seeing the build target change.
+3. **"Snippet Pack"**: Expanding `@g` to `\gamma` and `pmat` to a matrix.
 
 ## 2. Structural Changes
 
@@ -62,6 +62,6 @@ Since v0.16.0 is the "Observability" update, the store page should highlight the
 
 ## Implementation Plan
 
-1.  **Design Assets**: Create high-fidelity screenshots/GIFs.
-2.  **Rewrite README**: Implement the new markdown structure.
-3.  **Bundle Assets**: Ensure images are included in the `.vsix` (via `vscodeignore` exceptions for the `images` folder) so they render on Open VSX.
+1. **Design Assets**: Create high-fidelity screenshots/GIFs.
+2. **Rewrite README**: Implement the new markdown structure.
+3. **Bundle Assets**: Ensure images are included in the `.vsix` (via `vscodeignore` exceptions for the `images` folder) so they render on Open VSX.

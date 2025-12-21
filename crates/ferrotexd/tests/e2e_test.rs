@@ -84,17 +84,17 @@ async fn test_lsp_diagnostics_flow() -> anyhow::Result<()> {
 
     // 9. Wait for publishDiagnostics
     // It might take a moment for notify to trigger and processing to happen
-    let log_uri = Url::from_file_path(&log_file).unwrap();
+    let tex_uri = Url::from_file_path(temp_path.join("test.tex")).unwrap();
 
     let wait_loop = async {
         loop {
             let msg = read_msg(&mut reader).await?;
-            // eprintln!("Received: {:?}", msg); // Debug
             if msg.get("method").and_then(|m| m.as_str()) == Some("textDocument/publishDiagnostics")
             {
                 let params = &msg["params"];
                 if let Some(uri) = params["uri"].as_str() {
-                    if uri == log_uri.as_str() {
+                    // We expect diagnostics on the .tex file, not the .log file
+                    if uri == tex_uri.as_str() {
                         let diags = params["diagnostics"].as_array().unwrap();
                         if !diags.is_empty() {
                             let msg = diags[0]["message"].as_str().unwrap();
@@ -102,8 +102,6 @@ async fn test_lsp_diagnostics_flow() -> anyhow::Result<()> {
                                 return Ok::<(), anyhow::Error>(());
                             }
                         }
-                    } else {
-                        // eprintln!("Ignored diagnostics for uri: {}", uri);
                     }
                 }
             }
@@ -114,8 +112,8 @@ async fn test_lsp_diagnostics_flow() -> anyhow::Result<()> {
         Ok(Ok(())) => {}
         Ok(Err(e)) => anyhow::bail!("Error reading message: {:?}", e),
         Err(_) => anyhow::bail!(
-            "Timed out waiting for log diagnostic. Expected URI: {}",
-            log_uri
+            "Timed out waiting for log diagnostic on URI: {}",
+            tex_uri
         ),
     }
 
