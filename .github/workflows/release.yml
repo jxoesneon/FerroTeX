@@ -49,6 +49,10 @@ jobs:
             latexmk -pdf -interaction=nonstopmode -halt-on-error -file-line-error -output-directory=build tests/tex/smoke/main.tex
 
       # Build Artifact
+      - name: Install Extension Dependencies
+        working-directory: editors/vscode
+        run: npm ci
+
       - name: Package VSIX
         working-directory: editors/vscode
         run: npm run package
