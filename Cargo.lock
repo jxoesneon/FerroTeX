@@ -237,7 +237,7 @@ checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 
 [[package]]
 name = "ferrotex-cli"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -256,7 +256,7 @@ dependencies = [
 
 [[package]]
 name = "ferrotex-log"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -265,16 +265,17 @@ dependencies = [
 
 [[package]]
 name = "ferrotex-syntax"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "rowan",
 ]
 
 [[package]]
 name = "ferrotexd"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "dashmap",
  "ferrotex-log",
  "ferrotex-syntax",

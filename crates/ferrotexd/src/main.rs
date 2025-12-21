@@ -1,7 +1,9 @@
 mod fmt;
 mod workspace;
+mod build;
 
 use dashmap::DashMap;
+use build::{BuildEngine, BuildRequest, BuildStatus, latexmk::LatexmkAdapter};
 use ferrotex_log::ir::EventPayload;
 use ferrotex_log::parser::LogParser;
 use ferrotex_syntax::{SyntaxKind, SyntaxNode};
@@ -588,6 +590,64 @@ impl LanguageServer for Backend {
         // For v0.10.0 acceptance, we just need the handler to exist and not panic.
 
         Ok(Some(actions))
+    }
+
+    async fn execute_command(&self, params: ExecuteCommandParams) -> Result<Option<serde_json::Value>> {
+        if params.command == "ferrotex.build" {
+            let args = params.arguments;
+            if args.is_empty() {
+                self.client.log_message(MessageType::ERROR, "Build command missing file URI argument").await;
+                return Ok(None);
+            }
+
+            // Extract URI from arguments
+            let uri_str = args[0].as_str().unwrap_or_default();
+            let uri = match Url::parse(uri_str) {
+                Ok(u) => u,
+                Err(_) => {
+                    self.client.log_message(MessageType::ERROR, "Invalid URI argument").await;
+                    return Ok(None);
+                }
+            };
+
+            self.client.log_message(MessageType::INFO, format!("Starting build for: {}", uri)).await;
+
+            // Resolve workspace root
+            let root_path = {
+                let root = self.root_uri.lock().unwrap();
+                root.as_ref().and_then(|u| u.to_file_path().ok())
+            };
+
+            let req = BuildRequest {
+                document_uri: uri.clone(),
+                workspace_root: root_path,
+            };
+
+            let engine = LatexmkAdapter;
+            match engine.build(&req).await {
+                Ok(status) => match status {
+                    BuildStatus::Success(artifact) => {
+                        let msg = format!("Build Succeeded! Artifact: {:?}", artifact);
+                        self.client.show_message(MessageType::INFO, &msg).await;
+                        self.client.log_message(MessageType::INFO, msg).await;
+                    }
+                    BuildStatus::Failure(log) => {
+                        self.client.log_message(MessageType::ERROR, "Build Failed").await;
+                        // Stream stderr to log
+                        for line in log.stderr.lines() {
+                            self.client.log_message(MessageType::ERROR, line).await;
+                        }
+                        self.client.show_message(MessageType::ERROR, "Build Failed. Check logs.").await;
+                    }
+                },
+                Err(e) => {
+                    let err_msg = format!("Build execution error: {}", e);
+                    self.client.log_message(MessageType::ERROR, &err_msg).await;
+                    self.client.show_message(MessageType::ERROR, err_msg).await;
+                }
+            }
+        }
+        Ok(None)
     }
 }
 
