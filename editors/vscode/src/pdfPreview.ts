@@ -38,7 +38,7 @@ export class PdfPreviewProvider implements vscode.CustomReadonlyEditorProvider {
     webviewPanel.webview.options = {
       enableScripts: true,
       localResourceRoots: [
-        vscode.Uri.joinPath(this.extensionUri, "node_modules"),
+        vscode.Uri.joinPath(this.extensionUri, "dist"),
         vscode.Uri.file(document.uri.path).with({
           path: document.uri.path.substring(0, document.uri.path.lastIndexOf("/") + 1),
         }),
@@ -81,16 +81,10 @@ export class PdfPreviewProvider implements vscode.CustomReadonlyEditorProvider {
 
   private getHtmlForWebview(webview: vscode.Webview, pdfUri: vscode.Uri): string {
     const pdfJsUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, "node_modules", "pdfjs-dist", "build", "pdf.mjs"),
+      vscode.Uri.joinPath(this.extensionUri, "dist", "pdfjs", "pdf.mjs"),
     );
     const pdfWorkerUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(
-        this.extensionUri,
-        "node_modules",
-        "pdfjs-dist",
-        "build",
-        "pdf.worker.mjs",
-      ),
+      vscode.Uri.joinPath(this.extensionUri, "dist", "pdfjs", "pdf.worker.mjs"),
     );
 
     const pdfContentUri = webview.asWebviewUri(pdfUri);

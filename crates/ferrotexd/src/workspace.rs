@@ -1,5 +1,6 @@
 use dashmap::DashMap;
 use ferrotex_syntax::{SyntaxKind, TextRange, parse};
+use regex::Regex;
 use std::collections::{HashMap, HashSet};
 use tower_lsp::lsp_types::{SymbolKind, Url};
 
@@ -12,6 +13,8 @@ pub struct Workspace {
     indices: DashMap<Url, FileIndex>,
     /// Bibliography index containing parsed BibTeX entries.
     bib_indices: DashMap<Url, ferrotex_syntax::bibtex::BibFile>,
+    /// Explicit root overrides from `%!TEX root` comments.
+    explicit_roots: DashMap<Url, String>,
 }
 
 /// The index data for a single TeX file.
@@ -26,10 +29,14 @@ pub struct FileIndex {
     pub references: Vec<LabelRef>,
     /// List of citations (e.g., `\cite{...}`).
     pub citations: Vec<CitationRef>,
-    /// List of bibliography references (e.g., `\bibliography{...}`).
+    /// List of bibliographies (e.g., `\bibliography{...}`).
     pub bibliographies: Vec<BibRef>,
     /// List of sections (e.g., `\section{...}`).
     pub sections: Vec<SectionDef>,
+    /// List of used packages (e.g., `\usepackage{...}`).
+    pub packages: Vec<String>,
+    /// List of deprecated command usages.
+    pub deprecated_usages: Vec<(TextRange, String)>,
 }
 
 /// Represents an included file reference.
@@ -97,8 +104,15 @@ impl Workspace {
     ///
     /// Parses the file content and extracts includes, labels, citations, etc.
     pub fn update(&self, uri: &Url, text: &str) {
-        let (includes, definitions, references, citations, bibliographies, sections) =
+        let (includes, definitions, references, citations, bibliographies, sections, packages, magic_root, deprecated_usages) =
             scan_file(text);
+
+        if let Some(root_path) = magic_root {
+            self.explicit_roots.insert(uri.clone(), root_path);
+        } else {
+            self.explicit_roots.remove(uri);
+        }
+
         self.indices.insert(
             uri.clone(),
             FileIndex {
@@ -108,6 +122,8 @@ impl Workspace {
                 citations,
                 bibliographies,
                 sections,
+                packages,
+                deprecated_usages,
             },
         );
     }
@@ -132,6 +148,41 @@ impl Workspace {
             .get(uri)
             .map(|v| v.includes.clone())
             .unwrap_or_default()
+    }
+
+    /// Retrieves the explicit root override for a given document URI, if any.
+    pub fn get_explicit_root(&self, uri: &Url) -> Option<String> {
+        self.explicit_roots.get(uri).map(|v| v.value().clone())
+    }
+
+    /// Retrieves the list of used packages for a given document URI.
+    ///
+    /// If an explicit root is set, it also includes packages from the root.
+    pub fn get_packages(&self, uri: &Url) -> Vec<String> {
+        let mut packages = HashSet::new();
+
+        // 1. Get packages from current file
+        if let Some(idx) = self.indices.get(uri) {
+            packages.extend(idx.packages.clone());
+        }
+
+        // 2. Get packages from explicit root (if any)
+        if let Some(root_path) = self.get_explicit_root(uri) {
+            #[allow(clippy::collapsible_if)]
+            if let Ok(file_path) = uri.to_file_path() {
+                if let Some(parent) = file_path.parent() {
+                    let root_buf = parent.join(&root_path);
+                    if let Ok(root_uri) = Url::from_file_path(root_buf) {
+                        #[allow(clippy::collapsible_if)]
+                        if let Some(idx) = self.indices.get(&root_uri) {
+                            packages.extend(idx.packages.clone());
+                        }
+                    }
+                }
+            }
+        }
+
+        packages.into_iter().collect()
     }
 
     /// Retrieves the list of bibliography references for a given document URI.
@@ -218,6 +269,37 @@ impl Workspace {
         }
 
         false
+    }
+
+    /// Retrieves detailed information about a citation key for hover.
+    pub fn get_citation_details(&self, key: &str) -> Option<String> {
+        let referenced_bibs = self.get_referenced_bib_uris();
+
+        let find_in_bibs = |uris: &Vec<Url>| -> Option<String> {
+             for uri in uris {
+                if let Some(bib_file) = self.bib_indices.get(uri) {
+                    if let Some(entry) = bib_file.entries.iter().find(|e| e.key == key) {
+                        // Found logic
+                        let title = entry.fields.get("title").map(|s| s.as_str()).unwrap_or("Unknown Title");
+                        let author = entry.fields.get("author").map(|s| s.as_str()).unwrap_or("Unknown Author");
+                        let year = entry.fields.get("year").map(|s| s.as_str()).unwrap_or("????");
+                        
+                        return Some(format!("**{}**\n{} ({})", title, author, year));
+                    }
+                }
+            }
+            None
+        };
+
+        if !referenced_bibs.is_empty() {
+            if let Some(res) = find_in_bibs(&referenced_bibs) {
+                return Some(res);
+            }
+        }
+        
+        // Fallback: search all known bibs if not found in referenced ones (loose mode)
+        let all_uris: Vec<Url> = self.bib_indices.iter().map(|e| e.key().clone()).collect();
+        find_in_bibs(&all_uris)
     }
 
     /// Finds all definitions of a label by name.
@@ -414,6 +496,22 @@ impl Workspace {
         diagnostics
     }
 
+    /// Validates usage of deprecated commands.
+    pub fn validate_deprecated(&self) -> Vec<(Url, TextRange, String)> {
+        let mut diagnostics = Vec::new();
+
+        for entry in self.indices.iter() {
+            for (range, cmd) in &entry.value().deprecated_usages {
+                diagnostics.push((
+                    entry.key().clone(),
+                    *range,
+                    format!("Command '{}' is deprecated. Use standard LaTeX2e replacements.", cmd),
+                ));
+            }
+        }
+        diagnostics
+    }
+
     /// Detects inclusion cycles in the workspace.
     ///
     /// Performs a DFS on the inclusion graph to find cycles.
@@ -459,6 +557,7 @@ impl Workspace {
         unique_cycles
     }
 
+    #[allow(clippy::only_used_in_recursion)]
     fn check_cycle_dfs(
         &self,
         current: &Url,
@@ -497,9 +596,24 @@ type ScanResult = (
     Vec<CitationRef>,
     Vec<BibRef>,
     Vec<SectionDef>,
+    Vec<String>, // packages
+    Option<String>, // magic_root
+    Vec<(TextRange, String)>, // deprecated_usages
 );
 
 fn scan_file(text: &str) -> ScanResult {
+    // Scan for magic comments in the first 1KB
+    let head = if text.len() > 1024 {
+        &text[..1024]
+    } else {
+        text
+    };
+    
+    // Pattern: %!TEX root = <path>
+    // Handles optional spaces around = and leading whitespace
+    let re = Regex::new(r"(?m)^%\s*!TEX\s+root\s*=\s*(.+)$").unwrap();
+    let magic_root = re.captures(head).map(|cap| cap[1].trim().to_string());
+
     let parse = parse(text);
     let root = parse.syntax();
     let mut includes = Vec::new();
@@ -508,70 +622,174 @@ fn scan_file(text: &str) -> ScanResult {
     let mut citations = Vec::new();
     let mut bibs = Vec::new();
     let mut sections = Vec::new();
+    let mut deprecated_usages = Vec::new();
 
-    for node in root.descendants() {
-        match node.kind() {
-            SyntaxKind::Include => {
-                if let Some((name, range)) = extract_label_data(&node) {
-                    includes.push(IncludeRef {
-                        path: name,
-                        range, // Use inner range for includes too
-                    });
-                }
-            }
-            SyntaxKind::LabelDefinition => {
-                if let Some((name, range)) = extract_label_data(&node) {
-                    defs.push(LabelDef {
-                        name,
-                        range, // Inner range
-                    });
-                }
-            }
-            SyntaxKind::LabelReference => {
-                if let Some((name, range)) = extract_label_data(&node) {
-                    refs.push(LabelRef {
-                        name,
-                        range, // Inner range
-                    });
-                }
-            }
-            SyntaxKind::Citation => {
-                if let Some((keys, range)) = extract_label_data(&node) {
-                    // Split keys by comma
-                    for key in keys.split(',') {
-                        let trimmed = key.trim();
-                        if !trimmed.is_empty() {
-                            citations.push(CitationRef {
-                                key: trimmed.to_string(),
-                                range, // Note: This uses the full range for now, we might want sub-ranges later
-                            });
+    let mut last_was_dollar = false;
+    let mut last_dollar_range: Option<TextRange> = None;
+    let mut opening_display_math: Option<TextRange> = None; // Track opening $$
+
+    for element in root.descendants_with_tokens() {
+        match element.kind() {
+            SyntaxKind::Dollar => {
+                if last_was_dollar {
+                    if let Some(prev_range) = last_dollar_range {
+                        if prev_range.end() == element.text_range().start() {
+                            // Found consecutive $$
+                            let combined_range = TextRange::new(prev_range.start(), element.text_range().end());
+                            
+                            if let Some(opening_range) = opening_display_math {
+                                // This is the closing $$, mark the entire block
+                                let full_block_range = TextRange::new(opening_range.start(), combined_range.end());
+                                deprecated_usages.push((full_block_range, "displaymath".to_string()));
+                                opening_display_math = None;
+                            } else {
+                                // This is an opening $$, remember it
+                                opening_display_math = Some(combined_range);
+                            }
+                            
+                            last_was_dollar = false;
+                            last_dollar_range = None;
+                            continue;
                         }
                     }
                 }
+                last_was_dollar = true;
+                last_dollar_range = Some(element.text_range());
             }
-            SyntaxKind::Bibliography => {
-                if let Some((paths, range)) = extract_label_data(&node) {
-                    // Split paths by comma (usually bibliography takes comma-separated list)
-                    for path in paths.split(',') {
-                        let trimmed = path.trim();
-                        if !trimmed.is_empty() {
-                            bibs.push(BibRef {
-                                path: trimmed.to_string(),
-                                range,
-                            });
+            _ => {
+                last_was_dollar = false;
+                last_dollar_range = None;
+                
+                if element.kind() == SyntaxKind::Command {
+                    let text = element.to_string();
+                    let deprecated = ["\\bf", "\\it", "\\sc", "\\rm", "\\sf", "\\tt", "\\sl"];
+                    if deprecated.contains(&text.as_str()) {
+                        // Check if this command is inside a group (e.g., {\bf ...})
+                        // by looking at parent context
+                        let mut in_group = false;
+                        let mut group_range = element.text_range();
+                        
+                        if let Some(token) = element.as_token() {
+                            if let Some(parent) = token.parent() {
+                                // Check if parent is a Group node
+                                if parent.kind() == SyntaxKind::Group {
+                                    in_group = true;
+                                    group_range = parent.text_range();
+                                }
+                            }
                         }
+                        
+                        // Store command with context info
+                        // Format: "cmd:in_group" or just "cmd" for standalone
+                        let context_marker = if in_group {
+                            format!("{}:group", text)
+                        } else {
+                            text.clone()
+                        };
+                        
+                        deprecated_usages.push((
+                            if in_group { group_range } else { element.text_range() },
+                            context_marker
+                        ));
+                    }
+                } else if let Some(node) = element.as_node() {
+                    match node.kind() {
+                        SyntaxKind::Include => {
+                            if let Some((name, range)) = extract_label_data(node) {
+                                includes.push(IncludeRef {
+                                    path: name,
+                                    range, 
+                                });
+                            }
+                        }
+                        SyntaxKind::LabelDefinition => {
+                            if let Some((name, range)) = extract_label_data(node) {
+                                defs.push(LabelDef {
+                                    name,
+                                    range,
+                                });
+                            }
+                        }
+                        SyntaxKind::LabelReference => {
+                            if let Some((name, range)) = extract_label_data(node) {
+                                refs.push(LabelRef {
+                                    name,
+                                    range,
+                                });
+                            }
+                        }
+                        SyntaxKind::Citation => {
+                            if let Some((keys, range)) = extract_label_data(node) {
+                                for key in keys.split(',') {
+                                    let trimmed = key.trim();
+                                    if !trimmed.is_empty() {
+                                        citations.push(CitationRef {
+                                            key: trimmed.to_string(),
+                                            range,
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                        SyntaxKind::Bibliography => {
+                            if let Some((paths, range)) = extract_label_data(node) {
+                                for path in paths.split(',') {
+                                    let trimmed = path.trim();
+                                    if !trimmed.is_empty() {
+                                        bibs.push(BibRef {
+                                            path: trimmed.to_string(),
+                                            range,
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                        SyntaxKind::Section => {
+                            if let Some((name, range)) = extract_label_data(node) {
+                                sections.push(SectionDef { name, range });
+                            }
+                        }
+                        _ => {}
                     }
                 }
             }
-            SyntaxKind::Section => {
-                if let Some((name, range)) = extract_label_data(&node) {
-                    sections.push(SectionDef { name, range });
-                }
-            }
-            _ => {}
         }
     }
-    (includes, defs, refs, citations, bibs, sections)
+    // Scan for packages
+    // Pattern: \usepackage[opt]{pkg} or \RequirePackage[opt]{pkg}
+    // We ignore options for now.
+    // Scan for packages
+    let text_str = root.text().to_string();
+    let re = Regex::new(r"\\usepackage(?:\[[^\]]*\])?\{([^}]+)\}").unwrap();
+    let mut packages = Vec::new();
+    
+    for cap in re.captures_iter(&text_str) {
+        if let Some(pkg_group_match) = cap.get(1) {
+            for pkg in pkg_group_match.as_str().split(',') {
+                let trimmed = pkg.trim();
+                if !trimmed.is_empty() {
+                    packages.push(trimmed.to_string());
+                    
+                    let forbidden = ["a4wide", "times", "epsfig", "psfig"];
+                    if forbidden.contains(&trimmed) {
+                        // Calculate exact range of the package name
+                        use ferrotex_syntax::TextSize;
+                        let relative_start_in_group = pkg_group_match.as_str().find(trimmed).unwrap_or(0);
+                        let absolute_start = pkg_group_match.start() + relative_start_in_group;
+                        let absolute_end = absolute_start + trimmed.len();
+
+                        let range = TextRange::new(
+                            TextSize::from(absolute_start as u32), 
+                            TextSize::from(absolute_end as u32)
+                        );
+                        deprecated_usages.push((range, format!("package:{}", trimmed)));
+                    }
+                }
+            }
+        }
+    }
+
+    (includes, defs, refs, citations, bibs, sections, packages, magic_root, deprecated_usages)
 }
 
 pub fn extract_group_text(node: &ferrotex_syntax::SyntaxNode) -> Option<String> {
@@ -625,4 +843,38 @@ fn resolve_bib_uri(base_uri: &Url, raw_path: &str) -> Option<Url> {
     }
 
     base_uri.join(&path).ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_deprecated_command() {
+        let text = r#"\section{Test} {\bf bold} text"#;
+        let (.., deprecated) = scan_file(text);
+        assert!(!deprecated.is_empty(), "Should detect deprecated command");
+        assert_eq!(deprecated[0].1, "\\bf:group");
+    }
+
+    #[test]
+    fn test_deprecated_math_detection() {
+        let text = r#"
+        Text
+        $$
+        x = y
+        $$
+        End
+        "#;
+        let (.., deprecated) = scan_file(text);
+        assert!(deprecated.iter().any(|d| d.1 == "displaymath"), "Should detect display math block");
+    }
+
+    #[test]
+    fn test_obsolete_package_detection() {
+        let text = r#"\usepackage{times, geometry}"#;
+        let (.., deprecated) = scan_file(text);
+        assert!(deprecated.iter().any(|d| d.1 == "package:times"), "Should detect 'times' package");
+        assert!(!deprecated.iter().any(|d| d.1 == "package:geometry"), "Should NOT detect 'geometry' package");
+    }
 }

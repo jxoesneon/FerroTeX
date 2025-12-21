@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use anyhow::Result;
 use async_trait::async_trait;
 
@@ -31,8 +33,16 @@ pub trait BuildEngine: Send + Sync {
     /// uniquely identifies the engine (e.g. "latexmk", "tectonic")
     fn name(&self) -> &str;
 
-    /// Execute the build for the given request
-    async fn build(&self, request: &BuildRequest) -> Result<BuildStatus>;
+    /// Execute the build for the given request.
+    ///
+    /// `log_callback` is an optional function that receives stdout/stderr lines in real-time.
+    async fn build(
+        &self,
+        request: &BuildRequest,
+        log_callback: Option<Box<dyn Fn(String) + Send + Sync>>,
+    ) -> Result<BuildStatus>;
 }
 
 pub mod latexmk;
+pub mod tectonic;
+

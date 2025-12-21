@@ -6,6 +6,26 @@ The format is based on **Keep a Changelog**, and this project intends to follow 
 
 ## [Unreleased]
 
+## [0.16.0] - 2025-12-21
+
+### Added
+
+- **Zero-Config Build**: Automatically downloads and installs **Tectonic** if no TeX engine is found (UX-ZeroConfig).
+- **Self-Contained PDF Viewer**: Bundled PDF.js directly into the extension, resolving empty preview issues on offline/restricted environments.
+- **Rich Hovers**: Added math formatting and citation detail previews on hover (UX-1).
+- **Human-Readable Error Index**: Expanded error database to translate common LaTeX errors into actionable advice (UX-5).
+- **Marketplace Overhaul**: New branding assets, hero banner, and feature-focused README.
+- **Comprehensive Settings System**: Fully configurable build engines (`build.engine`), linting rules, and preview behavior (UX-7).
+
+## [0.15.0] - 2025-12-21
+
+### Added
+
+- **Snippet Pack**: Added 130+ LaTeX snippets for Math, Greek, and Environments (UX-2).
+- **Magic Comments**: Added support for `%!TEX root = ...` to override build root (PM-Override).
+- **Dynamic Package Metadata**: Added context-aware auto-completion for `amsmath`, `tikz`, `geometry`, `hyperref`, and `graphicx` (CS-3).
+- **Linting**: Fixed various clippy lints (`collapsible_if`, `unused_imports`) in the codebase.
+
 ## [0.14.0] - 2025-12-21
 
 ### Added
@@ -208,9 +228,21 @@ The format is based on **Keep a Changelog**, and this project intends to follow 
 
 - Initial repository documentation.
 
-[Unreleased]: https://github.com/jxoesneon/FerroTeX/compare/v0.9.0...HEAD
-[0.9.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.8.0...v0.9.0
-[0.8.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.7.0...v0.8.0
-[0.2.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.0.0...v0.1.0
 [0.0.0]: https://github.com/jxoesneon/FerroTeX/releases/tag/v0.0.0
+[0.1.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.0.0...v0.1.0
+[0.2.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.1.0...v0.2.0
+[0.3.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.2.0...v0.3.0
+[0.4.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.3.0...v0.4.0
+[0.5.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.4.0...v0.5.0
+[0.6.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.5.0...v0.6.0
+[0.7.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.6.0...v0.7.0
+[0.8.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.7.0...v0.8.0
+[0.9.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.8.0...v0.9.0
+[0.10.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.9.0...v0.10.0
+[0.11.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.10.0...v0.11.0
+[0.12.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.11.0...v0.12.0
+[0.13.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.12.0...v0.13.0
+[0.14.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.13.0...v0.14.0
+[0.15.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.14.0...v0.15.0
+[0.16.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.15.0...v0.16.0
+[Unreleased]: https://github.com/jxoesneon/FerroTeX/compare/v0.16.0...HEAD

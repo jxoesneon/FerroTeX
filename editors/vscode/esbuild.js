@@ -22,8 +22,24 @@ const esbuildProblemMatcherPlugin = {
     });
   },
 };
+const fs = require("fs");
+const path = require("path");
+
+function copyPdfJs() {
+  const src = path.join(__dirname, "node_modules", "pdfjs-dist", "build");
+  const dest = path.join(__dirname, "dist", "pdfjs");
+
+  if (fs.existsSync(dest)) {
+    fs.rmSync(dest, { recursive: true, force: true });
+  }
+  fs.mkdirSync(dest, { recursive: true });
+
+  fs.cpSync(src, dest, { recursive: true });
+  console.log("[build] Copied pdfjs-dist assets to dist/pdfjs");
+}
 
 async function main() {
+  copyPdfJs();
   const ctx = await esbuild.context({
     entryPoints: ["src/extension.ts"],
     bundle: true,

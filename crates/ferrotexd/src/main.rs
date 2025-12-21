@@ -1,17 +1,20 @@
 mod build;
+mod completer;
+mod diagnostics;
 mod fmt;
-mod workspace;
 mod hover;
+mod workspace;
 
 mod synctex;
 
 use build::{BuildEngine, BuildRequest, BuildStatus, latexmk::LatexmkAdapter};
 use dashmap::DashMap;
-use ferrotex_log::ir::EventPayload;
+
 use ferrotex_log::parser::LogParser;
 use ferrotex_syntax::{SyntaxKind, SyntaxNode};
 use line_index::LineIndex;
 use notify::{EventKind, RecursiveMode, Watcher};
+use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
@@ -101,7 +104,7 @@ impl LanguageServer for Backend {
                 document_symbol_provider: Some(OneOf::Left(true)),
                 execute_command_provider: Some(ExecuteCommandOptions {
                     commands: vec![
-                        "ferrotex.build".to_string(),
+                        "ferrotex.internal.build".to_string(),
                         "ferrotex.synctex_forward".to_string(),
                         "ferrotex.synctex_inverse".to_string()
                     ],
@@ -472,7 +475,7 @@ impl LanguageServer for Backend {
                 Ok(Some(CompletionResponse::Array(items)))
             }
             CompletionKind::Environment => {
-                let items: Vec<CompletionItem> = ENVIRONMENTS
+                let mut items: Vec<CompletionItem> = ENVIRONMENTS
                     .iter()
                     .map(|&env| CompletionItem {
                         label: env.to_string(),
@@ -481,10 +484,16 @@ impl LanguageServer for Backend {
                         ..Default::default()
                     })
                     .collect();
+
+                // Dynamic Package Completions (CS-3)
+                let packages = self.workspace.get_packages(&uri);
+                let (_, dyn_envs) = completer::get_package_completions(&packages);
+                items.extend(dyn_envs);
+
                 Ok(Some(CompletionResponse::Array(items)))
             }
             CompletionKind::Command => {
-                let items: Vec<CompletionItem> = COMMANDS
+                let mut items: Vec<CompletionItem> = COMMANDS
                     .iter()
                     .map(|&cmd| CompletionItem {
                         label: format!("\\{}", cmd),
@@ -493,6 +502,12 @@ impl LanguageServer for Backend {
                         ..Default::default()
                     })
                     .collect();
+
+                // Dynamic Package Completions (CS-3)
+                let packages = self.workspace.get_packages(&uri);
+                let (dyn_cmds, _) = completer::get_package_completions(&packages);
+                items.extend(dyn_cmds);
+
                 Ok(Some(CompletionResponse::Array(items)))
             }
             CompletionKind::File => {
@@ -592,12 +607,228 @@ impl LanguageServer for Backend {
         Ok(Some(fmt::format_document(&root, &line_index)))
     }
 
-    async fn code_action(&self, _params: CodeActionParams) -> Result<Option<Vec<CodeActionOrCommand>>> {
-        let actions = vec![
-            // Stub for future: e.g. "Create missing label"
-        ];
-        Ok(Some(actions))
+    async fn code_action(&self, params: CodeActionParams) -> Result<Option<Vec<CodeActionOrCommand>>> {
+        let uri = params.text_document.uri;
+        let mut actions = Vec::new();
+
+        for diagnostic in params.context.diagnostics {
+            if diagnostic.source.as_deref() == Some("ferrotex-deprecated") {
+                // Determine the command from the text to provide the correct fix
+                let cmd_name = if let Some(text) = self.get_text(&uri) {
+                let line_index = LineIndex::new(&text);
+                let start = line_index.offset(line_index::LineCol {
+                    line: diagnostic.range.start.line,
+                    col: diagnostic.range.start.character,
+                });
+                let end = line_index.offset(line_index::LineCol {
+                    line: diagnostic.range.end.line,
+                    col: diagnostic.range.end.character,
+                });
+
+                if let (Some(start), Some(end)) = (start, end) {
+                    text[usize::from(start)..usize::from(end)].to_string()
+                } else {
+                    continue;
+                }
+            } else {
+                continue;
+            };
+
+            // Handle Display Math ($$...$$)
+            if diagnostic.message.to_lowercase().contains("display math") {
+                // Extract the text content to replace $$...$$ with \[...\]
+                if let Some(text) = self.get_text(&uri) {
+                    let line_index = LineIndex::new(&text);
+                    let start = line_index.offset(line_index::LineCol {
+                        line: diagnostic.range.start.line,
+                        col: diagnostic.range.start.character,
+                    });
+                    let end = line_index.offset(line_index::LineCol {
+                        line: diagnostic.range.end.line,
+                        col: diagnostic.range.end.character,
+                    });
+
+                    if let (Some(start), Some(end)) = (start, end) {
+                        let block_text = &text[usize::from(start)..usize::from(end)];
+                        // Extract content between $$ and $$
+                        // Format: $$<content>$$
+                        if block_text.len() >= 4 && block_text.starts_with("$$") && block_text.ends_with("$$") {
+                            let content = &block_text[2..block_text.len()-2];
+                            let new_text = format!("\\[{}\\]", content);
+                            
+                            actions.push(CodeActionOrCommand::CodeAction(CodeAction {
+                                title: "Convert to \\[...\\] (LaTeX2e display math)".to_string(),
+                                kind: Some(CodeActionKind::QUICKFIX),
+                                diagnostics: Some(vec![diagnostic.clone()]),
+                                edit: Some(WorkspaceEdit {
+                                    changes: Some(std::collections::HashMap::from([(
+                                        uri.clone(),
+                                        vec![TextEdit {
+                                            range: diagnostic.range,
+                                            new_text,
+                                        }],
+                                    )])),
+                                    ..Default::default()
+                                }),
+                                is_preferred: Some(true),
+                                ..Default::default()
+                            }));
+                        }
+                    }
+                }
+                continue;
+            }
+
+            // Handle Packages
+            if diagnostic.message.to_lowercase().contains("package") {
+                let replacement = match cmd_name.as_str() {
+                    "times" => "mathptmx",
+                    "psfig" | "epsfig" => "graphicx",
+                    "a4wide" => "geometry",
+                    _ => continue,
+                };
+
+                let title = format!("Replace package '{}' with '{}'", cmd_name, replacement);
+                let edit = WorkspaceEdit {
+                    changes: Some(std::collections::HashMap::from([(
+                        uri.clone(),
+                        vec![TextEdit {
+                            range: diagnostic.range,
+                            new_text: replacement.to_string(),
+                        }],
+                    )])),
+                    ..Default::default()
+                };
+
+                actions.push(CodeActionOrCommand::CodeAction(CodeAction {
+                    title,
+                    kind: Some(CodeActionKind::QUICKFIX),
+                    diagnostics: Some(vec![diagnostic.clone()]),
+                    edit: Some(edit),
+                    is_preferred: Some(true),
+                    ..Default::default()
+                }));
+                continue;
+            }
+
+            // Handle Font Commands (context-aware)
+            // Check if this is a font command with context
+            let (base_cmd, in_group) = if cmd_name.contains(":group") {
+                (cmd_name.split(':').next().unwrap_or(""), true)
+            } else {
+                (cmd_name.as_str(), false)
+            };
+            
+            // Define mappings for deprecated font commands
+            let font_mappings: std::collections::HashMap<&str, (&str, &str)> = [
+                ("\\bf", ("\\bfseries", "\\textbf")),
+                ("\\it", ("\\itshape", "\\textit")),
+                ("\\sc", ("\\scshape", "\\textsc")),
+                ("\\rm", ("\\rmfamily", "\\textrm")),
+                ("\\sf", ("\\sffamily", "\\textsf")),
+                ("\\tt", ("\\ttfamily", "\\texttt")),
+                ("\\sl", ("\\slshape", "\\textsl")),
+            ].iter().cloned().collect();
+            
+            if let Some((declaration_cmd, semantic_cmd)) = font_mappings.get(base_cmd) {
+                if in_group {
+                    // For {\bf text}, offer two options:
+                    // 1. Replace \bf with \bfseries (declaration style)
+                    // 2. Convert to \textbf{text} (semantic style - preferred)
+                    
+                    if let Some(text) = self.get_text(&uri) {
+                        let line_index = LineIndex::new(&text);
+                        let start = line_index.offset(line_index::LineCol {
+                            line: diagnostic.range.start.line,
+                            col: diagnostic.range.start.character,
+                        });
+                        let end = line_index.offset(line_index::LineCol {
+                            line: diagnostic.range.end.line,
+                            col: diagnostic.range.end.character,
+                        });
+
+                        if let (Some(start), Some(end)) = (start, end) {
+                            let group_text = &text[usize::from(start)..usize::from(end)];
+                            
+                            // Expected format: {\cmd content}
+                            if group_text.starts_with('{') && group_text.ends_with('}') {
+                                let inner = &group_text[1..group_text.len()-1].trim_start();
+                                
+                                // Option 1: Semantic (preferred)
+                                if let Some(content) = inner.strip_prefix(base_cmd).map(|s| s.trim()) {
+                                    let semantic_replacement = format!("{}{{{}}}",  semantic_cmd, content);
+                                    actions.push(CodeActionOrCommand::CodeAction(CodeAction {
+                                        title: format!("Convert to {} (semantic, recommended)", semantic_cmd),
+                                        kind: Some(CodeActionKind::QUICKFIX),
+                                        diagnostics: Some(vec![diagnostic.clone()]),
+                                        edit: Some(WorkspaceEdit {
+                                            changes: Some(std::collections::HashMap::from([(
+                                                uri.clone(),
+                                                vec![TextEdit {
+                                                    range: diagnostic.range,
+                                                    new_text: semantic_replacement,
+                                                }],
+                                            )])),
+                                            ..Default::default()
+                                        }),
+                                        is_preferred: Some(true),
+                                        ..Default::default()
+                                    }));
+                                    
+                                    // Option 2: Declaration (alternative)
+                                    let declaration_replacement = group_text.replacen(base_cmd, declaration_cmd, 1);
+                                    actions.push(CodeActionOrCommand::CodeAction(CodeAction {
+                                        title: format!("Replace {} with {}", base_cmd, declaration_cmd),
+                                        kind: Some(CodeActionKind::QUICKFIX),
+                                        diagnostics: Some(vec![diagnostic.clone()]),
+                                        edit: Some(WorkspaceEdit {
+                                            changes: Some(std::collections::HashMap::from([(
+                                                uri.clone(),
+                                                vec![TextEdit {
+                                                    range: diagnostic.range,
+                                                    new_text: declaration_replacement,
+                                                }],
+                                            )])),
+                                            ..Default::default()
+                                        }),
+                                        is_preferred: Some(false),
+                                        ..Default::default()
+                                    }));
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // Standalone command, just replace with declaration
+                    let replacement = *declaration_cmd;
+                    let title = format!("Replace '{}' with '{}'", base_cmd, replacement);
+                    let edit = WorkspaceEdit {
+                        changes: Some(std::collections::HashMap::from([(
+                            uri.clone(),
+                            vec![TextEdit {
+                                range: diagnostic.range,
+                                new_text: replacement.to_string(),
+                            }],
+                        )])),
+                        ..Default::default()
+                    };
+
+                    actions.push(CodeActionOrCommand::CodeAction(CodeAction {
+                        title,
+                        kind: Some(CodeActionKind::QUICKFIX),
+                        diagnostics: Some(vec![diagnostic.clone()]),
+                        edit: Some(edit),
+                        is_preferred: Some(true),
+                        ..Default::default()
+                    }));
+                }
+                continue;
+            }
+        }
     }
+
+    Ok(Some(actions))
+}
 
     async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
         let uri = &params.text_document_position_params.text_document.uri;
@@ -613,7 +844,7 @@ impl LanguageServer for Backend {
                 })
                 .unwrap();
 
-            return Ok(hover::find_hover(&root, offset));
+            return Ok(hover::find_hover(&root, offset, &self.workspace));
         }
 
         Ok(None)
@@ -631,6 +862,7 @@ impl LanguageServer for Backend {
              let col = args[2].as_u64().unwrap_or(0) as u32;
              let pdf_uri_str = args[3].as_str().unwrap_or_default();
              
+             #[allow(clippy::collapsible_if)]
              if let Ok(tex_url) = Url::parse(tex_uri_str) {
                  if let Ok(pdf_url) = Url::parse(pdf_uri_str) {
                      if let (Ok(tex_path), Ok(pdf_path)) = (tex_url.to_file_path(), pdf_url.to_file_path()) {
@@ -650,6 +882,7 @@ impl LanguageServer for Backend {
              let x = args[2].as_f64().unwrap_or(0.0);
              let y = args[3].as_f64().unwrap_or(0.0);
              
+             #[allow(clippy::collapsible_if)]
              if let Ok(pdf_url) = Url::parse(pdf_uri_str) {
                  if let Ok(pdf_path) = pdf_url.to_file_path() {
                      if let Some(res) = synctex::inverse_search(&pdf_path, page, x, y) {
@@ -660,7 +893,7 @@ impl LanguageServer for Backend {
              return Ok(None);
         }
 
-        if params.command == "ferrotex.build" {
+        if params.command == "ferrotex.internal.build" {
             let args = params.arguments;
             if args.is_empty() {
                 self.client
@@ -718,25 +951,25 @@ impl LanguageServer for Backend {
             // ---------------------------------
 
             // --- Magic Comment Detection (UX-2) ---
+            // --- Magic Comment Detection (UX-2) --
+            // Refactored to use Workspace Index (v0.15.0)
             let mut build_uri = uri.clone();
-            if let Some(text) = self.get_text(&uri) {
-                if let Some(magic_path) = detect_magic_root(&text) {
-                    if let Ok(file_path) = uri.to_file_path() {
-                        if let Some(parent) = file_path.parent() {
-                            let new_path = parent.join(&magic_path);
-                            // Normalize if possible, but for now strict join
-                            if let Ok(new_uri) = Url::from_file_path(&new_path) {
-                                self.client
-                                    .log_message(
-                                        MessageType::INFO,
-                                        format!(
-                                            "Magic Root detected: Redirecting build to {}",
-                                            new_uri
-                                        ),
-                                    )
-                                    .await;
-                                build_uri = new_uri;
-                            }
+            #[allow(clippy::collapsible_if)]
+            if let Some(magic_path) = self.workspace.get_explicit_root(&uri) {
+                if let Ok(file_path) = uri.to_file_path() {
+                     if let Some(parent) = file_path.parent() {
+                        let new_path = parent.join(&magic_path);
+                        if let Ok(new_uri) = Url::from_file_path(&new_path) {
+                            self.client
+                                .log_message(
+                                    MessageType::INFO,
+                                    format!(
+                                        "Magic Root detected (Index): Redirecting build to {}",
+                                        new_uri
+                                    ),
+                                )
+                                .await;
+                            build_uri = new_uri;
                         }
                     }
                 }
@@ -754,8 +987,52 @@ impl LanguageServer for Backend {
                 workspace_root: root_path,
             };
 
-            let engine = LatexmkAdapter;
-            let result = engine.build(&req).await;
+            // Setup Log Streaming (BO-2)
+            let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+            let client_clone = self.client.clone();
+            
+            // Spawn a task to forward logs to the client
+            tokio::spawn(async move {
+                while let Some(msg) = rx.recv().await {
+                    #[derive(serde::Serialize, serde::Deserialize)]
+                    struct LogParams {
+                        message: String,
+                    }
+                    enum LogNotification {}
+                    impl tower_lsp::lsp_types::notification::Notification for LogNotification {
+                        type Params = LogParams;
+                        const METHOD: &'static str = "$/ferrotex/log";
+                    }
+
+                    client_clone
+                        .send_notification::<LogNotification>(LogParams { message: msg })
+                        .await;
+                }
+            });
+
+            // Callback to feed the channel
+            let log_callback = Box::new(move |msg: String| {
+                let _ = tx.send(msg);
+            });
+
+            // Engine Selection Logic (Zero-Config)
+            // 1. Check for valid 'latexmk'. Logic: It's the standard.
+            // 2. Fallback to 'tectonic' if latexmk missing (likely our downloaded one).
+            
+            // Note: In production we should maybe cache this decision or respect config.
+            // For now, heuristic check is acceptable.
+            
+            let engine: Box<dyn BuildEngine + Send + Sync> = if std::process::Command::new("latexmk").arg("-v").stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()).status().map(|s| s.success()).unwrap_or(false) {
+                 Box::new(LatexmkAdapter)
+            } else {
+                 Box::new(build::tectonic::TectonicAdapter)
+            };
+            
+            self.client
+                .log_message(MessageType::INFO, format!("Using Build Engine: {}", engine.name()))
+                .await;
+
+            let result = engine.build(&req, Some(log_callback)).await;
 
             match result {
                 Ok(status) => match status {
@@ -775,7 +1052,19 @@ impl LanguageServer for Backend {
                         for line in log.stderr.lines() {
                             self.client.log_message(MessageType::ERROR, line).await;
                         }
+                        
+                        // Parse Diagnostics from Tectonic Output (UX-ZeroConfig)
+                        if engine.name() == "tectonic" {
+                             let diagnostics = parse_tectonic_diagnostics(&format!("{}\n{}", log.stdout, log.stderr), &uri);
+                             for (doc_uri, diags) in diagnostics {
+                                 // We need to merge with existing diagnostics? 
+                                 // For now, just publish. The user will see them.
+                                 self.client.publish_diagnostics(doc_uri, diags, None).await;
+                             }
+                        }
+
                         // UX-5: Failure Notification
+
                         self.client
                             .show_message(MessageType::ERROR, "Build Failed ❌ (Check Output)")
                             .await;
@@ -790,6 +1079,7 @@ impl LanguageServer for Backend {
                                 Some(vec![MessageActionItem { title: format!("Install {}", pkg), properties: Default::default() }])
                             ).await;
                             
+                            #[allow(clippy::collapsible_if)]
                             if let Ok(Some(item)) = action {
                                 if item.title.starts_with("Install") {
                                     self.client.show_message(MessageType::INFO, "Installing package... Check logs.").await;
@@ -1194,9 +1484,19 @@ async fn publish_diagnostics_logic(
             .push((range, msg, "ferrotex-citations".into()));
     }
 
+    // Deprecated Commands (Lint)
+    let deprecated_warnings = workspace.validate_deprecated();
+    for (uri, range, msg) in deprecated_warnings {
+        project_diags
+            .entry(uri)
+            .or_default()
+            .push((range, msg, "ferrotex-deprecated".into()));
+    }
+
     // 2. Prepare diagnostics for all OPEN documents
     // We iterate over documents map to ensure we have text for line index calculation
     let mut pub_list = Vec::new();
+    let mut published_uris = HashSet::new();
 
     for entry in documents.iter() {
         let uri = entry.key();
@@ -1215,6 +1515,28 @@ async fn publish_diagnostics_logic(
                 let start = line_index.line_col(range.start());
                 let end = line_index.line_col(range.end());
 
+                let severity = if source == "ferrotex-deprecated" {
+                    DiagnosticSeverity::WARNING
+                } else {
+                    DiagnosticSeverity::ERROR
+                };
+
+                let mut message = msg.clone();
+                if source == "ferrotex-deprecated" {
+                     if msg == "displaymath" {
+                         message = "Use '\\[ ... \\]' instead of '$$ ... $$' for display math (LaTeX2e standard).".to_string();
+                     } else if msg.starts_with("package:") {
+                         let pkg = msg.strip_prefix("package:").unwrap_or("unknown");
+                         message = format!("Package '{}' is obsolete/deprecated.", pkg);
+                     } else if msg.contains(":group") {
+                         // Font command in group context
+                         let cmd = msg.split(':').next().unwrap_or("");
+                         message = format!("Font command '{}' is deprecated. Use LaTeX2e equivalents.", cmd);
+                     } else {
+                         message = format!("Command '{}' is deprecated. Use modern LaTeX2e equivalent.", msg);
+                     }
+                }
+
                 diags.push(Diagnostic {
                     range: Range {
                         start: Position {
@@ -1226,22 +1548,86 @@ async fn publish_diagnostics_logic(
                             character: end.col,
                         },
                     },
-                    severity: Some(DiagnosticSeverity::ERROR),
-                    code: None,
+                    severity: Some(severity),
+                    code: Some(NumberOrString::String("deprecated".to_string())),
                     code_description: None,
                     source: Some(source.clone()),
-                    message: msg.clone(),
+                    message,
                     related_information: None,
-                    tags: None,
+                    tags: if source == "ferrotex-deprecated" { Some(vec![DiagnosticTag::DEPRECATED]) } else { None },
                     data: None,
                 });
             }
         }
 
+        published_uris.insert(uri.clone());
         pub_list.push((uri.clone(), diags));
     }
 
-    // 3. Publish
+    // 3. Publish diagnostics for indexed workspace files that are NOT open
+    // This enables continuous monitoring even for files not currently in the editor
+    for (uri, proj_list) in project_diags.iter() {
+        // Skip if already published for open document
+        if published_uris.contains(uri) {
+            continue;
+        }
+
+        // Try to read file content from disk for line index calculation
+        if let Ok(file_path) = uri.to_file_path() {
+            if let Ok(text) = tokio::fs::read_to_string(&file_path).await {
+                let line_index = LineIndex::new(&text);
+                let mut diags = Vec::new();
+
+                for (range, msg, source) in proj_list {
+                    let start = line_index.line_col(range.start());
+                    let end = line_index.line_col(range.end());
+
+                    let severity = if source == "ferrotex-deprecated" {
+                        DiagnosticSeverity::WARNING
+                    } else {
+                        DiagnosticSeverity::ERROR
+                    };
+
+                    let mut message = msg.clone();
+                    if source == "ferrotex-deprecated" {
+                         if msg == "displaymath" {
+                             message = "Use '\\[ ... \\]' instead of '$$ ... $$' for display math (LaTeX2e standard).".to_string();
+                         } else if msg.starts_with("package:") {
+                             let pkg = msg.strip_prefix("package:").unwrap_or("unknown");
+                             message = format!("Package '{}' is obsolete/deprecated.", pkg);
+                         } else {
+                             message = format!("Command '{}' is deprecated. Use modern LaTeX2e equivalent.", msg);
+                         }
+                    }
+
+                    diags.push(Diagnostic {
+                        range: Range {
+                            start: Position {
+                                line: start.line,
+                                character: start.col,
+                            },
+                            end: Position {
+                                line: end.line,
+                                character: end.col,
+                            },
+                        },
+                        severity: Some(severity),
+                        code: Some(NumberOrString::String("deprecated".to_string())),
+                        code_description: None,
+                        source: Some(source.clone()),
+                        message,
+                        related_information: None,
+                        tags: if source == "ferrotex-deprecated" { Some(vec![DiagnosticTag::DEPRECATED]) } else { None },
+                        data: None,
+                    });
+                }
+
+                pub_list.push((uri.clone(), diags));
+            }
+        }
+    }
+
+    // 4. Publish
     for (uri, diags) in pub_list {
         client.publish_diagnostics(uri, diags, None).await;
     }
@@ -1546,42 +1932,74 @@ async fn watch_workspace(
                                             let events = parser.update(&buffer);
                                             file_offset = current_len;
 
-                                            let mut diagnostics = Vec::new();
+                                            let mut diagnostics_map: std::collections::HashMap<Url, Vec<Diagnostic>> = std::collections::HashMap::new();
+
+                                            // Track current file context from FileEnter/FileExit events?
+                                            // Since LogParser might be stateless per update call or stateful... 
+                                            // To rely on FileEnter/Exit we need to trust the sequence.
+                                            // For MVP of UX-5, we'll assume the log events relate to the tracked file or use what we have.
+                                            // NOTE: Without a robust state machine here, associating ErrorStart to a file is hard if not implicit.
+                                            // However, `ferrotex-log` seems to be designed to output raw events.
+                                            
+                                            // Let's implement a simple file tracker if needed, or just default to the log owner.
+                                            // Map log path to source file URI (Heuristic)
+                                            // 1. Check sibling .tex
+                                            let tex_path = path.with_extension("tex");
+                                            let mut target_uri = Url::from_file_path(&tex_path).ok();
+                                            
+                                            // 2. If not found, checks parent directory (common with -output-directory=build)
+                                            if !tex_path.exists() {
+                                                if let Some(parent) = path.parent() {
+                                                    if let Some(grandparent) = parent.parent() {
+                                                        if let Some(file_name) = path.file_name() {
+                                                            let parent_tex = grandparent.join(file_name).with_extension("tex");
+                                                            if parent_tex.exists() {
+                                                                target_uri = Url::from_file_path(&parent_tex).ok();
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            
+                                            // Fallback to log file itself if source not found
+                                            if target_uri.is_none() {
+                                                 target_uri = Url::from_file_path(&path).ok();
+                                            }
 
                                             for event in events {
-                                                match event.payload {
-                                                    EventPayload::Warning { message } => {
-                                                        diagnostics.push(Diagnostic {
-                                                            range: Range::default(),
-                                                            severity: Some(
-                                                                DiagnosticSeverity::WARNING,
-                                                            ),
-                                                            message,
-                                                            source: Some("ferrotexd".to_string()),
-                                                            ..Default::default()
-                                                        });
-                                                    }
-                                                    EventPayload::ErrorStart { message } => {
-                                                        diagnostics.push(Diagnostic {
-                                                            range: Range::default(),
-                                                            severity: Some(
-                                                                DiagnosticSeverity::ERROR,
-                                                            ),
-                                                            message,
-                                                            source: Some("ferrotexd".to_string()),
-                                                            ..Default::default()
-                                                        });
-                                                    }
-                                                    _ => {}
+                                                let (severity, raw_message) = match event.payload {
+                                                    ferrotex_log::ir::EventPayload::ErrorStart { message } => 
+                                                        (DiagnosticSeverity::ERROR, message),
+                                                    ferrotex_log::ir::EventPayload::Warning { message } => 
+                                                        (DiagnosticSeverity::WARNING, message),
+                                                    _ => continue,
+                                                };
+
+                                                let mut msg = raw_message.clone();
+                                                // UX-5: Human-Readable Errors
+                                                if let Some(exp) = diagnostics::error_index::explain(&raw_message) {
+                                                    msg.push_str(&format!("\n\n💡 {}: {}", exp.summary, exp.description));
+                                                }
+
+                                                let diag = Diagnostic {
+                                                    range: Range::default(), // No line info in basic events
+                                                    severity: Some(severity),
+                                                    code: None,
+                                                    code_description: None,
+                                                    source: Some("ferrotex-log".to_string()),
+                                                    message: msg,
+                                                    related_information: None,
+                                                    tags: None,
+                                                    data: None,
+                                                };
+
+                                                if let Some(uri) = &target_uri {
+                                                    diagnostics_map.entry(uri.clone()).or_default().push(diag);
                                                 }
                                             }
 
-                                            if !diagnostics.is_empty()
-                                                && let Ok(uri) = Url::from_file_path(&path)
-                                            {
-                                                client
-                                                    .publish_diagnostics(uri, diagnostics, None)
-                                                    .await;
+                                            for (uri, diags) in diagnostics_map {
+                                                client.publish_diagnostics(uri, diags, None).await;
                                             }
                                         }
                                     }
@@ -1598,85 +2016,6 @@ async fn watch_workspace(
 }
 
 /// Scans the first 5 lines of the document for a magic comment like `%!TEX root = ...`.
-///
-/// Returns the path relative to the current file if found.
-#[allow(dead_code)]
-fn detect_magic_root(text: &str) -> Option<std::path::PathBuf> {
-    for line in text.lines().take(5) {
-        let line = line.trim_start();
-        if line.starts_with('%') {
-            // Strip %
-            let content = line[1..].trim_start();
-            // Check for !TEX root or ! TeX root
-            if content.starts_with('!') {
-                let content = content[1..].trim_start();
-                if content.to_ascii_lowercase().starts_with("tex root") {
-                    // Extract value after =
-                    if let Some(eq_idx) = content.find('=') {
-                        let path_str = content[eq_idx + 1..].trim();
-                        if !path_str.is_empty() {
-                            return Some(std::path::PathBuf::from(path_str));
-                        }
-                    }
-                }
-            }
-        }
-    }
-    None
-}
-
-#[tokio::main]
-async fn main() {
-    let stdin = tokio::io::stdin();
-    let stdout = tokio::io::stdout();
-
-    let (service, socket) = LspService::new(|client| Backend {
-        client,
-        documents: Arc::new(DashMap::new()),
-        workspace: Arc::new(Workspace::new()),
-        root_uri: Arc::new(Mutex::new(None)),
-        syntax_diagnostics: Arc::new(DashMap::new()),
-    });
-    Server::new(stdin, stdout, socket).serve(service).await;
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_magic_root_detection() {
-        let cases = vec![
-            ("%!TEX root = ../main.tex", Some("../main.tex")),
-            ("% !TeX root=  main.tex", Some("main.tex")),
-            ("%!TEX root=subdir/main.tex", Some("subdir/main.tex")),
-            ("% Regular comment", None),
-            ("No comment at all", None),
-        ];
-
-        for (input, expected) in cases {
-            assert_eq!(
-                detect_magic_root(input).map(|p| p.to_string_lossy().to_string()),
-                expected.map(|s| s.to_string())
-            );
-        }
-    }
-
-    #[test]
-    fn test_magic_root_limit() {
-        // Line 1-5 (first 5 lines) are safe. Line 6 is ignored.
-        // lines() iterator: 1, 2, 3, 4, 5. So text with 5 leading newlines means the magic comment is on 6th line.
-        let text = "\n\n\n\n\n%!TEX root = hidden.tex";
-        assert_eq!(detect_magic_root(text), None);
-
-        let valid_text = "\n\n\n\n%!TEX root = visible.tex"; // On 5th line
-        assert_eq!(
-            detect_magic_root(valid_text).map(|p| p.to_string_lossy().to_string()),
-            Some("visible.tex".to_string())
-        );
-    }
-}
-
 /// Analyzes the build log to identify a missing LaTeX package.
 ///
 /// Looks for the standard `! LaTeX Error: File 'foo.sty' not found.` pattern.
@@ -1693,6 +2032,94 @@ fn detect_missing_package(log: &str) -> Option<String> {
         }
     }
     None
+}
+
+/// Parses Tectonic's `error: file:line: message` format into LSP Diagnostics.
+fn parse_tectonic_diagnostics(output: &str, base_uri: &Url) -> std::collections::HashMap<Url, Vec<Diagnostic>> {
+    let mut map: std::collections::HashMap<Url, Vec<Diagnostic>> = std::collections::HashMap::new();
+    
+    // Tectonic format: "error: main.tex:15: Missing $ inserted"
+    // Also "warning: ..."
+    
+    for line in output.lines() {
+        let parts: Vec<&str> = line.splitn(4, ':').collect();
+        if parts.len() < 4 { continue; }
+        
+        let severity_str = parts[0].trim();
+        let filename = parts[1].trim();
+        let lineno_str = parts[2].trim();
+        let message = parts[3].trim();
+        
+        let severity = match severity_str {
+            "error" => DiagnosticSeverity::ERROR,
+            "warning" => DiagnosticSeverity::WARNING,
+             _ => {
+                 // Sometimes it starts with "[error] ..." or similar if piped? 
+                 // But Tectonic raw output is usually clear.
+                 // We'll skip if it doesn't match known prefixes.
+                 if line.contains("error:") { DiagnosticSeverity::ERROR } else { continue }
+             }
+        };
+        
+        // Resolve URI
+        // Assuming filename is relative to the document being built
+        // If base_uri is "file:///demo/main.tex", and filename is "main.tex" -> match.
+        // If filename is "chapters/intro.tex" -> resolve.
+        
+        let target_uri = if let Ok(base_path) = base_uri.to_file_path() {
+            if let Some(parent) = base_path.parent() {
+                 let path = parent.join(filename);
+                 Url::from_file_path(path).ok()
+            } else {
+                None
+            }
+        } else {
+             None
+        };
+        
+        if let Some(uri) = target_uri {
+             let line_num: u32 = lineno_str.parse::<u32>().unwrap_or(1).saturating_sub(1); // 0-indexed
+             
+             // Enhance error messages with helpful suggestions
+             let enhanced_message = if message.contains("Undefined control sequence") {
+                 // Try to extract the undefined command
+                 if let Some(command) = crate::diagnostics::error_index::extract_undefined_command(message) {
+                     if let Some(suggestion) = crate::diagnostics::error_index::suggest_package(&command) {
+                         format!("{}\n\n{}", message, suggestion)
+                     } else {
+                         // No known package, provide general help
+                         format!("{}\n\n💡 Check: spelling, \\usepackage{{...}}, or define with \\newcommand", message)
+                     }
+                 } else {
+                     message.to_string()
+                 }
+             } else if let Some(explanation) = crate::diagnostics::error_index::explain(message) {
+                 // Use human-readable explanation for other errors
+                 format!("{}\n\n💡 {}: {}", message, explanation.summary, explanation.description)
+             } else {
+                 message.to_string()
+             };
+             
+             let diag = Diagnostic {
+                range: Range {
+                    start: Position { line: line_num, character: 0 },
+                    end: Position { line: line_num, character: 100 }, // Highlight whole line?
+                },
+                severity: Some(severity),
+                code: None,
+                code_description: None,
+                source: Some("tectonic".to_string()),
+                message: enhanced_message,
+                related_information: None,
+                tags: None,
+                data: None, 
+             };
+             
+             map.entry(uri).or_default().push(diag);
+        }
+    }
+    
+    map
 }
 
 /// Installs a package using `tlmgr`.
@@ -1724,4 +2151,24 @@ async fn install_package(client: &Client, package: &str) -> bool {
          client.log_message(MessageType::ERROR, format!("tlmgr failed: {}", stderr)).await;
          false
     }
+}
+
+#[tokio::main]
+async fn main() {
+    let stdin = tokio::io::stdin();
+    let stdout = tokio::io::stdout();
+
+    let (service, socket) = LspService::new(|client| Backend {
+        client,
+        documents: Arc::new(DashMap::new()),
+        workspace: Arc::new(Workspace::new()),
+        root_uri: Arc::new(Mutex::new(None)),
+        syntax_diagnostics: Arc::new(DashMap::new()),
+    });
+    Server::new(stdin, stdout, socket).serve(service).await;
+}
+
+#[cfg(test)]
+mod tests {
+    // use super::*; // Unused
 }

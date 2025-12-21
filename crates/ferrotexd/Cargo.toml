@@ -1,6 +1,6 @@
 [package]
 name = "ferrotexd"
-version = "0.14.0"
+version = "0.16.0"
 edition = "2024"
 description = "LSP implementation for FerroTeX"
 license = "Apache-2.0 OR MIT"
@@ -19,6 +19,8 @@ ferrotex-syntax = { path = "../ferrotex-syntax", version = "0.14.0" }
 line-index = "0.1"
 rowan = "0.15"
 async-trait = "0.1.89"
+regex = "1.12.2"
+lazy_static = "1.5.0"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }

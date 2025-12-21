@@ -48,7 +48,7 @@ class PdfPreviewProvider {
         webviewPanel.webview.options = {
             enableScripts: true,
             localResourceRoots: [
-                vscode.Uri.joinPath(this.extensionUri, "node_modules"),
+                vscode.Uri.joinPath(this.extensionUri, "dist"),
                 vscode.Uri.file(document.uri.path).with({
                     path: document.uri.path.substring(0, document.uri.path.lastIndexOf("/") + 1),
                 }),
@@ -85,8 +85,8 @@ class PdfPreviewProvider {
         }
     }
     getHtmlForWebview(webview, pdfUri) {
-        const pdfJsUri = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, "node_modules", "pdfjs-dist", "build", "pdf.mjs"));
-        const pdfWorkerUri = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, "node_modules", "pdfjs-dist", "build", "pdf.worker.mjs"));
+        const pdfJsUri = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, "dist", "pdfjs", "pdf.mjs"));
+        const pdfWorkerUri = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, "dist", "pdfjs", "pdf.worker.mjs"));
         const pdfContentUri = webview.asWebviewUri(pdfUri);
         return `<!DOCTYPE html>
         <html lang="en">
