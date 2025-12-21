@@ -3,7 +3,7 @@
 ## Status
 
 - **Type:** Normative
-- **Stability:** Draft
+- **Stability:** Stable (v1.0.0)
 
 ## Purpose
 
