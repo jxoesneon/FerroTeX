@@ -14,6 +14,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libicu-dev libharfbuzz-dev libfontconfig1-dev libssl-dev libgraphite2-dev
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
