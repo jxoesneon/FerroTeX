@@ -4,6 +4,7 @@ import { LanguageClient, LanguageClientOptions, ServerOptions } from "vscode-lan
 import { PdfPreviewProvider } from "./pdfPreview";
 import { checkAndInstallTectonic } from "./installTectonic";
 import { validateBuildEngine, validateSyncTeX } from "./engineValidator";
+import { ImagePasteProvider } from "./imagePaste";
 
 let client: LanguageClient;
 
@@ -79,23 +80,15 @@ export function activate(context: vscode.ExtensionContext) {
 
   // UX-3: Image Paste Wizard
   if (vscode.languages.registerDocumentPasteEditProvider) {
-    const metadata = {
-      id: "ferrotex.imagePaste",
-      pasteMimeTypes: ["image/png"],
-    };
+    const selector = [
+      { scheme: "file", language: "latex" },
+      { scheme: "file", language: "tex" },
+    ];
     context.subscriptions.push(
-      vscode.languages.registerDocumentPasteEditProvider(
-        { scheme: "file", language: "latex" },
-        new ImagePasteProvider(),
-        metadata as any,
-      ),
-    );
-    context.subscriptions.push(
-      vscode.languages.registerDocumentPasteEditProvider(
-        { scheme: "file", language: "tex" },
-        new ImagePasteProvider(),
-        metadata as any,
-      ),
+      vscode.languages.registerDocumentPasteEditProvider(selector, new ImagePasteProvider(), {
+        pasteMimeTypes: ["image/png"],
+        providedPasteEditKinds: [],
+      }),
     );
   }
 
@@ -124,6 +117,46 @@ export function activate(context: vscode.ExtensionContext) {
         });
       } catch (e) {
         vscode.window.showErrorMessage(`Build request failed: ${e}`);
+      }
+    }),
+  );
+
+  // Package Installation Command
+  context.subscriptions.push(
+    vscode.commands.registerCommand("ferrotex.installPackage", async (packageName: string) => {
+      const confirm = await vscode.window.showWarningMessage(
+        `Install LaTeX package "${packageName}" using your package manager?`,
+        { modal: true },
+        "Install",
+      );
+
+      if (confirm === "Install") {
+        await vscode.window.withProgress(
+          {
+            location: vscode.ProgressLocation.Notification,
+            title: `Installing ${packageName}...`,
+            cancellable: false,
+          },
+          async (progress) => {
+            try {
+              const result: any = await client.sendRequest("workspace/executeCommand", {
+                command: "ferrotex.installPackage",
+                arguments: [packageName],
+              });
+
+              if (result && result.success) {
+                vscode.window.showInformationMessage(
+                  `Successfully installed package "${packageName}"`,
+                );
+              } else {
+                const error = result?.error || "Unknown error";
+                vscode.window.showErrorMessage(`Failed to install ${packageName}: ${error}`);
+              }
+            } catch (e) {
+              vscode.window.showErrorMessage(`Installation error: ${e}`);
+            }
+          },
+        );
       }
     }),
   );
@@ -298,62 +331,4 @@ export function deactivate(): Thenable<void> | undefined {
     return undefined;
   }
   return client.stop();
-}
-
-/**
- * Handles pasting of image data from the clipboard.
- *
- * - Prompts the user for a filename.
- * - Saves the image file relative to the document.
- * - Inserts an `\includegraphics{...}` snippet.
- */
-class ImagePasteProvider implements vscode.DocumentPasteEditProvider {
-  async provideDocumentPasteEdits(
-    document: vscode.TextDocument,
-    ranges: readonly vscode.Range[],
-    dataTransfer: vscode.DataTransfer,
-    _context: vscode.DocumentPasteEditContext,
-    token: vscode.CancellationToken,
-  ): Promise<vscode.DocumentPasteEdit[] | undefined> {
-    const item = dataTransfer.get("image/png");
-    if (!item) {
-      return undefined;
-    }
-
-    const file = item.asFile();
-    if (!file) {
-      return undefined;
-    }
-
-    // 1. Ask for filename
-    const name = await vscode.window.showInputBox({
-      prompt: "Enter filename for pasted image (e.g., plot.png)",
-      value: "image.png",
-      ignoreFocusOut: true,
-    });
-    if (!name) {
-      return undefined;
-    }
-
-    // 2. Save file relative to document
-    const uri = vscode.Uri.joinPath(document.uri, "..", name);
-
-    try {
-      const data = await file.data();
-      await vscode.workspace.fs.writeFile(uri, data);
-    } catch (e) {
-      vscode.window.showErrorMessage(`Failed to save image: ${e}`);
-      return undefined;
-    }
-
-    // 3. Insert snippet
-    const snippet = new vscode.SnippetString(`\\includegraphics{${name}}`);
-
-    // Create edit
-    // We replace the range (which is usually empty "paste" position, or selection)
-    // Pass 'kind' as any to bypass private constructor issue/missing static
-    const edit = new vscode.DocumentPasteEdit(snippet, "Insert Image", "insert" as any);
-
-    return [edit];
-  }
 }

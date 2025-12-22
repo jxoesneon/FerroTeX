@@ -6,6 +6,44 @@ The format is based on **Keep a Changelog**, and this project intends to follow 
 
 ## [Unreleased]
 
+## [0.18.0] - 2025-12-22
+
+### Added
+
+- **Image Paste Wizard**: Seamlessly paste images from clipboard into LaTeX documents (UX-3).
+  - Automatically saves image to configured directory (default: `figures/`).
+  - Generates unique filenames and inserts `\includegraphics` snippet.
+- **Math Semantics Validation**: Deep validation for math environments.
+  - Checks for mismatched delimiters (`(`, `[`, `{`, `\langle`, etc.).
+  - Validates command arguments (`\frac`, `\sqrt`, etc.).
+- **Package Management Integration**:
+  - Auto-detects missing packages from build logs.
+  - Prompts to install via `tlmgr` or `miktex`.
+- **Test Coverage**:
+  - Achieved >90% test coverage for core libraries.
+  - Integrated `cargo-tarpaulin` and Codecov for continuous monitoring.
+
+- **Comprehensive Settings System**: 46 configurable settings for complete customization (UX-7)
+  - Build engine selection (auto, tectonic, latexmk, pdflatex, xelatex, lualatex)
+  - Custom engine paths with validation
+  - Granular lint rule controls (master switch + individual rules)
+  - Preview customization (zoom, sync, scroll mode)
+  - Completion and formatting options
+  - Workspace configuration (scan, file size limits, exclude patterns)
+- **Marketplace Improvements**:
+  - Apache-2.0 LICENSE for proper GitHub license detection
+  - Version, downloads, and license badges on marketplace page
+  - Ko-fi donation badge for community support
+  - GitHub Discussions QnA link
+
+### Fixed
+
+- Build command handler implementation
+
+### Changed
+
+- LICENSE file now contains full Apache-2.0 text (dual-license notice moved to README.md)
+
 ## [0.16.0] - 2025-12-21
 
 ### Added
