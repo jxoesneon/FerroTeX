@@ -786,6 +786,7 @@ name = "ferrotexd"
 version = "0.18.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "crossbeam-channel",
  "dashmap",
  "dirs 5.0.1",
@@ -794,12 +795,14 @@ dependencies = [
  "ferrotex-log",
  "ferrotex-syntax",
  "glob",
+ "lazy_static",
  "line-index",
  "log",
  "notify 6.1.1",
  "once_cell",
  "regex",
  "reqwest",
+ "rowan",
  "serde",
  "serde_json",
  "tectonic",

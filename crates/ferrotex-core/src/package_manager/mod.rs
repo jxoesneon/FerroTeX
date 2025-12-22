@@ -191,8 +191,9 @@ impl PackageBackend for NoOpBackend {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct PackageManager {
-    backend: Box<dyn PackageBackend>,
+    backend: std::sync::Arc<dyn PackageBackend>,
 }
 
 impl PackageManager {
@@ -200,18 +201,18 @@ impl PackageManager {
         // Auto-detect
         if let Ok(path) = which::which("tlmgr") {
             info!("Detected tlmgr at {:?}", path);
-            return Self { backend: Box::new(TlmgrBackend::new(path)) };
+            return Self { backend: std::sync::Arc::new(TlmgrBackend::new(path)) };
         }
         if let Ok(path) = which::which("mpm") {
             info!("Detected miktex (mpm) at {:?}", path);
-            return Self { backend: Box::new(MiktexBackend::new(path)) };
+            return Self { backend: std::sync::Arc::new(MiktexBackend::new(path)) };
         }
         
         warn!("No package manager detected");
-        Self { backend: Box::new(NoOpBackend) }
+        Self { backend: std::sync::Arc::new(NoOpBackend) }
     }
 
-    pub fn with_backend(backend: Box<dyn PackageBackend>) -> Self {
+    pub fn with_backend(backend: std::sync::Arc<dyn PackageBackend>) -> Self {
         Self { backend }
     }
 
