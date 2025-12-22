@@ -3270,8 +3270,6 @@ dependencies = [
 [[package]]
 name = "tectonic_xetex_layout"
 version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "563b87eefbdf3e2dfe560dfc0a71b8e788fbd74f774cffa9fcdbcdec2d477069"
 dependencies = [
  "cc",
  "tectonic_bridge_core",

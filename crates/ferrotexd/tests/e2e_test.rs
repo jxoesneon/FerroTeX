@@ -545,6 +545,7 @@ async fn test_document_link_flow() -> anyhow::Result<()> {
                     .as_array()
                     .expect("result should be an array")
                 .clone();
+            }
         }
     };
 

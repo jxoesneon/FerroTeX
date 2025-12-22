@@ -51,6 +51,7 @@ FerroTeX requires specific configuration on macOS due to dependencies on ICU and
    ```
 
 4. **Verify the build:**
+
    ```bash
    cargo build
    cargo test
