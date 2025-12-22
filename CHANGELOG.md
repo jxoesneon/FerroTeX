@@ -19,8 +19,11 @@ The format is based on **Keep a Changelog**, and this project intends to follow 
 - **Package Management Integration**:
   - Auto-detects missing packages from build logs.
   - Prompts to install via `tlmgr` or `miktex`.
-- **Test Coverage**:
-  - Achieved >90% test coverage for core libraries.
+- **Build Infrastructure**:
+  - Added full support for linking against system libraries (`harfbuzz`, `icu`, `openssl`) on Linux/macOS for the language server.
+  - Improved CI robustness with comprehensive system dependency installation.
+  - Enabled `external-harfbuzz` feature for Tectonic engine integration.
+- **Testing**: Achieved >90% code coverage across core crates.
   - Integrated `cargo-tarpaulin` and Codecov for continuous monitoring.
 
 - **Comprehensive Settings System**: 46 configurable settings for complete customization (UX-7)

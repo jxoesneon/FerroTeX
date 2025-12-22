@@ -53,3 +53,8 @@ demo/
 /ferrotexd
 editors/vscode/bin/ferrotexd
 *.exe
+
+# Docker CI testing
+Dockerfile.ci-test
+test-ci-locally.sh
+.docker-ci-cache//.cargo/config.toml

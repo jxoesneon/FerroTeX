@@ -79,7 +79,7 @@ pub fn get_package_completions(packages: &[String]) -> (Vec<CompletionItem>, Vec
             }
             for env in &data.environments {
                 env_items.push(CompletionItem {
-                    label: env.clone(),
+                    label: env.to_string(),
                     kind: Some(CompletionItemKind::SNIPPET),
                     detail: Some(format!("Package: {}", pkg)),
                     ..Default::default()

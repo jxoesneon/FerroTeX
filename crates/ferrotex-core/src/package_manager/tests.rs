@@ -30,10 +30,10 @@ impl PackageBackend for MockBackend {
 
 #[test]
 fn test_package_manager_is_available() {
-    let pm = PackageManager::with_backend(Box::new(NoOpBackend));
+    let pm = PackageManager::with_backend(std::sync::Arc::new(NoOpBackend));
     assert!(!pm.is_available());
     
-    let pm2 = PackageManager::with_backend(Box::new(MockBackend { 
+    let pm2 = PackageManager::with_backend(std::sync::Arc::new(MockBackend { 
         install_result: Ok(InstallStatus { 
             name: "test".into(), 
             state: InstallState::Complete, 
@@ -95,7 +95,7 @@ fn test_mock_backend_install_success() {
         }),
         search_result: Ok(vec![]),
     };
-    let pm = PackageManager::with_backend(Box::new(mock));
+    let pm = PackageManager::with_backend(std::sync::Arc::new(mock));
     let status = pm.install("test").unwrap();
     assert_eq!(status.state, InstallState::Complete);
 }
@@ -110,7 +110,7 @@ fn test_mock_backend_install_failure() {
         }),
         search_result: Ok(vec![]),
     };
-    let pm = PackageManager::with_backend(Box::new(mock));
+    let pm = PackageManager::with_backend(std::sync::Arc::new(mock));
     let status = pm.install("test").unwrap();
     assert_eq!(status.state, InstallState::Failed);
     assert_eq!(status.message, Some("Failed".into()));
@@ -122,7 +122,7 @@ fn test_mock_backend_search() {
         install_result: Ok(InstallStatus{name: "".into(), state: InstallState::Unknown, message: None}),
         search_result: Ok(vec!["p1".into(), "p2".into()]),
     };
-    let pm = PackageManager::with_backend(Box::new(mock));
+    let pm = PackageManager::with_backend(std::sync::Arc::new(mock));
     let results = pm.search("query").unwrap();
     assert_eq!(results.len(), 2);
     assert_eq!(results[0], "p1");

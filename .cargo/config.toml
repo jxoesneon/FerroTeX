@@ -1,0 +1,10 @@
+[build]
+rustflags = []
+
+[target.aarch64-apple-darwin]
+rustflags = []
+
+[env]
+CFLAGS = "-IREDACTED_HOMEBREW_PATH"
+CXXFLAGS = "-IREDACTED_HOMEBREW_PATH -std=c++17"
+PKG_CONFIG_PATH = "REDACTED_HOMEBREW_PATH"

@@ -4,15 +4,13 @@ mod diagnostics;
 mod fmt;
 mod hover;
 mod workspace;
-mod code_actions;
 
 mod synctex;
 
 use build::{BuildEngine, BuildRequest, BuildStatus, latexmk::LatexmkAdapter};
 use dashmap::DashMap;
 
-use ferrotex_core::package_manager::{self, PackageManager};
-use ferrotex_core::math_validator::{self, MathValidator};
+use ferrotex_core::package_manager;
 
 use ferrotex_log::parser::LogParser;
 use ferrotex_syntax::{SyntaxKind, SyntaxNode};
@@ -20,6 +18,7 @@ use line_index::LineIndex;
 use notify::{EventKind, RecursiveMode, Watcher};
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
+use tokio::io::{AsyncReadExt, AsyncSeekExt};
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
@@ -102,7 +101,7 @@ impl LanguageServer for Backend {
         }
         
         // Detect package manager asynchronously on initialization
-        let detected_pm = package_manager::PackageManager::detect().await;
+        let detected_pm = package_manager::PackageManager::new();
         {
             let mut pm = self.package_manager.lock().unwrap();
             *pm = detected_pm;
@@ -878,14 +877,15 @@ impl LanguageServer for Backend {
             self.client.log_message(MessageType::INFO, format!("Installing package '{}'...", package_name)).await;
             
             let pm = self.package_manager.lock().unwrap().clone();
-            match pm.install(package_name).await {
+            match pm.install(package_name) {
                 Ok(status) => {
                     match status.state {
                         package_manager::InstallState::Complete => {
                             self.client.show_message(MessageType::INFO, format!("Successfully installed package '{}'", package_name)).await;
                             return Ok(Some(serde_json::json!({"success": true})));
                         }
-                        package_manager::InstallState::Failed(err) => {
+                        package_manager::InstallState::Failed => {
+                            let err = status.message.unwrap_or_else(|| "Unknown error".to_string());
                             self.client.show_message(MessageType::ERROR, format!("Failed to install '{}': {}", package_name, err)).await;
                             return Ok(Some(serde_json::json!({"success": false, "error": err})));
                         }
@@ -1067,10 +1067,36 @@ impl LanguageServer for Backend {
             // Note: In production we should maybe cache this decision or respect config.
             // For now, heuristic check is acceptable.
             
-            let engine: Box<dyn BuildEngine + Send + Sync> = if std::process::Command::new("latexmk").arg("-v").stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()).status().map(|s| s.success()).unwrap_or(false) {
-                 Box::new(LatexmkAdapter)
+            // Create an enum-based engine to work around async trait object limitations
+            enum BuildEngineImpl {
+                Latexmk(LatexmkAdapter),
+                Tectonic(build::tectonic::TectonicAdapter),
+            }
+            
+            impl BuildEngineImpl {
+                fn name(&self) -> &str {
+                    match self {
+                        Self::Latexmk(e) => e.name(),
+                        Self::Tectonic(e) => e.name(),
+                    }
+                }
+                
+                async fn build(
+                    &self,
+                    request: &BuildRequest,
+                    log_callback: Option<Box<dyn Fn(String) + Send + Sync>>,
+                ) -> anyhow::Result<BuildStatus> {
+                    match self {
+                        Self::Latexmk(e) => e.build(request, log_callback).await,
+                        Self::Tectonic(e) => e.build(request, log_callback).await,
+                    }
+                }
+            }
+            
+            let engine = if std::process::Command::new("latexmk").arg("-v").stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()).status().map(|s| s.success()).unwrap_or(false) {
+                BuildEngineImpl::Latexmk(LatexmkAdapter)
             } else {
-                 Box::new(build::tectonic::TectonicAdapter)
+                BuildEngineImpl::Tectonic(build::tectonic::TectonicAdapter)
             };
             
             self.client
@@ -1196,30 +1222,31 @@ fn extract_semantic_tokens(root: SyntaxNode, line_index: &LineIndex) -> Vec<Sema
     let mut prev_start = 0;
 
     for event in root.preorder_with_tokens() {
-        if let rowan::WalkEvent::Enter(rowan::NodeOrToken::Token(token)) = event
-            && let Some((type_idx, modifier_bitset)) = classify_token(&token)
-        {
-            let range = token.text_range();
-            let start_pos = line_index.line_col(range.start());
-            let length = range.len().into();
+        if let rowan::WalkEvent::Enter(rowan::NodeOrToken::Token(token)) = event {
+            if let Some((type_idx, modifier_bitset)) = classify_token(&token)
+            {
+                let range = token.text_range();
+                let start_pos = line_index.line_col(range.start());
+                let length = range.len().into();
 
-            let delta_line = start_pos.line - prev_line;
-            let delta_start = if delta_line == 0 {
-                start_pos.col - prev_start
-            } else {
-                start_pos.col
-            };
+                let delta_line = start_pos.line - prev_line;
+                let delta_start = if delta_line == 0 {
+                    start_pos.col - prev_start
+                } else {
+                    start_pos.col
+                };
 
-            tokens.push(SemanticToken {
-                delta_line,
-                delta_start,
-                length,
-                token_type: type_idx,
-                token_modifiers_bitset: modifier_bitset,
-            });
+                tokens.push(SemanticToken {
+                    delta_line,
+                    delta_start,
+                    length,
+                    token_type: type_idx,
+                    token_modifiers_bitset: modifier_bitset,
+                });
 
-            prev_line = start_pos.line;
-            prev_start = start_pos.col;
+                prev_line = start_pos.line;
+                prev_start = start_pos.col;
+            }
         }
     }
 
@@ -1308,17 +1335,19 @@ fn determine_completion_kind(token: &ferrotex_syntax::SyntaxToken) -> Completion
     }
 
     // Fallback for Text inside Group
-    if kind == SyntaxKind::Text
-        && let Some(parent) = token.parent()
-        && parent.kind() == SyntaxKind::Group
-        && let Some(grandparent) = parent.parent()
-    {
-        match grandparent.kind() {
-            SyntaxKind::Citation => return CompletionKind::Citation,
-            SyntaxKind::LabelReference => return CompletionKind::Label,
-            SyntaxKind::Environment => return CompletionKind::Environment,
-            SyntaxKind::Include => return CompletionKind::File,
-            _ => {}
+    if kind == SyntaxKind::Text {
+        if let Some(parent) = token.parent() {
+            if parent.kind() == SyntaxKind::Group {
+                if let Some(grandparent) = parent.parent() {
+                    match grandparent.kind() {
+                        SyntaxKind::Citation => return CompletionKind::Citation,
+                        SyntaxKind::LabelReference => return CompletionKind::Label,
+                        SyntaxKind::Environment => return CompletionKind::Environment,
+                        SyntaxKind::Include => return CompletionKind::File,
+                        _ => {}
+                    }
+                }
+            }
         }
     }
 
@@ -1339,27 +1368,29 @@ fn scan_files_for_completion(root_path: &std::path::Path) -> Vec<CompletionItem>
                 let path = entry.path();
                 if path.is_dir() {
                     // Simple skip of hidden dirs
-                    if let Some(name) = path.file_name().and_then(|n| n.to_str())
-                        && !name.starts_with('.')
-                    {
-                        stack.push(path);
+                    if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                        if !name.starts_with('.') {
+                            stack.push(path);
+                        }
                     }
-                } else if let Some(ext) = path.extension()
-                    && ext == "tex"
-                    && let Ok(rel) = path.strip_prefix(root_path)
-                    && let Some(s) = rel.to_str()
-                {
-                    // Strip extension for standard LaTeX includes
-                    let label = s.trim_end_matches(".tex").to_string();
-                    items.push(CompletionItem {
-                        label,
-                        kind: Some(CompletionItemKind::FILE),
-                        detail: Some("File".to_string()),
-                        ..Default::default()
-                    });
-                    count += 1;
-                    if count >= MAX_FILES {
-                        return items;
+                } else if let Some(ext) = path.extension() {
+                    if ext == "tex" {
+                        if let Ok(rel) = path.strip_prefix(root_path) {
+                            if let Some(s) = rel.to_str() {
+                                // Strip extension for standard LaTeX includes
+                                let label = s.trim_end_matches(".tex").to_string();
+                                items.push(CompletionItem {
+                                    label,
+                                    kind: Some(CompletionItemKind::FILE),
+                                    detail: Some("File".to_string()),
+                                    ..Default::default()
+                                });
+                                count += 1;
+                                if count >= MAX_FILES {
+                                    return items;
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -1844,23 +1875,25 @@ async fn watch_workspace(
                         stack.push(path);
                     }
                 } else if let Some(ext) = path.extension() {
-                    if ext == "tex"
-                        && let Ok(uri) = Url::from_file_path(&path)
-                    {
+                    if ext == "tex" {
+                        if let Ok(uri) = Url::from_file_path(&path) {
                         // Only index if not already open (though at startup, usually nothing is open yet)
-                        if !documents.contains_key(&uri)
-                            && let Ok(text) = std::fs::read_to_string(&path)
-                        {
-                            workspace.update(&uri, &text);
-                            scan_count += 1;
+                        if !documents.contains_key(&uri) {
+                            if let Ok(text) = std::fs::read_to_string(&path) {
+                                workspace.update(&uri, &text);
+                                scan_count += 1;
+                            }
                         }
-                    } else if ext == "bib"
-                        && let Ok(uri) = Url::from_file_path(&path)
-                        && !documents.contains_key(&uri)
-                        && let Ok(text) = std::fs::read_to_string(&path)
-                    {
-                        workspace.update_bib(&uri, &text);
-                        scan_count += 1;
+                    }
+                } else if ext == "bib" {
+                        if let Ok(uri) = Url::from_file_path(&path) {
+                            if !documents.contains_key(&uri) {
+                                if let Ok(text) = std::fs::read_to_string(&path) {
+                                    workspace.update_bib(&uri, &text);
+                                    scan_count += 1;
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -1890,18 +1923,18 @@ async fn watch_workspace(
                         match event.kind {
                             EventKind::Create(_) | EventKind::Modify(_) => {
                                 // If file is open in editor, ignore disk events (editor handles it)
-                                if !documents.contains_key(&uri)
-                                    && let Ok(text) = tokio::fs::read_to_string(&path).await
-                                {
-                                    workspace.update(&uri, &text);
-                                    // Re-validate workspace
-                                    publish_diagnostics_logic(
-                                        &client,
-                                        &workspace,
-                                        &documents,
-                                        &syntax_diagnostics,
-                                    )
-                                    .await;
+                                if !documents.contains_key(&uri) {
+                                    if let Ok(text) = tokio::fs::read_to_string(&path).await {
+                                        workspace.update(&uri, &text);
+                                        // Re-validate workspace
+                                        publish_diagnostics_logic(
+                                            &client,
+                                            &workspace,
+                                            &documents,
+                                            &syntax_diagnostics,
+                                        )
+                                        .await;
+                                    }
                                 }
                             }
                             EventKind::Remove(_) => {
@@ -1923,17 +1956,17 @@ async fn watch_workspace(
                     if let Ok(uri) = Url::from_file_path(&path) {
                         match event.kind {
                             EventKind::Create(_) | EventKind::Modify(_) => {
-                                if !documents.contains_key(&uri)
-                                    && let Ok(text) = tokio::fs::read_to_string(&path).await
-                                {
-                                    workspace.update_bib(&uri, &text);
-                                    publish_diagnostics_logic(
-                                        &client,
-                                        &workspace,
-                                        &documents,
-                                        &syntax_diagnostics,
-                                    )
-                                    .await;
+                                if !documents.contains_key(&uri) {
+                                    if let Ok(text) = tokio::fs::read_to_string(&path).await {
+                                        workspace.update_bib(&uri, &text);
+                                        publish_diagnostics_logic(
+                                            &client,
+                                            &workspace,
+                                            &documents,
+                                            &syntax_diagnostics,
+                                        )
+                                        .await;
+                                    }
                                 }
                             }
                             EventKind::Remove(_) => {
@@ -1960,96 +1993,92 @@ async fn watch_workspace(
                                 .await;
                         }
 
+
                         if tracked_log.as_ref() == Some(&path) {
-                            // Read and parse
-                            if let Ok(mut file) = tokio::fs::File::open(&path).await
-                                && let Ok(metadata) = file.metadata().await
-                            {
-                                let current_len = metadata.len();
+                             // Read and parse log incrementally
+                             let mut file_handle = None;
+                             if let Ok(f) = tokio::fs::File::open(&path).await {
+                                 file_handle = Some(f);
+                             }
 
-                                if current_len > file_offset {
-                                    use tokio::io::{AsyncReadExt, AsyncSeekExt};
-                                    if (file.seek(std::io::SeekFrom::Start(file_offset)).await)
-                                        .is_ok()
-                                    {
-                                        let mut buffer = String::new();
-                                        if (file.read_to_string(&mut buffer).await).is_ok() {
-                                            let events = parser.update(&buffer);
-                                            file_offset = current_len;
+                             if let Some(mut file) = file_handle {
+                                 // Check for truncation
+                                 if let Ok(metadata) = file.metadata().await {
+                                     if metadata.len() < file_offset {
+                                         file_offset = 0;
+                                         parser = LogParser::new();
+                                     }
+                                 }
 
-                                            let mut diagnostics_map: std::collections::HashMap<Url, Vec<Diagnostic>> = std::collections::HashMap::new();
+                                 if let Ok(_) = file.seek(std::io::SeekFrom::Start(file_offset)).await {
+                                     let mut buffer = String::new();
+                                     if let Ok(_) = file.read_to_string(&mut buffer).await {
+                                         if !buffer.is_empty() {
+                                             file_offset += buffer.len() as u64;
+                                             let events = parser.update(&buffer);
 
-                                            // Track current file context from FileEnter/FileExit events?
-                                            // Since LogParser might be stateless per update call or stateful... 
-                                            // To rely on FileEnter/Exit we need to trust the sequence.
-                                            // For MVP of UX-5, we'll assume the log events relate to the tracked file or use what we have.
-                                            // NOTE: Without a robust state machine here, associating ErrorStart to a file is hard if not implicit.
-                                            // However, `ferrotex-log` seems to be designed to output raw events.
-                                            
-                                            // Let's implement a simple file tracker if needed, or just default to the log owner.
-                                            // Map log path to source file URI (Heuristic)
-                                            // 1. Check sibling .tex
-                                            let tex_path = path.with_extension("tex");
-                                            let mut target_uri = Url::from_file_path(&tex_path).ok();
-                                            
-                                            // 2. If not found, checks parent directory (common with -output-directory=build)
-                                            if !tex_path.exists() {
-                                                if let Some(parent) = path.parent() {
-                                                    if let Some(grandparent) = parent.parent() {
-                                                        if let Some(file_name) = path.file_name() {
-                                                            let parent_tex = grandparent.join(file_name).with_extension("tex");
-                                                            if parent_tex.exists() {
-                                                                target_uri = Url::from_file_path(&parent_tex).ok();
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                            
-                                            // Fallback to log file itself if source not found
-                                            if target_uri.is_none() {
+                                             // Map log path to source file URI (Heuristic)
+                                             let tex_path = path.with_extension("tex");
+                                             let mut target_uri = Url::from_file_path(&tex_path).ok();
+
+                                             if !tex_path.exists() {
+                                                 if let Some(parent) = path.parent() {
+                                                     if let Some(grandparent) = parent.parent() {
+                                                         if let Some(file_name) = path.file_name() {
+                                                             let parent_tex = grandparent.join(file_name).with_extension("tex");
+                                                             if parent_tex.exists() {
+                                                                 target_uri = Url::from_file_path(&parent_tex).ok();
+                                                             }
+                                                         }
+                                                     }
+                                                 }
+                                             }
+                                             
+                                             // Fallback
+                                             if target_uri.is_none() {
                                                  target_uri = Url::from_file_path(&path).ok();
-                                            }
+                                             }
 
-                                            for event in events {
-                                                let (severity, raw_message) = match event.payload {
-                                                    ferrotex_log::ir::EventPayload::ErrorStart { message } => 
-                                                        (DiagnosticSeverity::ERROR, message),
-                                                    ferrotex_log::ir::EventPayload::Warning { message } => 
-                                                        (DiagnosticSeverity::WARNING, message),
-                                                    _ => continue,
-                                                };
+                                             let mut diagnostics_map: std::collections::HashMap<Url, Vec<Diagnostic>> = std::collections::HashMap::new();
 
-                                                let mut msg = raw_message.clone();
-                                                // UX-5: Human-Readable Errors
-                                                if let Some(exp) = diagnostics::error_index::explain(&raw_message) {
-                                                    msg.push_str(&format!("\n\n💡 {}: {}", exp.summary, exp.description));
-                                                }
+                                             for event in events {
+                                                 let (severity, raw_message) = match event.payload {
+                                                     ferrotex_log::ir::EventPayload::ErrorStart { message } => 
+                                                         (DiagnosticSeverity::ERROR, message),
+                                                     ferrotex_log::ir::EventPayload::Warning { message } => 
+                                                         (DiagnosticSeverity::WARNING, message),
+                                                     _ => continue,
+                                                 };
 
-                                                let diag = Diagnostic {
-                                                    range: Range::default(), // No line info in basic events
-                                                    severity: Some(severity),
-                                                    code: None,
-                                                    code_description: None,
-                                                    source: Some("ferrotex-log".to_string()),
-                                                    message: msg,
-                                                    related_information: None,
-                                                    tags: None,
-                                                    data: None,
-                                                };
+                                                 let mut msg = raw_message.clone();
+                                                 if let Some(exp) = diagnostics::error_index::explain(&raw_message) {
+                                                     msg.push_str(&format!("\n\n💡 {}: {}", exp.summary, exp.description));
+                                                 }
 
-                                                if let Some(uri) = &target_uri {
-                                                    diagnostics_map.entry(uri.clone()).or_default().push(diag);
-                                                }
-                                            }
+                                                 let diag = Diagnostic {
+                                                     range: Range::default(),
+                                                     severity: Some(severity),
+                                                     code: None,
+                                                     code_description: None,
+                                                     source: Some("ferrotex-log".to_string()),
+                                                     message: msg,
+                                                     related_information: None,
+                                                     tags: None,
+                                                     data: None,
+                                                 };
 
-                                            for (uri, diags) in diagnostics_map {
+                                                 if let Some(uri) = &target_uri {
+                                                     diagnostics_map.entry(uri.clone()).or_default().push(diag);
+                                                 }
+                                             }
+
+                                             for (uri, diags) in diagnostics_map {
                                                 client.publish_diagnostics(uri, diags, None).await;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                                             }
+                                         }
+                                     }
+                                 }
+                             }
                         }
                     }
                 }
@@ -2226,7 +2255,7 @@ async fn main() {
         workspace: Arc::new(Workspace::new()),
         root_uri: Arc::new(Mutex::new(None)),
         syntax_diagnostics: Arc::new(DashMap::new()),
-        package_manager: Arc::new(Mutex::new(package_manager::PackageManager::None)),
+        package_manager: Arc::new(Mutex::new(package_manager::PackageManager::new())),
     });
     Server::new(stdin, stdout, socket).serve(service).await;
 }

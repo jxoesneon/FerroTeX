@@ -215,13 +215,13 @@ async fn test_document_symbol_flow() -> anyhow::Result<()> {
     // We might get window/logMessage notifications, so we loop until we get the response to ID 2
     let syms = loop {
         let msg = read_msg(&mut reader).await?;
-        if let Some(id) = msg.get("id")
-            && id == 2
-        {
-            break msg["result"]
-                .as_array()
-                .expect("result should be an array")
-                .clone();
+        if let Some(id) = msg.get("id") {
+            if id == 2 {
+                break msg["result"]
+                    .as_array()
+                    .expect("result should be an array")
+                    .clone();
+            }
         }
         // Ignore other messages (notifications)
     };
@@ -428,13 +428,13 @@ async fn test_document_symbol_section_flow() -> anyhow::Result<()> {
     // 7. Read Response
     let syms = loop {
         let msg = read_msg(&mut reader).await?;
-        if let Some(id) = msg.get("id")
-            && id == 2
-        {
-            break msg["result"]
-                .as_array()
+        if let Some(id) = msg.get("id") {
+            if id == 2 {
+                break msg["result"]
+                    .as_array()
                 .expect("result should be an array")
                 .clone();
+            }
         }
     };
 
@@ -540,13 +540,13 @@ async fn test_document_link_flow() -> anyhow::Result<()> {
     // 7. Read Response
     let links = loop {
         let msg = read_msg(&mut reader).await?;
-        if let Some(id) = msg.get("id")
-            && id == 2
-        {
-            break msg["result"]
-                .as_array()
-                .expect("result should be an array")
+        if let Some(id) = msg.get("id") {
+            if id == 2 {
+                break msg["result"]
+                    .as_array()
+                    .expect("result should be an array")
                 .clone();
+            }
         }
     };
 
@@ -784,10 +784,10 @@ async fn test_label_features_flow() -> anyhow::Result<()> {
 
     let def_res = loop {
         let msg = read_msg(&mut reader).await?;
-        if let Some(id) = msg.get("id")
-            && id == 2
-        {
-            break msg;
+        if let Some(id) = msg.get("id") {
+            if id == 2 {
+                break msg;
+            }
         }
     };
 
@@ -815,10 +815,10 @@ async fn test_label_features_flow() -> anyhow::Result<()> {
 
     let ref_res = loop {
         let msg = read_msg(&mut reader).await?;
-        if let Some(id) = msg.get("id")
-            && id == 3
-        {
-            break msg;
+        if let Some(id) = msg.get("id") {
+            if id == 3 {
+                break msg;
+            }
         }
     };
     let refs = ref_res["result"]
@@ -847,10 +847,10 @@ async fn test_label_features_flow() -> anyhow::Result<()> {
                 if uri == doc_uri {
                     let diags = params["diagnostics"].as_array().unwrap();
                     for d in diags {
-                        if let Some(msg) = d["message"].as_str()
-                            && msg.contains("Undefined reference: 'missing'")
-                        {
-                            return Ok::<(), anyhow::Error>(());
+                        if let Some(msg) = d["message"].as_str() {
+                            if msg.contains("Undefined reference: 'missing'") {
+                                return Ok::<(), anyhow::Error>(());
+                            }
                         }
                     }
                 }
@@ -967,10 +967,10 @@ async fn test_rename_flow() -> anyhow::Result<()> {
     // 7. Verify Edit
     let rename_res = loop {
         let msg = read_msg(&mut reader).await?;
-        if let Some(id) = msg.get("id")
-            && id == 2
-        {
-            break msg;
+        if let Some(id) = msg.get("id") {
+            if id == 2 {
+                break msg;
+            }
         }
     };
 
@@ -1081,11 +1081,11 @@ async fn test_citation_flow() -> anyhow::Result<()> {
             if params["uri"] == tex_uri {
                 let diags = params["diagnostics"].as_array().unwrap();
                 for d in diags {
-                    if let Some(m) = d["message"].as_str()
-                        && m.contains("Undefined citation: 'myKey'")
-                    {
-                        found_undef = true;
-                        break;
+                    if let Some(m) = d["message"].as_str() {
+                        if m.contains("Undefined citation: 'myKey'") {
+                            found_undef = true;
+                            break;
+                        }
                     }
                 }
             }
@@ -1146,10 +1146,10 @@ async fn test_citation_flow() -> anyhow::Result<()> {
 
     let comp_res = loop {
         let msg = read_msg(&mut reader).await?;
-        if let Some(id) = msg.get("id")
-            && id == 2
-        {
-            break msg;
+        if let Some(id) = msg.get("id") {
+            if id == 2 {
+                break msg;
+            }
         }
     };
 
@@ -1251,10 +1251,10 @@ async fn test_enhanced_completion_flow() -> anyhow::Result<()> {
     send_msg(stdin, &comp_cmd).await?;
     let res_cmd = loop {
         let msg = read_msg(&mut reader).await?;
-        if let Some(id) = msg.get("id")
-            && id == 2
-        {
-            break msg;
+        if let Some(id) = msg.get("id") {
+            if id == 2 {
+                break msg;
+            }
         }
     };
     let items_cmd = res_cmd["result"]
@@ -1278,10 +1278,10 @@ async fn test_enhanced_completion_flow() -> anyhow::Result<()> {
     send_msg(stdin, &comp_env).await?;
     let res_env = loop {
         let msg = read_msg(&mut reader).await?;
-        if let Some(id) = msg.get("id")
-            && id == 3
-        {
-            break msg;
+        if let Some(id) = msg.get("id") {
+            if id == 3 {
+                break msg;
+            }
         }
     };
     let items_env = res_env["result"].as_array().expect("Env completion items");
@@ -1303,10 +1303,10 @@ async fn test_enhanced_completion_flow() -> anyhow::Result<()> {
     send_msg(stdin, &comp_file).await?;
     let res_file = loop {
         let msg = read_msg(&mut reader).await?;
-        if let Some(id) = msg.get("id")
-            && id == 4
-        {
-            break msg;
+        if let Some(id) = msg.get("id") {
+            if id == 4 {
+                break msg;
+            }
         }
     };
     let items_file = res_file["result"]

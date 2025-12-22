@@ -786,6 +786,7 @@ name = "ferrotexd"
 version = "0.18.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "crossbeam-channel",
  "dashmap",
  "dirs 5.0.1",
@@ -794,12 +795,14 @@ dependencies = [
  "ferrotex-log",
  "ferrotex-syntax",
  "glob",
+ "lazy_static",
  "line-index",
  "log",
  "notify 6.1.1",
  "once_cell",
  "regex",
  "reqwest",
+ "rowan",
  "serde",
  "serde_json",
  "tectonic",
@@ -3267,8 +3270,6 @@ dependencies = [
 [[package]]
 name = "tectonic_xetex_layout"
 version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "563b87eefbdf3e2dfe560dfc0a71b8e788fbd74f774cffa9fcdbcdec2d477069"
 dependencies = [
  "cc",
  "tectonic_bridge_core",
