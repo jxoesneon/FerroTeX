@@ -30,6 +30,7 @@ const node_1 = require("vscode-languageclient/node");
 const pdfPreview_1 = require("./pdfPreview");
 const installTectonic_1 = require("./installTectonic");
 const engineValidator_1 = require("./engineValidator");
+const imagePaste_1 = require("./imagePaste");
 let client;
 function activate(context) {
     const config = vscode.workspace.getConfiguration("ferrotex");
@@ -38,10 +39,10 @@ function activate(context) {
     (0, installTectonic_1.checkAndInstallTectonic)(context);
     // Validate build engine when configuration changes
     context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(async (e) => {
-        if (e.affectsConfiguration('ferrotex.build.engine')) {
+        if (e.affectsConfiguration("ferrotex.build.engine")) {
             await (0, engineValidator_1.validateBuildEngine)();
         }
-        if (e.affectsConfiguration('ferrotex.preview.syncToSource')) {
+        if (e.affectsConfiguration("ferrotex.preview.syncToSource")) {
             await (0, engineValidator_1.validateSyncTeX)();
         }
     }));
@@ -52,7 +53,7 @@ function activate(context) {
     if (!serverPath || serverPath === "ferrotexd") {
         // Check bundled path: extensions/ferrotex/bin/ferrotexd
         const bundledPath = path.join(context.extensionPath, "bin", process.platform === "win32" ? "ferrotexd.exe" : "ferrotexd");
-        const fs = require('fs');
+        const fs = require("fs");
         console.log("[FerroTeX] Checking bundled binary at:", bundledPath);
         if (fs.existsSync(bundledPath)) {
             serverPath = bundledPath;
@@ -88,12 +89,14 @@ function activate(context) {
     client = new node_1.LanguageClient("ferrotex", "FerroTeX Language Server", serverOptions, clientOptions);
     // UX-3: Image Paste Wizard
     if (vscode.languages.registerDocumentPasteEditProvider) {
-        const metadata = {
-            id: "ferrotex.imagePaste",
+        const selector = [
+            { scheme: "file", language: "latex" },
+            { scheme: "file", language: "tex" },
+        ];
+        context.subscriptions.push(vscode.languages.registerDocumentPasteEditProvider(selector, new imagePaste_1.ImagePasteProvider(), {
             pasteMimeTypes: ["image/png"],
-        };
-        context.subscriptions.push(vscode.languages.registerDocumentPasteEditProvider({ scheme: "file", language: "latex" }, new ImagePasteProvider(), metadata));
-        context.subscriptions.push(vscode.languages.registerDocumentPasteEditProvider({ scheme: "file", language: "tex" }, new ImagePasteProvider(), metadata));
+            providedPasteEditKinds: [],
+        }));
     }
     // EX-4: Integrated PDF Viewer
     const pdfProvider = new pdfPreview_1.PdfPreviewProvider(context.extensionUri, client);
@@ -118,6 +121,34 @@ function activate(context) {
             vscode.window.showErrorMessage(`Build request failed: ${e}`);
         }
     }));
+    // Package Installation Command
+    context.subscriptions.push(vscode.commands.registerCommand("ferrotex.installPackage", async (packageName) => {
+        const confirm = await vscode.window.showWarningMessage(`Install LaTeX package "${packageName}" using your package manager?`, { modal: true }, "Install");
+        if (confirm === "Install") {
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: `Installing ${packageName}...`,
+                cancellable: false,
+            }, async (progress) => {
+                try {
+                    const result = await client.sendRequest("workspace/executeCommand", {
+                        command: "ferrotex.installPackage",
+                        arguments: [packageName],
+                    });
+                    if (result && result.success) {
+                        vscode.window.showInformationMessage(`Successfully installed package "${packageName}"`);
+                    }
+                    else {
+                        const error = result?.error || "Unknown error";
+                        vscode.window.showErrorMessage(`Failed to install ${packageName}: ${error}`);
+                    }
+                }
+                catch (e) {
+                    vscode.window.showErrorMessage(`Installation error: ${e}`);
+                }
+            });
+        }
+    }));
     // Preview Button: Open PDF Preview
     context.subscriptions.push(vscode.commands.registerCommand("ferrotex.openPreview", async () => {
         const editor = vscode.window.activeTextEditor;
@@ -133,7 +164,7 @@ function activate(context) {
         const dirName = path.dirname(texUri.fsPath);
         const possiblePdfPaths = [
             path.join(dirName, "build", `${baseName}.pdf`),
-            path.join(dirName, `${baseName}.pdf`)
+            path.join(dirName, `${baseName}.pdf`),
         ];
         let pdfUri = null;
         for (const pdfPath of possiblePdfPaths) {
@@ -156,7 +187,7 @@ function activate(context) {
                     arguments: [texUri.toString()],
                 });
                 // Wait a bit for build to complete and try again
-                await new Promise(resolve => setTimeout(resolve, 500));
+                await new Promise((resolve) => setTimeout(resolve, 500));
                 for (const pdfPath of possiblePdfPaths) {
                     try {
                         await vscode.workspace.fs.stat(vscode.Uri.file(pdfPath));
@@ -244,12 +275,15 @@ function activate(context) {
     // Note: v8+ handling might differ, but onNotification is standard
     // To avoid race conditions, we can set it up immediately if possible, but usually wait for start.
     // Actually, standard practice is:
-    client.start().then(() => {
+    client
+        .start()
+        .then(() => {
         console.log("[FerroTeX] Client started successfully.");
         client.onNotification("$/ferrotex/log", (params) => {
             outputChannel.append(params.message);
         });
-    }).catch(e => {
+    })
+        .catch((e) => {
         console.error("[FerroTeX] Client start failed:", e);
         vscode.window.showErrorMessage(`FerroTeX Server Failed to Start: ${e.message || e}`);
     });
@@ -262,49 +296,4 @@ function deactivate() {
     return client.stop();
 }
 exports.deactivate = deactivate;
-/**
- * Handles pasting of image data from the clipboard.
- *
- * - Prompts the user for a filename.
- * - Saves the image file relative to the document.
- * - Inserts an `\includegraphics{...}` snippet.
- */
-class ImagePasteProvider {
-    async provideDocumentPasteEdits(document, ranges, dataTransfer, _context, token) {
-        const item = dataTransfer.get("image/png");
-        if (!item) {
-            return undefined;
-        }
-        const file = item.asFile();
-        if (!file) {
-            return undefined;
-        }
-        // 1. Ask for filename
-        const name = await vscode.window.showInputBox({
-            prompt: "Enter filename for pasted image (e.g., plot.png)",
-            value: "image.png",
-            ignoreFocusOut: true,
-        });
-        if (!name) {
-            return undefined;
-        }
-        // 2. Save file relative to document
-        const uri = vscode.Uri.joinPath(document.uri, "..", name);
-        try {
-            const data = await file.data();
-            await vscode.workspace.fs.writeFile(uri, data);
-        }
-        catch (e) {
-            vscode.window.showErrorMessage(`Failed to save image: ${e}`);
-            return undefined;
-        }
-        // 3. Insert snippet
-        const snippet = new vscode.SnippetString(`\\includegraphics{${name}}`);
-        // Create edit
-        // We replace the range (which is usually empty "paste" position, or selection)
-        // Pass 'kind' as any to bypass private constructor issue/missing static
-        const edit = new vscode.DocumentPasteEdit(snippet, "Insert Image", "insert");
-        return [edit];
-    }
-}
 //# sourceMappingURL=extension.js.map

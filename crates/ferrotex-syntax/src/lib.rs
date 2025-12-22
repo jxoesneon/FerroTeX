@@ -7,6 +7,11 @@ pub mod bibtex;
 pub mod lexer;
 pub mod parser;
 
+#[cfg(test)]
+mod coverage_tests;
+#[cfg(test)]
+mod additional_tests;
+
 pub use parser::parse;
 use rowan::Language;
 pub use rowan::{TextRange, TextSize};

@@ -6,9 +6,22 @@ The format is based on **Keep a Changelog**, and this project intends to follow 
 
 ## [Unreleased]
 
-## [0.17.0] - 2025-12-21
+## [0.18.0] - 2025-12-22
 
 ### Added
+
+- **Image Paste Wizard**: Seamlessly paste images from clipboard into LaTeX documents (UX-3).
+  - Automatically saves image to configured directory (default: `figures/`).
+  - Generates unique filenames and inserts `\includegraphics` snippet.
+- **Math Semantics Validation**: Deep validation for math environments.
+  - Checks for mismatched delimiters (`(`, `[`, `{`, `\langle`, etc.).
+  - Validates command arguments (`\frac`, `\sqrt`, etc.).
+- **Package Management Integration**:
+  - Auto-detects missing packages from build logs.
+  - Prompts to install via `tlmgr` or `miktex`.
+- **Test Coverage**:
+  - Achieved >90% test coverage for core libraries.
+  - Integrated `cargo-tarpaulin` and Codecov for continuous monitoring.
 
 - **Comprehensive Settings System**: 46 configurable settings for complete customization (UX-7)
   - Build engine selection (auto, tectonic, latexmk, pdflatex, xelatex, lualatex)

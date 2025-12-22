@@ -22,8 +22,9 @@ jobs:
 
       - name: Run coverage
         run: |
-          cargo tarpaulin --workspace --out Xml --out Html --output-dir coverage \
-            --ignore-tests --skip-clean
+          cargo tarpaulin --lib --out Xml --output-dir coverage --skip-clean \
+            --packages ferrotex-core ferrotex-syntax ferrotex-log \
+            --exclude-files "crates/ferrotexd/*"
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
