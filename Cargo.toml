@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "crates/ferrotex-cli",
+    "crates/ferrotex-cli", "crates/ferrotex-core",
     "crates/ferrotex-log",
     "crates/ferrotex-syntax",
     "crates/ferrotexd",

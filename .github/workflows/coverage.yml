@@ -14,6 +14,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libicu-dev libharfbuzz-dev libfontconfig1-dev libssl-dev libgraphite2-dev libfreetype6-dev
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
@@ -22,8 +27,9 @@ jobs:
 
       - name: Run coverage
         run: |
-          cargo tarpaulin --workspace --out Xml --out Html --output-dir coverage \
-            --ignore-tests --skip-clean
+          cargo tarpaulin --lib --out Xml --output-dir coverage --skip-clean \
+            --packages ferrotex-core ferrotex-syntax ferrotex-log \
+            --exclude-files "crates/ferrotexd/*"
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4

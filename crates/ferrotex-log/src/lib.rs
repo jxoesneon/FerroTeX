@@ -8,6 +8,9 @@
 pub mod ir;
 pub mod parser;
 
+#[cfg(test)]
+mod tests;
+
 pub use parser::LogParser;
 
 /// Schema version for the log event IR.

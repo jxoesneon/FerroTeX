@@ -52,6 +52,7 @@ impl LogParser {
         // Ensure any trailing data is processed
         if !self.buffer.is_empty() {
             if !self.buffer.ends_with('\n') {
+                self.buffer.push(' '); // Ensure any open token is terminated
                 self.buffer.push('\n');
             }
             let mut final_events = self.process_buffer();
@@ -335,27 +336,7 @@ impl LogParser {
         let mut current_char_idx = start_char_idx;
 
         loop {
-            if current_line_idx >= lines.len() {
-                // We ran out of lines in the current chunk.
-                // Check peek_line if available.
-                if let Some(next_line) = peek_line
-                    && (next_line.starts_with("LaTeX Warning:")
-                        || next_line.starts_with("Package")
-                        || next_line.starts_with("!")
-                        || next_line.starts_with("(")
-                        || next_line.starts_with(")")
-                        || next_line.starts_with("Overfull")
-                        || next_line.starts_with("Underfull"))
-                {
-                    // The next line (partial) looks like a new event.
-                    // So the path definitely ended at the previous newline.
-                    // We return successfully.
-                    return (path, current_line_idx - start_line_idx, 0, false);
-                }
 
-                // If peek_line didn't match a guard, or wasn't available, we are incomplete.
-                return (path, current_line_idx - start_line_idx, 0, true);
-            }
             let line = lines[current_line_idx];
             let remainder = &line[current_char_idx..];
 

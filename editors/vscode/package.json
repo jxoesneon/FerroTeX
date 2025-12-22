@@ -2,7 +2,7 @@
   "name": "ferrotex",
   "displayName": "FerroTeX",
   "description": "High-performance LaTeX language support with IDE features, PDF preview, and intelligent diagnostics.",
-  "version": "0.16.0",
+  "version": "0.18.0",
   "publisher": "ferrotex",
   "license": "Apache-2.0",
   "repository": {

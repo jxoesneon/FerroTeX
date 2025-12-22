@@ -61,7 +61,7 @@ suite("Regression Suite v2 (Comprehensive)", function () {
         // Check config/path resolution logic via internal state or logs implies success if no error.
         // 'ferrotexd' binary should be executable.
         // Wait for server to be ready (heuristic)
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise((resolve) => setTimeout(resolve, 2000));
         // Verify commands registered
         const commands = await vscode.commands.getCommands(true);
         assert.ok(commands.includes("ferrotex.build"), "Build command not registered");
@@ -73,7 +73,7 @@ suite("Regression Suite v2 (Comprehensive)", function () {
         while (Date.now() - start < timeout) {
             if (await predicate())
                 return;
-            await new Promise(r => setTimeout(r, 500));
+            await new Promise((r) => setTimeout(r, 500));
         }
         throw new Error(`Timeout waiting for: ${description}`);
     }
@@ -90,7 +90,7 @@ suite("Regression Suite v2 (Comprehensive)", function () {
         const position = new vscode.Position(0, 0); // Start of file
         const completions = await vscode.commands.executeCommand("vscode.executeCompletionItemProvider", docUri, position);
         // Check for standard environments or commands that should always be there
-        // Note: Depends on what 'detects' completions at (0,0). 
+        // Note: Depends on what 'detects' completions at (0,0).
         // Usually easier to trigger at a specific context, but let's check if the provider returns anything usable
         // or checks specific items if we place cursor after '\'.
         assert.ok(completions.items.length > 0, "No completions returned");
@@ -101,7 +101,7 @@ suite("Regression Suite v2 (Comprehensive)", function () {
             throw new Error("No workspace open");
         // Create a file with a label and reference
         const docPath = path.resolve(ws[0].uri.fsPath, "refs.tex");
-        const fs = require('fs');
+        const fs = require("fs");
         fs.writeFileSync(docPath, `\\section{Intro}\\label{sec:intro}\nSee section \\ref{sec:intro}.`);
         const docUri = vscode.Uri.file(docPath);
         const doc = await vscode.workspace.openTextDocument(docUri);
@@ -109,8 +109,7 @@ suite("Regression Suite v2 (Comprehensive)", function () {
         // Wait for indexing
         await waitFor("Indexing", async () => (await vscode.commands.executeCommand("vscode.executeDefinitionProvider", docUri, new vscode.Position(1, 15))).length > 0, 5000);
         // Test Definition
-        const defs = await vscode.commands.executeCommand("vscode.executeDefinitionProvider", docUri, new vscode.Position(1, 15) // inside \ref{sec:intro}
-        );
+        const defs = await vscode.commands.executeCommand("vscode.executeDefinitionProvider", docUri, new vscode.Position(1, 15));
         assert.strictEqual(defs.length, 1, "Definition not found");
         assert.strictEqual(defs[0].range.start.line, 0, "Definition line mismatch");
         // Test Rename
@@ -123,13 +122,12 @@ suite("Regression Suite v2 (Comprehensive)", function () {
         if (!ws || ws.length === 0)
             throw new Error("No workspace open");
         const docPath = path.resolve(ws[0].uri.fsPath, "format.tex");
-        const fs = require('fs');
+        const fs = require("fs");
         fs.writeFileSync(docPath, `\\section{   Messy   }\n   \\item    Content`);
         const docUri = vscode.Uri.file(docPath);
         const doc = await vscode.workspace.openTextDocument(docUri);
         // Execute Formatting
-        const edits = await vscode.commands.executeCommand("vscode.executeFormatDocumentProvider", docUri, {} // options
-        );
+        const edits = await vscode.commands.executeCommand("vscode.executeFormatDocumentProvider", docUri, {});
         // Even if built-in formatter is no-op or basic, it should return something or at least not crash.
         // If we have a formatter, assert changes. If not, assert empty but success.
         // FerroTeX v1 has a basic formatter.
@@ -150,7 +148,7 @@ suite("Regression Suite v2 (Comprehensive)", function () {
         const subPath = path.resolve(folder, "sub.tex");
         const mainPath = path.resolve(folder, "main.tex");
         // Create files if missing (mocking workspace state)
-        const fs = require('fs');
+        const fs = require("fs");
         if (!fs.existsSync(subPath)) {
             fs.writeFileSync(subPath, `% !TEX root = main.tex\n\\section{Sub}`);
         }
@@ -195,10 +193,10 @@ suite("Regression Suite v2 (Comprehensive)", function () {
         await vscode.workspace.openTextDocument(docUri);
         // manually write mock log to simulate build failure + diagnostics
         const buildDir = path.resolve(ws[0].uri.fsPath, "build");
-        const fs = require('fs');
+        const fs = require("fs");
         if (!fs.existsSync(buildDir))
             fs.mkdirSync(buildDir);
-        // Log file timestamp must be NEWER than "last check" to trigger update? 
+        // Log file timestamp must be NEWER than "last check" to trigger update?
         // Or just change content.
         const logPath = path.resolve(buildDir, "error.log");
         const mockLog = `
@@ -217,103 +215,125 @@ l.5 \\undefinedCommand
         assert.ok(diags[0].message.includes("Undefined control sequence"), "Wrong diagnostic message");
     });
     /*
-      test.skip("Feature v0.16.0: Quick Fixes (Deprecated Commands)", async function() {
-        // SKIPPED: This test is flaky due to async indexing timing in CI/test environment
-        // Manual verification confirms quickfixes work correctly
-      });
-    
-      test("Feature v0.16.0: Quick Fixes (Display Math & Packages)", async function() {
-        this.skip(); // Skip for now due to async indexing timing issues in test environment
-        // ... test implementation ...
-      });
-    */
+    test.skip("Feature v0.16.0: Quick Fixes (Deprecated Commands)", async function() {
+      // SKIPPED: This test is flaky due to async indexing timing in CI/test environment
+      // Manual verification confirms quickfixes work correctly
+    });
+  
+    test("Feature v0.16.0: Quick Fixes (Display Math & Packages)", async function() {
+      this.skip(); // Skip for now due to async indexing timing issues in test environment
+      // ... test implementation ...
+    });
+  */
     // ============================================================
     // Settings Validation Tests (v0.17.0)
     // ============================================================
-    suite('Settings Validation', () => {
-        const settingsPrefix = 'ferrotex';
+    suite("Settings Validation", () => {
+        const settingsPrefix = "ferrotex";
         function getConfig() {
             return vscode.workspace.getConfiguration(settingsPrefix);
         }
-        test('All 32 settings should be readable', () => {
+        test("All 32 settings should be readable", () => {
             const config = getConfig();
             const settings = [
-                'serverPath', 'trace.server',
-                'build.autoBuildOnSave', 'build.engine', 'build.outputDirectory', 'build.cleanAuxiliaryFiles', 'build.showOutputPanel',
-                'lint.enabled', 'lint.onType', 'lint.deprecatedCommands', 'lint.obsoletePackages', 'lint.displayMathDelimiters',
-                'preview.syncToSource', 'preview.defaultZoom', 'preview.scrollMode',
-                'completion.enabled', 'completion.packages', 'completion.citations',
-                'format.enabled', 'format.onSave', 'format.indentSize',
-                'imagePaste.enabled', 'imagePaste.defaultDirectory', 'imagePaste.filenamePattern',
-                'hover.enabled', 'hover.citations', 'hover.previewMath',
-                'workspace.scanOnStartup', 'workspace.maxFileSize', 'workspace.excludePatterns',
-                'diagnostics.humanReadableErrors', 'diagnostics.showCode'
+                "serverPath",
+                "trace.server",
+                "build.autoBuildOnSave",
+                "build.engine",
+                "build.outputDirectory",
+                "build.cleanAuxiliaryFiles",
+                "build.showOutputPanel",
+                "lint.enabled",
+                "lint.onType",
+                "lint.deprecatedCommands",
+                "lint.obsoletePackages",
+                "lint.displayMathDelimiters",
+                "preview.syncToSource",
+                "preview.defaultZoom",
+                "preview.scrollMode",
+                "completion.enabled",
+                "completion.packages",
+                "completion.citations",
+                "format.enabled",
+                "format.onSave",
+                "format.indentSize",
+                "imagePaste.enabled",
+                "imagePaste.defaultDirectory",
+                "imagePaste.filenamePattern",
+                "hover.enabled",
+                "hover.citations",
+                "hover.previewMath",
+                "workspace.scanOnStartup",
+                "workspace.maxFileSize",
+                "workspace.excludePatterns",
+                "diagnostics.humanReadableErrors",
+                "diagnostics.showCode",
             ];
             for (const setting of settings) {
                 const value = config.get(setting);
                 assert.notStrictEqual(value, undefined, `Setting ${setting} should have a value`);
             }
         });
-        test('Boolean settings have correct defaults', () => {
+        test("Boolean settings have correct defaults", () => {
             const config = getConfig();
-            assert.strictEqual(config.get('build.autoBuildOnSave'), true);
-            assert.strictEqual(config.get('lint.enabled'), true);
-            assert.strictEqual(config.get('lint.deprecatedCommands'), true);
-            assert.strictEqual(config.get('completion.enabled'), true);
-            assert.strictEqual(config.get('format.enabled'), true);
+            assert.strictEqual(config.get("build.autoBuildOnSave"), true);
+            assert.strictEqual(config.get("lint.enabled"), true);
+            assert.strictEqual(config.get("lint.deprecatedCommands"), true);
+            assert.strictEqual(config.get("completion.enabled"), true);
+            assert.strictEqual(config.get("format.enabled"), true);
         });
-        test('Enum settings have valid default values', () => {
+        test("Enum settings have valid default values", () => {
             const config = getConfig();
-            const traceServer = config.get('trace.server');
-            assert.ok(['off', 'messages', 'verbose'].includes(traceServer));
-            const buildEngine = config.get('build.engine');
-            assert.ok(['auto', 'tectonic', 'latexmk', 'pdflatex', 'xelatex', 'lualatex'].includes(buildEngine));
-            const showOutputPanel = config.get('build.showOutputPanel');
-            assert.ok(['always', 'onError', 'never'].includes(showOutputPanel));
+            const traceServer = config.get("trace.server");
+            assert.ok(["off", "messages", "verbose"].includes(traceServer));
+            const buildEngine = config.get("build.engine");
+            assert.ok(["auto", "tectonic", "latexmk", "pdflatex", "xelatex", "lualatex"].includes(buildEngine));
+            const showOutputPanel = config.get("build.showOutputPanel");
+            assert.ok(["always", "onError", "never"].includes(showOutputPanel));
         });
-        test('Number settings have valid ranges', () => {
+        test("Number settings have valid ranges", () => {
             const config = getConfig();
-            const defaultZoom = config.get('preview.defaultZoom');
-            assert.ok(defaultZoom >= 25 && defaultZoom <= 500, 'defaultZoom should be in range 25-500');
-            const indentSize = config.get('format.indentSize');
-            assert.ok(indentSize >= 1 && indentSize <= 8, 'indentSize should be in range 1-8');
-            const maxFileSize = config.get('workspace.maxFileSize');
-            assert.ok(maxFileSize >= 1 && maxFileSize <= 100, 'maxFileSize should be in range 1-100');
+            const defaultZoom = config.get("preview.defaultZoom");
+            assert.ok(defaultZoom >= 25 && defaultZoom <= 500, "defaultZoom should be in range 25-500");
+            const indentSize = config.get("format.indentSize");
+            assert.ok(indentSize >= 1 && indentSize <= 8, "indentSize should be in range 1-8");
+            const maxFileSize = config.get("workspace.maxFileSize");
+            assert.ok(maxFileSize >= 1 && maxFileSize <= 100, "maxFileSize should be in range 1-100");
         });
-        test('Array settings should be arrays', () => {
+        test("Array settings should be arrays", () => {
             const config = getConfig();
-            const excludePatterns = config.get('workspace.excludePatterns');
-            assert.ok(Array.isArray(excludePatterns), 'excludePatterns should be an array');
-            assert.ok(excludePatterns.length > 0, 'excludePatterns should have default values');
+            const excludePatterns = config.get("workspace.excludePatterns");
+            assert.ok(Array.isArray(excludePatterns), "excludePatterns should be an array");
+            assert.ok(excludePatterns.length > 0, "excludePatterns should have default values");
         });
-        test('Critical settings can be updated', async () => {
+        test("Critical settings can be updated", async () => {
             // Test updating build engine
-            await getConfig().update('build.engine', 'tectonic', vscode.ConfigurationTarget.Workspace);
-            await new Promise(r => setTimeout(r, 200));
-            assert.strictEqual(getConfig().get('build.engine'), 'tectonic');
+            await getConfig().update("build.engine", "tectonic", vscode.ConfigurationTarget.Workspace);
+            await new Promise((r) => setTimeout(r, 200));
+            assert.strictEqual(getConfig().get("build.engine"), "tectonic");
             // Reset
-            await getConfig().update('build.engine', 'auto', vscode.ConfigurationTarget.Workspace);
-            await new Promise(r => setTimeout(r, 200));
-            assert.strictEqual(getConfig().get('build.engine'), 'auto');
+            await getConfig().update("build.engine", "auto", vscode.ConfigurationTarget.Workspace);
+            await new Promise((r) => setTimeout(r, 200));
+            assert.strictEqual(getConfig().get("build.engine"), "auto");
             // Test updating auto-build
-            await getConfig().update('build.autoBuildOnSave', false, vscode.ConfigurationTarget.Workspace);
-            await new Promise(r => setTimeout(r, 200));
-            assert.strictEqual(getConfig().get('build.autoBuildOnSave'), false);
+            await getConfig().update("build.autoBuildOnSave", false, vscode.ConfigurationTarget.Workspace);
+            await new Promise((r) => setTimeout(r, 200));
+            assert.strictEqual(getConfig().get("build.autoBuildOnSave"), false);
             // Reset
-            await getConfig().update('build.autoBuildOnSave', true, vscode.ConfigurationTarget.Workspace);
-            await new Promise(r => setTimeout(r, 200));
+            await getConfig().update("build.autoBuildOnSave", true, vscode.ConfigurationTarget.Workspace);
+            await new Promise((r) => setTimeout(r, 200));
         });
-        test('Lint settings can be individually controlled', async () => {
+        test("Lint settings can be individually controlled", async () => {
             // Test individual lint rules
-            await getConfig().update('lint.deprecatedCommands', false, vscode.ConfigurationTarget.Workspace);
-            await new Promise(r => setTimeout(r, 200));
-            await getConfig().update('lint.obsoletePackages', true, vscode.ConfigurationTarget.Workspace);
-            await new Promise(r => setTimeout(r, 200));
-            assert.strictEqual(getConfig().get('lint.deprecatedCommands'), false);
-            assert.strictEqual(getConfig().get('lint.obsoletePackages'), true);
+            await getConfig().update("lint.deprecatedCommands", false, vscode.ConfigurationTarget.Workspace);
+            await new Promise((r) => setTimeout(r, 200));
+            await getConfig().update("lint.obsoletePackages", true, vscode.ConfigurationTarget.Workspace);
+            await new Promise((r) => setTimeout(r, 200));
+            assert.strictEqual(getConfig().get("lint.deprecatedCommands"), false);
+            assert.strictEqual(getConfig().get("lint.obsoletePackages"), true);
             // Reset
-            await getConfig().update('lint.deprecatedCommands', true, vscode.ConfigurationTarget.Workspace);
-            await new Promise(r => setTimeout(r, 200));
+            await getConfig().update("lint.deprecatedCommands", true, vscode.ConfigurationTarget.Workspace);
+            await new Promise((r) => setTimeout(r, 200));
         });
     });
 });
@@ -330,17 +350,17 @@ suite("Hover Functionality Tests", function () {
         document = await vscode.workspace.openTextDocument(docUri);
         await vscode.window.showTextDocument(document);
         // Wait for language server
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        await new Promise((resolve) => setTimeout(resolve, 3000));
     });
     async function getHoverAt(line, character) {
         const position = new vscode.Position(line, character);
-        return await vscode.commands.executeCommand('vscode.executeHoverProvider', document.uri, position);
+        return await vscode.commands.executeCommand("vscode.executeHoverProvider", document.uri, position);
     }
     function extractHoverText(hovers) {
         if (!hovers || hovers.length === 0)
             return "";
         const content = hovers[0].contents[0];
-        if (typeof content === 'string')
+        if (typeof content === "string")
             return content;
         return content.value;
     }

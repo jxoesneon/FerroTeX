@@ -4,11 +4,15 @@ mod diagnostics;
 mod fmt;
 mod hover;
 mod workspace;
+mod code_actions;
 
 mod synctex;
 
 use build::{BuildEngine, BuildRequest, BuildStatus, latexmk::LatexmkAdapter};
 use dashmap::DashMap;
+
+use ferrotex_core::package_manager::{self, PackageManager};
+use ferrotex_core::math_validator::{self, MathValidator};
 
 use ferrotex_log::parser::LogParser;
 use ferrotex_syntax::{SyntaxKind, SyntaxNode};
@@ -86,6 +90,7 @@ struct Backend {
     workspace: Arc<Workspace>,
     root_uri: Arc<Mutex<Option<Url>>>,
     syntax_diagnostics: Arc<DashMap<Url, Vec<Diagnostic>>>,
+    package_manager: Arc<Mutex<package_manager::PackageManager>>,
 }
 
 #[tower_lsp::async_trait]
@@ -94,6 +99,13 @@ impl LanguageServer for Backend {
         {
             let mut root = self.root_uri.lock().unwrap();
             *root = params.root_uri.clone();
+        }
+        
+        // Detect package manager asynchronously on initialization
+        let detected_pm = package_manager::PackageManager::detect().await;
+        {
+            let mut pm = self.package_manager.lock().unwrap();
+            *pm = detected_pm;
         }
 
         Ok(InitializeResult {
@@ -106,7 +118,8 @@ impl LanguageServer for Backend {
                     commands: vec![
                         "ferrotex.internal.build".to_string(),
                         "ferrotex.synctex_forward".to_string(),
-                        "ferrotex.synctex_inverse".to_string()
+                        "ferrotex.synctex_inverse".to_string(),
+                        "ferrotex.installPackage".to_string(),
                     ],
                     work_done_progress_options: WorkDoneProgressOptions {
                         work_done_progress: Some(true),
@@ -854,6 +867,38 @@ impl LanguageServer for Backend {
         &self,
         params: ExecuteCommandParams,
     ) -> Result<Option<serde_json::Value>> {
+        // Handle package installation command
+        if params.command == "ferrotex.installPackage" {
+            if params.arguments.is_empty() {
+                self.client.log_message(MessageType::ERROR, "Install package command missing package name").await;
+                return Ok(None);
+            }
+            
+            let package_name = params.arguments[0].as_str().unwrap_or_default();
+            self.client.log_message(MessageType::INFO, format!("Installing package '{}'...", package_name)).await;
+            
+            let pm = self.package_manager.lock().unwrap().clone();
+            match pm.install(package_name).await {
+                Ok(status) => {
+                    match status.state {
+                        package_manager::InstallState::Complete => {
+                            self.client.show_message(MessageType::INFO, format!("Successfully installed package '{}'", package_name)).await;
+                            return Ok(Some(serde_json::json!({"success": true})));
+                        }
+                        package_manager::InstallState::Failed(err) => {
+                            self.client.show_message(MessageType::ERROR, format!("Failed to install '{}': {}", package_name, err)).await;
+                            return Ok(Some(serde_json::json!({"success": false, "error": err})));
+                        }
+                        _ => {}
+                    }
+                }
+                Err(e) => {
+                    self.client.show_message(MessageType::ERROR, format!("Installation error: {}", e)).await;
+                    return Ok(Some(serde_json::json!({"success": false, "error": e.to_string()})));
+                }
+            }
+        }
+        
         if params.command == "ferrotex.synctex_forward" {
              let args = params.arguments;
              if args.len() < 4 { return Ok(None); }
@@ -2015,6 +2060,22 @@ async fn watch_workspace(
     Ok(())
 }
 
+/// Detects if an error message indicates a missing package file.
+/// Returns the filename (e.g., "tikz.sty") if found.
+fn detect_missing_package_file(message: &str) -> Option<String> {
+    // Pattern: "File 'xxx.sty' not found"
+    if let Some(start_idx) = message.find("File '") {
+        let rest = &message[start_idx + 6..];
+        if let Some(end_idx) = rest.find("' not found") {
+            let filename = rest[..end_idx].trim();
+            if filename.ends_with(".sty") {
+                return Some(filename.to_string());
+            }
+        }
+    }
+    None
+}
+
 /// Scans the first 5 lines of the document for a magic comment like `%!TEX root = ...`.
 /// Analyzes the build log to identify a missing LaTeX package.
 ///
@@ -2158,12 +2219,14 @@ async fn main() {
     let stdin = tokio::io::stdin();
     let stdout = tokio::io::stdout();
 
+
     let (service, socket) = LspService::new(|client| Backend {
         client,
         documents: Arc::new(DashMap::new()),
         workspace: Arc::new(Workspace::new()),
         root_uri: Arc::new(Mutex::new(None)),
         syntax_diagnostics: Arc::new(DashMap::new()),
+        package_manager: Arc::new(Mutex::new(package_manager::PackageManager::None)),
     });
     Server::new(stdin, stdout, socket).serve(service).await;
 }
