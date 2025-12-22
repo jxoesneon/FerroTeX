@@ -3,7 +3,7 @@ import * as path from "path";
 
 /**
  * Handles pasting of image data from the clipboard.
- * 
+ *
  * Configurable via:
  * - `ferrotex.imagePaste.enabled`: Enable/disable.
  * - `ferrotex.imagePaste.defaultDirectory`: Target directory relative to source file (default: "figures").
@@ -17,17 +17,15 @@ export class ImagePasteProvider implements vscode.DocumentPasteEditProvider {
   public generateFilename(pattern: string): string {
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     const uuid = Math.random().toString(36).substring(2, 9);
-    
+
     // Simple replacement of variables
-    let name = pattern
-      .replace("{timestamp}", timestamp)
-      .replace("{uuid}", uuid);
-      
+    let name = pattern.replace("{timestamp}", timestamp).replace("{uuid}", uuid);
+
     // Ensure extension
     if (!name.toLowerCase().endsWith(".png")) {
       name += ".png";
     }
-    
+
     return name;
   }
 
@@ -40,10 +38,10 @@ export class ImagePasteProvider implements vscode.DocumentPasteEditProvider {
     // e.g. doc: /a/b/main.tex, img: /a/b/figures/image.png -> figures/image.png
     const docDir = path.dirname(docPath);
     let relative = path.relative(docDir, imagePath);
-    
+
     // Format for LaTeX (always forward slashes)
     relative = relative.split(path.sep).join("/");
-    
+
     return relative;
   }
 
@@ -74,7 +72,7 @@ export class ImagePasteProvider implements vscode.DocumentPasteEditProvider {
     // 1. Determine Target Path
     const defaultDir = config.get<string>("imagePaste.defaultDirectory", "figures");
     const pattern = config.get<string>("imagePaste.filenamePattern", "image-{timestamp}");
-    
+
     const docDir = path.dirname(document.uri.fsPath);
     const targetDir = path.join(docDir, defaultDir);
     const filename = this.generateFilename(pattern);
@@ -82,16 +80,16 @@ export class ImagePasteProvider implements vscode.DocumentPasteEditProvider {
     const targetUri = vscode.Uri.file(targetPath);
 
     // 2. Confirm with user (optional, but good UX to allow rename)
-    // We'll skip the prompt for "speedy" paste as per "Wizard" spec, 
+    // We'll skip the prompt for "speedy" paste as per "Wizard" spec,
     // but maybe standard behavior is just do it.
     // Let's stick to the automation: config-driven.
 
     // 3. Ensure directory exists
     try {
-        await vscode.workspace.fs.createDirectory(vscode.Uri.file(targetDir));
+      await vscode.workspace.fs.createDirectory(vscode.Uri.file(targetDir));
     } catch (e) {
-        vscode.window.showErrorMessage(`Failed to create directory: ${e}`);
-        return undefined;
+      vscode.window.showErrorMessage(`Failed to create directory: ${e}`);
+      return undefined;
     }
 
     // 4. Write File
@@ -107,7 +105,7 @@ export class ImagePasteProvider implements vscode.DocumentPasteEditProvider {
     const relativePath = this.resolveRelativePath(document.uri.fsPath, targetPath);
     // Remove extension for LaTeX cleanliness usually, but PNG is fine.
     // Standard is usually without extension if configured, but let's keep it simple.
-    const snippetPath = relativePath.replace(/\.png$/i, ""); 
+    const snippetPath = relativePath.replace(/\.png$/i, "");
     const snippet = new vscode.SnippetString(`\\includegraphics{${snippetPath}}`);
 
     // 6. Return Edit

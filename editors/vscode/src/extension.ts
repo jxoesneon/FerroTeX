@@ -6,7 +6,6 @@ import { checkAndInstallTectonic } from "./installTectonic";
 import { validateBuildEngine, validateSyncTeX } from "./engineValidator";
 import { ImagePasteProvider } from "./imagePaste";
 
-
 let client: LanguageClient;
 
 export function activate(context: vscode.ExtensionContext) {
@@ -86,14 +85,10 @@ export function activate(context: vscode.ExtensionContext) {
       { scheme: "file", language: "tex" },
     ];
     context.subscriptions.push(
-      vscode.languages.registerDocumentPasteEditProvider(
-        selector,
-        new ImagePasteProvider(),
-        {
-          pasteMimeTypes: ["image/png"],
-          providedPasteEditKinds: [],
-        },
-      ),
+      vscode.languages.registerDocumentPasteEditProvider(selector, new ImagePasteProvider(), {
+        pasteMimeTypes: ["image/png"],
+        providedPasteEditKinds: [],
+      }),
     );
   }
 
@@ -132,7 +127,7 @@ export function activate(context: vscode.ExtensionContext) {
       const confirm = await vscode.window.showWarningMessage(
         `Install LaTeX package "${packageName}" using your package manager?`,
         { modal: true },
-        "Install"
+        "Install",
       );
 
       if (confirm === "Install") {
@@ -150,7 +145,9 @@ export function activate(context: vscode.ExtensionContext) {
               });
 
               if (result && result.success) {
-                vscode.window.showInformationMessage(`Successfully installed package "${packageName}"`);
+                vscode.window.showInformationMessage(
+                  `Successfully installed package "${packageName}"`,
+                );
               } else {
                 const error = result?.error || "Unknown error";
                 vscode.window.showErrorMessage(`Failed to install ${packageName}: ${error}`);
@@ -158,7 +155,7 @@ export function activate(context: vscode.ExtensionContext) {
             } catch (e) {
               vscode.window.showErrorMessage(`Installation error: ${e}`);
             }
-          }
+          },
         );
       }
     }),
@@ -335,5 +332,3 @@ export function deactivate(): Thenable<void> | undefined {
   }
   return client.stop();
 }
-
-
