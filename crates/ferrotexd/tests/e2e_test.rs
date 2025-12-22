@@ -434,6 +434,7 @@ async fn test_document_symbol_section_flow() -> anyhow::Result<()> {
                     .as_array()
                 .expect("result should be an array")
                 .clone();
+            }
         }
     };
 
