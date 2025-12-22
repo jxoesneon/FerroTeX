@@ -1,11 +1,11 @@
 # The `tectonic_xetex_layout` crate
 
-[![](http://meritbadge.herokuapp.com/tectonic_xetex_layout)](https://crates.io/crates/tectonic_xetex_layout)
+[![crates.io badge](http://meritbadge.herokuapp.com/tectonic_xetex_layout)](https://crates.io/crates/tectonic_xetex_layout)
 
 This crate is part of [the Tectonic
 project](https://tectonic-typesetting.github.io/en-US/). It provides the font
-loading and layout routines of [XeTeX] as a crate, *currently providing only a C
-API*.
+loading and layout routines of [XeTeX] as a crate, _currently providing only a C
+API_.
 
 [XeTeX]: http://xetex.sourceforge.net/
 
@@ -26,7 +26,6 @@ suffice:
 #[allow(clippy::single_component_path_imports)]
 use tectonic_xetex_layout;
 ```
-
 
 ## Cargo features
 
