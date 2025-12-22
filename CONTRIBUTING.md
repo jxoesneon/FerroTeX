@@ -22,9 +22,47 @@ This document defines contribution standards to keep both goals aligned.
 - LSP features and VS Code UX.
 - Documentation and ADRs.
 
-## Development Setup
-
 See `docs/development/setup.md`.
+
+### macOS-Specific Setup
+
+FerroTeX requires specific configuration on macOS due to dependencies on ICU and HarfBuzz:
+
+1. **Install dependencies via Homebrew:**
+
+   ```bash
+   brew install harfbuzz icu4c@76 freetype fontconfig
+   ```
+
+2. **Link ICU 76 (required, not 78):**
+
+   ```bash
+   brew unlink icu4c@78  # if installed
+   brew link --force icu4c@76
+   ```
+
+3. **Configure build environment:**
+
+   ```bash
+   cp .cargo/config.toml.example .cargo/config.toml
+   # Edit .cargo/config.toml and update harfbuzz VERSION to match:
+   brew list --versions harfbuzz
+   # Example: if you see "harfbuzz 12.2.0_1", use "12.2.0_1"
+   ```
+
+4. **Verify the build:**
+   ```bash
+   cargo build
+   cargo test
+   ```
+
+**Alternative:** Use Docker for a consistent build environment:
+
+```bash
+./test-ci-locally.sh
+```
+
+This replicates the CI environment and avoids macOS-specific issues.
 
 ## Change Process
 

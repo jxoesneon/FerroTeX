@@ -1,0 +1,18 @@
+# macOS Build Configuration Template
+# Copy this file to .cargo/config.toml and update paths to match your system
+
+[build]
+rustflags = []
+
+[target.aarch64-apple-darwin]
+rustflags = []
+
+[env]
+# Update VERSION to match your Homebrew harfbuzz version
+# Find with: brew list --versions harfbuzz
+CFLAGS = "-I/opt/homebrew/Cellar/harfbuzz/VERSION/include"
+CXXFLAGS = "-I/opt/homebrew/Cellar/harfbuzz/VERSION/include -std=c++17"
+
+# Update to ICU version 76 or 77 (not 78, which requires additional C++17 fixes)
+# Switch versions with: brew unlink icu4c@78 && brew link --force icu4c@76
+PKG_CONFIG_PATH = "/opt/homebrew/opt/icu4c@76/lib/pkgconfig"
