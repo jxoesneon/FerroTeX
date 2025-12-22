@@ -24,7 +24,7 @@ regex = "1.10"
 uuid = { version = "1.6", features = ["v4"] }
 line-index = "0.1"
 dirs = "5.0"
-tectonic = { version = "0.15", default-features = false }
+tectonic = { version = "0.15", default-features = false, features = ["external-harfbuzz"] }
 which = "4.4"
 once_cell = "1.18"
 
