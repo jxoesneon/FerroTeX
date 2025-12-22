@@ -260,10 +260,10 @@ impl Workspace {
             }
         } else {
             for uri in referenced_bibs {
-                if let Some(bib_file) = self.bib_indices.get(&uri)
-                    && bib_file.entries.iter().any(|e| e.key == key)
-                {
-                    return true;
+                if let Some(bib_file) = self.bib_indices.get(&uri) {
+                    if bib_file.entries.iter().any(|e| e.key == key) {
+                        return true;
+                    }
                 }
             }
         }
