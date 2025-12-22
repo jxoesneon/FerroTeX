@@ -93,6 +93,34 @@ jobs:
       - name: Test
         run: cargo test --verbose
 
+  rust-windows:
+    name: Rust Build & Test (Windows)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install vcpkg dependencies
+        run: |
+          vcpkg install icu:x64-windows harfbuzz:x64-windows fontconfig:x64-windows freetype:x64-windows graphite2:x64-windows
+        shell: bash
+
+      - name: Build
+        run: cargo build --verbose
+        env:
+          VCPKGRS_DYNAMIC: 1
+
+      - name: Test
+        run: cargo test --verbose
+        env:
+          VCPKGRS_DYNAMIC: 1
+
   extension:
     name: VS Code Extension
     runs-on: ubuntu-latest
