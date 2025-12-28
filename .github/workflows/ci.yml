@@ -106,14 +106,11 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
 
-
       - name: Build
         run: cargo build --verbose
 
-
       - name: Test
         run: cargo test --verbose
-
 
   extension:
     name: VS Code Extension
