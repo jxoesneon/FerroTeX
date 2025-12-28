@@ -34,10 +34,6 @@ ferrotex-syntax = { path = "../ferrotex-syntax" }
 ferrotex-log = { path = "../ferrotex-log" }
 ferrotex-core = { path = "../ferrotex-core" }
 
-[target.'cfg(not(windows))'.dependencies]
-tectonic = { version = "0.15", default-features = false, features = ["external-harfbuzz"] }
-
-[target.'cfg(windows)'.dependencies]
 tectonic = { version = "0.15", default-features = false }
 
 [dev-dependencies]
