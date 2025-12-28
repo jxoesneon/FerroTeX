@@ -180,6 +180,7 @@ fn main() {
 
     if target.contains("-msvc") {
         cppcfg.flag("/EHsc");
+        cppcfg.flag("/std:c++17");
     }
 
     // OK, back to generic build rules.
