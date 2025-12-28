@@ -108,18 +108,22 @@ jobs:
 
       - name: Install vcpkg dependencies
         run: |
-          vcpkg install icu:x64-windows harfbuzz:x64-windows fontconfig:x64-windows freetype:x64-windows graphite2:x64-windows
+          vcpkg install icu:x64-windows harfbuzz:x64-windows fontconfig:x64-windows freetype:x64-windows graphite2:x64-windows pkgconf:x64-windows
         shell: bash
 
       - name: Build
         run: cargo build --verbose
         env:
           VCPKGRS_DYNAMIC: 1
+          PKG_CONFIG: vcpkg pkgconf
+          PKG_CONFIG_PATH: C:/vcpkg/installed/x64-windows/lib/pkgconfig
 
       - name: Test
         run: cargo test --verbose
         env:
           VCPKGRS_DYNAMIC: 1
+          PKG_CONFIG: vcpkg pkgconf
+          PKG_CONFIG_PATH: C:/vcpkg/installed/x64-windows/lib/pkgconfig
 
   extension:
     name: VS Code Extension
