@@ -96,9 +96,12 @@ jobs:
   rust-windows:
     name: Rust Build & Test (Windows)
     runs-on: windows-latest
+    env:
+      TECTONIC_DEP_BACKEND: vcpkg
+      VCPKG_ROOT: C:/vcpkg
+      VCPKGRS_DYNAMIC: 1
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -106,24 +109,16 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
 
-      - name: Install vcpkg dependencies
+      - name: Install dependencies
         run: |
-          vcpkg install icu:x64-windows harfbuzz:x64-windows fontconfig:x64-windows freetype:x64-windows graphite2:x64-windows pkgconf:x64-windows
+          vcpkg install icu:x64-windows harfbuzz:x64-windows fontconfig:x64-windows freetype:x64-windows graphite2:x64-windows
         shell: bash
 
       - name: Build
         run: cargo build --verbose
-        env:
-          VCPKGRS_DYNAMIC: 1
-          PKG_CONFIG: vcpkg pkgconf
-          PKG_CONFIG_PATH: C:/vcpkg/installed/x64-windows/lib/pkgconfig
 
       - name: Test
         run: cargo test --verbose
-        env:
-          VCPKGRS_DYNAMIC: 1
-          PKG_CONFIG: vcpkg pkgconf
-          PKG_CONFIG_PATH: C:/vcpkg/installed/x64-windows/lib/pkgconfig
 
   extension:
     name: VS Code Extension
