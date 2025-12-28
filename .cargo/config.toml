@@ -4,7 +4,12 @@ rustflags = []
 [target.aarch64-apple-darwin]
 rustflags = []
 
-[env]
+[target.aarch64-apple-darwin.env]
+CFLAGS = "-I/opt/homebrew/Cellar/harfbuzz/12.2.0_1/include"
+CXXFLAGS = "-I/opt/homebrew/Cellar/harfbuzz/12.2.0_1/include -std=c++17"
+PKG_CONFIG_PATH = "/opt/homebrew/opt/icu4c@76/lib/pkgconfig"
+
+[target.x86_64-apple-darwin.env]
 CFLAGS = "-I/opt/homebrew/Cellar/harfbuzz/12.2.0_1/include"
 CXXFLAGS = "-I/opt/homebrew/Cellar/harfbuzz/12.2.0_1/include -std=c++17"
 PKG_CONFIG_PATH = "/opt/homebrew/opt/icu4c@76/lib/pkgconfig"
