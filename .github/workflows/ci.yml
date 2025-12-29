@@ -115,10 +115,10 @@ jobs:
         shell: bash
 
       - name: Build
-        run: cargo build --verbose
+        run: cargo build --verbose --workspace --exclude ferrotex-fuzz
 
       - name: Test
-        run: cargo test --verbose
+        run: cargo test --verbose --workspace --exclude ferrotex-fuzz
 
   extension:
     name: VS Code Extension
