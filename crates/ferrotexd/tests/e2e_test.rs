@@ -16,23 +16,7 @@ async fn test_lsp_diagnostics_flow() -> anyhow::Result<()> {
     // We assume the test is run from crate root or workspace root.
     // Let's look for the binary in standard cargo locations relative to current dir.
 
-    let mut bin_path = None;
-    let candidates = vec![
-        "../../target/debug/ferrotexd", // From crate root
-        "target/debug/ferrotexd",       // From workspace root
-    ];
-
-    for candidate in candidates {
-        let path = std::env::current_dir()?.join(candidate);
-        if path.exists() {
-            bin_path = Some(path);
-            break;
-        }
-    }
-
-    let final_bin_path = bin_path.ok_or_else(|| {
-        anyhow::anyhow!("ferrotexd binary not found. Run `cargo build -p ferrotexd` first.")
-    })?;
+    let final_bin_path = find_ferrotexd_binary()?;
 
     // 3. Start the server
     let mut child = Command::new(final_bin_path)
@@ -130,16 +114,7 @@ async fn test_document_symbol_flow() -> anyhow::Result<()> {
     let temp_path = temp_dir.path().canonicalize()?;
 
     // 2. Locate binary
-    let mut bin_path = None;
-    let candidates = vec!["../../target/debug/ferrotexd", "target/debug/ferrotexd"];
-    for candidate in candidates {
-        let path = std::env::current_dir()?.join(candidate);
-        if path.exists() {
-            bin_path = Some(path);
-            break;
-        }
-    }
-    let final_bin_path = bin_path.ok_or_else(|| anyhow::anyhow!("ferrotexd binary not found"))?;
+    let final_bin_path = find_ferrotexd_binary()?;
 
     // 3. Start server
     let mut child = Command::new(final_bin_path)
@@ -255,16 +230,7 @@ async fn test_syntax_diagnostics_flow() -> anyhow::Result<()> {
     let temp_path = temp_dir.path().to_owned();
 
     // 2. Locate binary
-    let mut bin_path = None;
-    let candidates = vec!["../../target/debug/ferrotexd", "target/debug/ferrotexd"];
-    for candidate in candidates {
-        let path = std::env::current_dir()?.join(candidate);
-        if path.exists() {
-            bin_path = Some(path);
-            break;
-        }
-    }
-    let final_bin_path = bin_path.ok_or_else(|| anyhow::anyhow!("ferrotexd binary not found"))?;
+    let final_bin_path = find_ferrotexd_binary()?;
 
     // 3. Start server
     let mut child = Command::new(final_bin_path)
@@ -285,7 +251,7 @@ async fn test_syntax_diagnostics_flow() -> anyhow::Result<()> {
         "method": "initialize",
         "params": {
             "capabilities": {},
-            "rootUri": format!("file://{}", temp_path.display()),
+            "rootUri": Url::from_directory_path(&temp_path).unwrap(),
             "processId": std::process::id()
         }
     });
@@ -300,7 +266,7 @@ async fn test_syntax_diagnostics_flow() -> anyhow::Result<()> {
     send_msg(stdin, &initialized_msg).await?;
 
     // 5. Open a document with syntax error
-    let doc_uri = format!("file://{}/broken.tex", temp_path.display());
+    let doc_uri = Url::from_file_path(temp_path.join("broken.tex")).unwrap().to_string();
     // Missing closing brace
     let doc_text = r"{ \cmd";
     let did_open = json!({
@@ -351,16 +317,7 @@ async fn test_document_symbol_section_flow() -> anyhow::Result<()> {
     let temp_path = temp_dir.path().to_owned();
 
     // 2. Locate binary
-    let mut bin_path = None;
-    let candidates = vec!["../../target/debug/ferrotexd", "target/debug/ferrotexd"];
-    for candidate in candidates {
-        let path = std::env::current_dir()?.join(candidate);
-        if path.exists() {
-            bin_path = Some(path);
-            break;
-        }
-    }
-    let final_bin_path = bin_path.ok_or_else(|| anyhow::anyhow!("ferrotexd binary not found"))?;
+    let final_bin_path = find_ferrotexd_binary()?;
 
     // 3. Start server
     let mut child = Command::new(final_bin_path)
@@ -381,7 +338,7 @@ async fn test_document_symbol_section_flow() -> anyhow::Result<()> {
         "method": "initialize",
         "params": {
             "capabilities": {},
-            "rootUri": format!("file://{}", temp_path.display()),
+            "rootUri": Url::from_directory_path(&temp_path).unwrap(),
             "processId": std::process::id()
         }
     });
@@ -396,7 +353,7 @@ async fn test_document_symbol_section_flow() -> anyhow::Result<()> {
     send_msg(stdin, &initialized_msg).await?;
 
     // 5. Open a document with sections
-    let doc_uri = format!("file://{}/sections.tex", temp_path.display());
+    let doc_uri = Url::from_file_path(temp_path.join("sections.tex")).unwrap().to_string();
     let doc_text = r"\section{Introduction} \begin{itemize} \item A \end{itemize}";
     let did_open = json!({
         "jsonrpc": "2.0",
@@ -463,16 +420,7 @@ async fn test_document_link_flow() -> anyhow::Result<()> {
     let temp_path = temp_dir.path().to_owned();
 
     // 2. Locate binary
-    let mut bin_path = None;
-    let candidates = vec!["../../target/debug/ferrotexd", "target/debug/ferrotexd"];
-    for candidate in candidates {
-        let path = std::env::current_dir()?.join(candidate);
-        if path.exists() {
-            bin_path = Some(path);
-            break;
-        }
-    }
-    let final_bin_path = bin_path.ok_or_else(|| anyhow::anyhow!("ferrotexd binary not found"))?;
+    let final_bin_path = find_ferrotexd_binary()?;
 
     // 3. Start server
     let mut child = Command::new(final_bin_path)
@@ -493,7 +441,7 @@ async fn test_document_link_flow() -> anyhow::Result<()> {
         "method": "initialize",
         "params": {
             "capabilities": {},
-            "rootUri": format!("file://{}", temp_path.display()),
+            "rootUri": Url::from_directory_path(&temp_path).unwrap(),
             "processId": std::process::id()
         }
     });
@@ -508,7 +456,7 @@ async fn test_document_link_flow() -> anyhow::Result<()> {
     send_msg(stdin, &initialized_msg).await?;
 
     // 5. Open a document with includes
-    let doc_uri = format!("file://{}/main.tex", temp_path.display());
+    let doc_uri = Url::from_file_path(temp_path.join("main.tex")).unwrap().to_string();
     let doc_text = r"\documentclass{article} \input{chapters/intro} \include{chapters/concl}";
     let did_open = json!({
         "jsonrpc": "2.0",
@@ -580,16 +528,7 @@ async fn test_cycle_detection_flow() -> anyhow::Result<()> {
     let temp_path = temp_dir.path().to_owned();
 
     // 2. Locate binary
-    let mut bin_path = None;
-    let candidates = vec!["../../target/debug/ferrotexd", "target/debug/ferrotexd"];
-    for candidate in candidates {
-        let path = std::env::current_dir()?.join(candidate);
-        if path.exists() {
-            bin_path = Some(path);
-            break;
-        }
-    }
-    let final_bin_path = bin_path.ok_or_else(|| anyhow::anyhow!("ferrotexd binary not found"))?;
+    let final_bin_path = find_ferrotexd_binary()?;
 
     // 3. Start server
     let mut child = Command::new(final_bin_path)
@@ -610,7 +549,7 @@ async fn test_cycle_detection_flow() -> anyhow::Result<()> {
         "method": "initialize",
         "params": {
             "capabilities": {},
-            "rootUri": format!("file://{}", temp_path.display()),
+            "rootUri": Url::from_directory_path(&temp_path).unwrap(),
             "processId": std::process::id()
         }
     });
@@ -625,7 +564,7 @@ async fn test_cycle_detection_flow() -> anyhow::Result<()> {
     send_msg(stdin, &initialized_msg).await?;
 
     // 5. Open A -> B
-    let uri_a = format!("file://{}/a.tex", temp_path.display());
+    let uri_a = Url::from_file_path(temp_path.join("a.tex")).unwrap().to_string();
     let text_a = r"\input{b.tex}";
     let did_open_a = json!({
         "jsonrpc": "2.0",
@@ -645,7 +584,7 @@ async fn test_cycle_detection_flow() -> anyhow::Result<()> {
     // Wait a bit or consume until idle? simpler to just proceed since we check B specifically.
 
     // 6. Open B -> A (Cycle!)
-    let uri_b = format!("file://{}/b.tex", temp_path.display());
+    let uri_b = Url::from_file_path(temp_path.join("b.tex")).unwrap().to_string();
     let text_b = r"\input{a.tex}";
     let did_open_b = json!({
         "jsonrpc": "2.0",
@@ -697,16 +636,7 @@ async fn test_label_features_flow() -> anyhow::Result<()> {
     let temp_path = temp_dir.path().to_owned();
 
     // 2. Locate binary
-    let mut bin_path = None;
-    let candidates = vec!["../../target/debug/ferrotexd", "target/debug/ferrotexd"];
-    for candidate in candidates {
-        let path = std::env::current_dir()?.join(candidate);
-        if path.exists() {
-            bin_path = Some(path);
-            break;
-        }
-    }
-    let final_bin_path = bin_path.ok_or_else(|| anyhow::anyhow!("ferrotexd binary not found"))?;
+    let final_bin_path = find_ferrotexd_binary()?;
 
     // 3. Start server
     let mut child = Command::new(final_bin_path)
@@ -727,7 +657,7 @@ async fn test_label_features_flow() -> anyhow::Result<()> {
         "method": "initialize",
         "params": {
             "capabilities": {},
-            "rootUri": format!("file://{}", temp_path.display()),
+            "rootUri": Url::from_directory_path(&temp_path).unwrap(),
             "processId": std::process::id()
         }
     });
@@ -742,7 +672,7 @@ async fn test_label_features_flow() -> anyhow::Result<()> {
     send_msg(stdin, &initialized_msg).await?;
 
     // 5. Open document
-    let doc_uri = format!("file://{}/main.tex", temp_path.display());
+    let doc_uri = Url::from_file_path(temp_path.join("main.tex")).unwrap().to_string();
     let doc_text = "\\section{Intro}\n\\label{sec:intro}\nSee Section \\ref{sec:intro}.";
     let did_open = json!({
         "jsonrpc": "2.0",
@@ -875,16 +805,7 @@ async fn test_rename_flow() -> anyhow::Result<()> {
     let temp_path = temp_dir.path().to_owned();
 
     // 2. Locate binary
-    let mut bin_path = None;
-    let candidates = vec!["../../target/debug/ferrotexd", "target/debug/ferrotexd"];
-    for candidate in candidates {
-        let path = std::env::current_dir()?.join(candidate);
-        if path.exists() {
-            bin_path = Some(path);
-            break;
-        }
-    }
-    let final_bin_path = bin_path.ok_or_else(|| anyhow::anyhow!("ferrotexd binary not found"))?;
+    let final_bin_path = find_ferrotexd_binary()?;
 
     // 3. Start server
     let mut child = Command::new(final_bin_path)
@@ -905,7 +826,7 @@ async fn test_rename_flow() -> anyhow::Result<()> {
         "method": "initialize",
         "params": {
             "capabilities": {},
-            "rootUri": format!("file://{}", temp_path.display()),
+            "rootUri": Url::from_directory_path(&temp_path).unwrap(),
             "processId": std::process::id()
         }
     });
@@ -920,7 +841,7 @@ async fn test_rename_flow() -> anyhow::Result<()> {
     send_msg(stdin, &initialized_msg).await?;
 
     // 5. Open document
-    let doc_uri = format!("file://{}/main.tex", temp_path.display());
+    let doc_uri = Url::from_file_path(temp_path.join("main.tex")).unwrap().to_string();
     // Line 0: \section{Intro}
     // Line 1: \label{oldName}
     // Line 2: See \ref{oldName}.
@@ -1011,16 +932,7 @@ async fn test_citation_flow() -> anyhow::Result<()> {
     let temp_path = temp_dir.path().to_owned();
 
     // 2. Locate binary
-    let mut bin_path = None;
-    let candidates = vec!["../../target/debug/ferrotexd", "target/debug/ferrotexd"];
-    for candidate in candidates {
-        let path = std::env::current_dir()?.join(candidate);
-        if path.exists() {
-            bin_path = Some(path);
-            break;
-        }
-    }
-    let final_bin_path = bin_path.ok_or_else(|| anyhow::anyhow!("ferrotexd binary not found"))?;
+    let final_bin_path = find_ferrotexd_binary()?;
 
     // 3. Start server
     let mut child = Command::new(final_bin_path)
@@ -1041,7 +953,7 @@ async fn test_citation_flow() -> anyhow::Result<()> {
         "method": "initialize",
         "params": {
             "capabilities": {},
-            "rootUri": format!("file://{}", temp_path.display()),
+            "rootUri": Url::from_directory_path(&temp_path).unwrap(),
             "processId": std::process::id()
         }
     });
@@ -1056,7 +968,7 @@ async fn test_citation_flow() -> anyhow::Result<()> {
     send_msg(stdin, &initialized_msg).await?;
 
     // 5. Open .tex with undefined citation
-    let tex_uri = format!("file://{}/main.tex", temp_path.display());
+    let tex_uri = Url::from_file_path(temp_path.join("main.tex")).unwrap().to_string();
     let tex_text = r"\cite{myKey}";
     let did_open_tex = json!({
         "jsonrpc": "2.0",
@@ -1097,7 +1009,7 @@ async fn test_citation_flow() -> anyhow::Result<()> {
     assert!(found_undef, "Expected undefined citation diagnostic");
 
     // 7. Open .bib file defining the key
-    let bib_uri = format!("file://{}/refs.bib", temp_path.display());
+    let bib_uri = Url::from_file_path(temp_path.join("refs.bib")).unwrap().to_string();
     let bib_text = r"@article{myKey, title={A Title}}";
     let did_open_bib = json!({
         "jsonrpc": "2.0",
@@ -1173,16 +1085,7 @@ async fn test_enhanced_completion_flow() -> anyhow::Result<()> {
     tokio::fs::write(chapter_dir.join("intro.tex"), "Intro content").await?;
 
     // 2. Locate binary
-    let mut bin_path = None;
-    let candidates = vec!["../../target/debug/ferrotexd", "target/debug/ferrotexd"];
-    for candidate in candidates {
-        let path = std::env::current_dir()?.join(candidate);
-        if path.exists() {
-            bin_path = Some(path);
-            break;
-        }
-    }
-    let final_bin_path = bin_path.ok_or_else(|| anyhow::anyhow!("ferrotexd binary not found"))?;
+    let final_bin_path = find_ferrotexd_binary()?;
 
     // 3. Start server
     let mut child = Command::new(final_bin_path)
@@ -1203,7 +1106,7 @@ async fn test_enhanced_completion_flow() -> anyhow::Result<()> {
         "method": "initialize",
         "params": {
             "capabilities": {},
-            "rootUri": format!("file://{}", temp_path.display()),
+            "rootUri": Url::from_directory_path(&temp_path).unwrap(),
             "processId": std::process::id()
         }
     });
@@ -1218,7 +1121,7 @@ async fn test_enhanced_completion_flow() -> anyhow::Result<()> {
     send_msg(stdin, &initialized_msg).await?;
 
     // 5. Open document
-    let doc_uri = format!("file://{}/main.tex", temp_path.display());
+    let doc_uri = Url::from_file_path(temp_path.join("main.tex")).unwrap().to_string();
     // Contexts to test:
     // 1. Command: \s -> section
     // 2. Environment: \begin{i -> itemize
@@ -1366,4 +1269,22 @@ async fn read_msg<R: AsyncBufReadExt + Unpin>(reader: &mut R) -> anyhow::Result<
 
     let text = String::from_utf8(body)?;
     Ok(serde_json::from_str(&text)?)
+}
+
+fn find_ferrotexd_binary() -> anyhow::Result<std::path::PathBuf> {
+    let candidates = vec![
+        "../../target/debug/ferrotexd", // From crate root
+        "target/debug/ferrotexd",       // From workspace root
+        "../../target/debug/ferrotexd.exe", // Windows crate root
+        "target/debug/ferrotexd.exe",       // Windows workspace root
+    ];
+
+    for candidate in candidates {
+        let path = std::env::current_dir()?.join(candidate);
+        if path.exists() {
+            return Ok(path);
+        }
+    }
+
+    anyhow::bail!("ferrotexd binary not found. Run `cargo build -p ferrotexd` first.")
 }

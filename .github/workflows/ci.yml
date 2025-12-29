@@ -93,6 +93,33 @@ jobs:
       - name: Test
         run: cargo test --verbose
 
+  rust-windows:
+    name: Rust Build & Test (Windows)
+    runs-on: windows-latest
+    env:
+      TECTONIC_DEP_BACKEND: vcpkg
+      VCPKG_ROOT: C:/vcpkg
+      VCPKGRS_DYNAMIC: 1
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install dependencies
+        run: |
+          vcpkg install icu:x64-windows harfbuzz[graphite2]:x64-windows fontconfig:x64-windows freetype:x64-windows graphite2:x64-windows
+        shell: bash
+
+      - name: Build
+        run: cargo build --verbose --workspace --exclude ferrotex-fuzz
+
+      - name: Test
+        run: cargo test --verbose --workspace --exclude ferrotex-fuzz
+
   extension:
     name: VS Code Extension
     runs-on: ubuntu-latest
