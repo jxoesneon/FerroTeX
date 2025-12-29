@@ -18,6 +18,10 @@ FerroTeX is a next-generation LaTeX engine built in **Rust** 🦀. It replaces t
 | :---------------------------------------------------------- | :---------------------------------------------------------------- | :----------------------------------------------- |
 | **Instant Startup**: Powered by a hand-written Rust parser. | **Context-Aware**: Dynamic completion for packages and citations. | **Human-Readable Errors**: No more cryptic logs. |
 
+### 🪟 Now on Windows! (v0.19.0)
+
+FerroTeX is strictly tested on **Windows**, ensuring a first-class experience for all developers. No WSL required.
+
 ## 🚀 Key Capabilities
 
 ### 1. Intelligent Completion
@@ -41,6 +45,7 @@ Inspect your bibliography without leaving the file. Hover over any `\cite` key t
 ### 4. Zero-Config Build
 
 **FerroTeX Just Works™.**
+**Zero Configuration** on Linux, macOS, and Windows.
 If you don't have a TeX distribution, we'll automatically set up **Tectonic**, a modern, lightweight engine.
 
 ---
