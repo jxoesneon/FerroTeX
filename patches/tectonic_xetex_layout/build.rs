@@ -180,6 +180,13 @@ fn main() {
 
     if target.contains("-msvc") {
         cppcfg.flag("/EHsc");
+        cppcfg.flag("/std:c++17");
+        // Disable noisy warnings that are enabled by -Wall
+        cppcfg.flag("/wd4514"); // unreferenced inline function has been removed
+        cppcfg.flag("/wd5045"); // Spectre mitigation insertion (informational)
+        cppcfg.flag("/wd4820"); // padding added after data member
+        cppcfg.flag("/wd4244"); // conversion from T1 to T2, possible loss of data
+        cppcfg.flag("/wd4365"); // signed/unsigned mismatch
     }
 
     // OK, back to generic build rules.

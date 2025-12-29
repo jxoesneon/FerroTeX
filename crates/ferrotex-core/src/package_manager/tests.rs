@@ -9,7 +9,7 @@ struct MockBackend {
 }
 
 impl PackageBackend for MockBackend {
-    fn install(&self, package: &str) -> Result<InstallStatus> {
+    fn install(&self, _package: &str) -> Result<InstallStatus> {
         match &self.install_result {
             Ok(status) => Ok(status.clone()),
             Err(_) => Err(anyhow::anyhow!("Mock error")),

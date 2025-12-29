@@ -24,7 +24,6 @@ regex = "1.10"
 uuid = { version = "1.6", features = ["v4"] }
 line-index = "0.1"
 dirs = "5.0"
-tectonic = { version = "0.15", default-features = false, features = ["external-harfbuzz"] }
 which = "4.4"
 once_cell = "1.18"
 lazy_static = "1.4"
@@ -34,6 +33,8 @@ async-trait = "0.1"
 ferrotex-syntax = { path = "../ferrotex-syntax" }
 ferrotex-log = { path = "../ferrotex-log" }
 ferrotex-core = { path = "../ferrotex-core" }
+
+tectonic = { version = "0.15", default-features = false, features = ["external-harfbuzz"] }
 
 [dev-dependencies]
 tempfile = "3.8"

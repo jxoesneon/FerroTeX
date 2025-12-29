@@ -3186,8 +3186,6 @@ dependencies = [
 [[package]]
 name = "tectonic_engine_xetex"
 version = "0.4.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ef3af8dcc2c125c210d8a9639fb5342af35d1e4d01119dc4b24a0fbfd1f2e86"
 dependencies = [
  "cc",
  "libc",
