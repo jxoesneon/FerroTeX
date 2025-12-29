@@ -119,7 +119,6 @@ Also:
   offline mode when building on docs.rs, which builds crates with network access
   turned off.
 
-[#788]: https://github.com/tectonic-typesetting/tectonic/issues/788
 # tectonic_engine_xetex 0.1.1 (2021-06-15)
 
 - Fix SyncTeX output (@hulloanson, @pkgw, #720, #744). We needed to include
