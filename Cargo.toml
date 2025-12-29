@@ -10,3 +10,4 @@ resolver = "2"
 
 [patch.crates-io]
 tectonic_xetex_layout = { path = "patches/tectonic_xetex_layout" }
+tectonic_engine_xetex = { path = "patches/tectonic_engine_xetex" }
