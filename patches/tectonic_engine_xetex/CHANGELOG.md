@@ -4,11 +4,9 @@
   @pkgw). This includes one of the gnarliest build hacks I've ever had to
   perpetrate, as documented in `xetex/xetex-engine-interface.c`.
 
-
 # tectonic_engine_xetex 0.4.3 (2023-06-12)
 
 - Address a C compiler warning (#1050, @pkgw).
-
 
 # tectonic_engine_xetex 0.4.2 (2023-05-18)
 
@@ -22,7 +20,6 @@
   hooks, and then there's no need for paragraph tagging support to be built into
   the engine here.
 
-
 # tectonic_engine_xetex 0.4.1 (2022-10-04)
 
 - When emitting in HTML mode, express paragraphs with `<div class="tdux-p">`
@@ -32,7 +29,6 @@
   recommends grouping semantic paragraphs with `<div>`s. You can't nest an
   `<ol>` inside a `<p>`, for instance, which does not align with TeX's view of
   things.
-
 
 # tectonic_engine_xetex 0.4.0 (2022-10-03)
 
@@ -48,7 +44,6 @@
   - Other upstream changes are not relevant to Tectonic.
 - Remove C's `time_t` from internal FFI APIs to avoid portability issues. This
   should avoid issues with Linux Musl builds.
-
 
 # tectonic_engine_xetex 0.3.0 (2022-04-26)
 
@@ -84,7 +79,6 @@ Also:
 
 - Allow `\openin` of `\openout` files to succeed (addresses #862, @pkgw).
 
-
 # tectonic_engine_xetex 0.2.0 (2022-02-28)
 
 - Use the new `tectonic_xetex_format` crate as part of the build process (#851,
@@ -101,7 +95,6 @@ Also:
 - Fix a long-standing test issue with PNG image dimensions occasionally leading
   to not-quite-reproducible output (#847, @pkgw)
 
-
 # tectonic_engine_xetex 0.1.4 (2021-07-04)
 
 - Avoid misplaced newlines in warning output ([#803], [@ralismark])
@@ -109,7 +102,6 @@ Also:
 
 [#803]: https://github.com/tectonic-typesetting/tectonic/pull/803
 [@ralismark]: https://github.com/ralismark
-
 
 # tectonic_engine_xetex 0.1.3 (2021-06-17)
 
@@ -120,7 +112,6 @@ Also:
 [cbindgen]: https://github.com/eqrion/cbindgen
 [#788]: https://github.com/tectonic-typesetting/tectonic/issues/788
 
-
 # tectonic_engine_xetex 0.1.2 (2021-06-17)
 
 - Attempt to fix crate builds on docs.rs — see [#788]. This works around an
@@ -129,9 +120,6 @@ Also:
   turned off.
 
 [#788]: https://github.com/tectonic-typesetting/tectonic/issues/788
-[cbindgen]: https://github.com/eqrion/cbindgen
-
-
 # tectonic_engine_xetex 0.1.1 (2021-06-15)
 
 - Fix SyncTeX output (@hulloanson, @pkgw, #720, #744). We needed to include
@@ -142,7 +130,6 @@ Also:
   (@pkgw, #714, #783). This requires a bump in the format file serial number. We
   believe that this fix includes a fix to an upstream XeTeX bug, which has been
   reported.
-
 
 # tectonic_engine_xetex 0.1.0 (2021-06-03)
 
