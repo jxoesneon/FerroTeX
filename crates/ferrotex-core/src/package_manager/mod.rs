@@ -51,9 +51,19 @@ pub struct MockCommandExecutor {
 #[cfg(test)]
 impl CommandExecutor for MockCommandExecutor {
     fn execute(&self, _program: &Path, _args: &[&str]) -> Result<std::process::Output> {
-         use std::os::unix::process::ExitStatusExt;
+         #[cfg(unix)]
+         let status = {
+             use std::os::unix::process::ExitStatusExt;
+             std::process::ExitStatus::from_raw(self.status_code << 8)
+         };
+         #[cfg(windows)]
+         let status = {
+             use std::os::windows::process::ExitStatusExt;
+             std::process::ExitStatus::from_raw(self.status_code as u32)
+         };
+
          Ok(std::process::Output {
-             status: std::process::ExitStatus::from_raw(self.status_code << 8), // 0 success, non-zero fail
+             status,
              stdout: self.stdout.as_bytes().to_vec(),
              stderr: self.stderr.as_bytes().to_vec(),
          })
