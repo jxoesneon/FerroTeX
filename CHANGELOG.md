@@ -6,6 +6,16 @@ The format is based on **Keep a Changelog**, and this project intends to follow 
 
 ## [Unreleased]
 
+## [0.19.0] - 2025-12-29
+
+### Added
+
+- **Windows Support**: Officially supported on Windows 10/11 (x64).
+  - Verified full E2E test suite passing on Windows CI.
+  - Fixed binary discovery logic to support `.exe` extension.
+  - Resolved `ferrotex-core` compilation issues on MSVC.
+  - Updated build pipeline to correctly link against system dependencies on Windows.
+
 ## [0.18.0] - 2025-12-22
 
 ### Added
