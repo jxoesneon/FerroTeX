@@ -17,5 +17,6 @@ ferrotex.vsix
 out/**
 *.log
 
-# Keep dist
+# Keep dist and images
 !dist/**
+!images/**
