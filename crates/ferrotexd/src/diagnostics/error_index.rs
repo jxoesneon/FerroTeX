@@ -215,3 +215,46 @@ pub fn suggest_package(command: &str) -> Option<String> {
         None
     }
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_explain_error() {
+        let msg = "Something Missing $ inserted in text";
+        let explanation = explain(msg).expect("Should find explanation");
+        assert_eq!(explanation.summary, "Missing math mode");
+    }
+
+    #[test]
+    fn test_explain_unknown() {
+        let msg = "Random error";
+        assert!(explain(msg).is_none());
+    }
+
+    #[test]
+    fn test_extract_undefined_command() {
+        let msg = "Undefined control sequence \\mycommand here";
+        let cmd = extract_undefined_command(msg);
+        assert_eq!(cmd.as_deref(), Some("\\mycommand"));
+    }
+
+    #[test]
+    fn test_extract_undefined_command_no_backslash() {
+        let msg = "Undefined control sequence mycommand here";
+        // Heuristic looks for backslash
+        assert_eq!(extract_undefined_command(msg), None);
+    }
+
+    #[test]
+    fn test_suggest_package() {
+        let suggestion = suggest_package("\\includegraphics");
+        assert!(suggestion.is_some());
+        assert!(suggestion.unwrap().contains("usepackage{graphicx}"));
+    }
+
+    #[test]
+    fn test_suggest_package_unknown() {
+        assert!(suggest_package("\\unknowncustomcmd").is_none());
+    }
+}

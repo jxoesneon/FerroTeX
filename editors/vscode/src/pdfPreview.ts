@@ -31,7 +31,14 @@ export class PdfPreviewProvider implements vscode.CustomReadonlyEditorProvider {
   ): Promise<void> {
     this.panels.set(document.uri.toString(), webviewPanel);
 
+    const watcher = vscode.workspace.createFileSystemWatcher(document.uri.fsPath);
+    watcher.onDidChange(() => {
+      // Reload the webview content when the PDF file is updated (e.g., after compilation)
+      webviewPanel.webview.html = this.getHtmlForWebview(webviewPanel.webview, document.uri);
+    });
+
     webviewPanel.onDidDispose(() => {
+      watcher.dispose();
       this.panels.delete(document.uri.toString());
     });
 

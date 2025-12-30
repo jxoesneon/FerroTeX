@@ -3,6 +3,10 @@ name = "ferrotexd"
 version = "0.19.2"
 edition = "2021"
 
+[features]
+default = ["build-tectonic"]
+build-tectonic = ["dep:tectonic"]
+
 [dependencies]
 tokio = { version = "1.0", features = ["full"] }
 tower-lsp = "0.20"
@@ -29,12 +33,13 @@ once_cell = "1.18"
 lazy_static = "1.4"
 rowan = "0.15"
 async-trait = "0.1"
+flate2 = "1.0"
 
 ferrotex-syntax = { path = "../ferrotex-syntax" }
 ferrotex-log = { path = "../ferrotex-log" }
 ferrotex-core = { path = "../ferrotex-core" }
 
-tectonic = { version = "0.15", default-features = false, features = ["external-harfbuzz"] }
+tectonic = { version = "0.15", optional = true }
 
 [dev-dependencies]
 tempfile = "3.8"

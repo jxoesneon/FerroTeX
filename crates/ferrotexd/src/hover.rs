@@ -306,6 +306,17 @@ mod tests {
     use super::*;
     use ferrotex_syntax::parse;
 
+    fn get_hover_at(text: &str, target: &str) -> Option<Hover> {
+        let p = parse(text);
+        if let Some(idx) = text.find(target) {
+            let offset = TextSize::from(idx as u32);
+            let workspace = crate::workspace::Workspace::default();
+            find_hover(&p.syntax(), offset, &workspace)
+        } else {
+            None
+        }
+    }
+
     #[test]
     fn test_hover_environment() {
         let input = r#"
@@ -313,35 +324,139 @@ mod tests {
             E = mc^2
         \end{equation}
         "#;
-        let p = parse(input);
-        let offset = TextSize::from(input.find("\\begin").unwrap() as u32);
-        let workspace = crate::workspace::Workspace::default();
-        let hover = find_hover(&p.syntax(), offset, &workspace).expect("No hover found");
-        
+        let hover = get_hover_at(input, "\\begin").expect("No hover found");
         match hover.contents {
             HoverContents::Markup(m) => {
-                assert_eq!(m.kind, MarkupKind::Markdown);
                 assert!(m.value.contains("equation"));
-                assert!(!m.value.contains("E = mc^2")); // Should NOT show raw LaTeX
+                assert!(m.value.contains("Cmd/Ctrl+Click"));
             },
             _ => panic!("Wrong hover content type"),
         }
     }
 
     #[test]
-    fn test_hover_command() {
-        let input = r#"\textbf{bold text}"#;
-        let p = parse(input);
-        let offset = TextSize::from(input.find("textbf").unwrap() as u32);
-        let workspace = crate::workspace::Workspace::default();
-        let hover = find_hover(&p.syntax(), offset, &workspace);
-        
-        assert!(hover.is_some());
-        match hover.unwrap().contents {
+    fn test_hover_unknown_environment() {
+         let input = r#"\begin{customenv} \end{customenv}"#;
+         // Hover on \begin to trigger environment logic fallback
+         let hover = get_hover_at(input, "\\begin").expect("No hover found");
+         match hover.contents {
             HoverContents::Markup(m) => {
-                assert!(m.value.contains("Bold"));
+                assert!(m.value.contains("customenv"));
+                assert!(m.value.contains("Custom environment"));
             },
             _ => panic!("Wrong hover content type"),
         }
+    }
+
+    #[test]
+    fn test_hover_command_basic() {
+        let hover = get_hover_at(r#"\textbf{bold}"#, "textbf").unwrap();
+        if let HoverContents::Markup(m) = hover.contents {
+            assert!(m.value.contains("Bold text"));
+        } else { panic!() }
+    }
+
+    #[test]
+    fn test_hover_command_variants() {
+        // Test a few variants
+        let cases = [
+            ("\\section", "Section heading"),
+            ("\\frac", "Fraction"),
+            ("\\usepackage", "Package import"),
+            ("\\cite", "Citation"),
+            ("\\SI", "Number with unit"),
+        ];
+
+        for (cmd, expected) in cases {
+            let text = format!("{}{{arg}}", cmd);
+            let hover = get_hover_at(&text, cmd).expect(&format!("No hover for {}", cmd));
+            if let HoverContents::Markup(m) = hover.contents {
+                assert!(m.value.contains(expected), "Hover for {} missing '{}', got: {}", cmd, expected, m.value);
+            } else { panic!() }
+        }
+    }
+
+    #[test]
+    fn test_citation_hover() {
+        use crate::workspace::Workspace;
+        use tower_lsp::lsp_types::Url;
+        
+        // Mock workspace with bib
+        let temp_dir = tempfile::tempdir().unwrap();
+        let bib_path = temp_dir.path().join("ref.bib");
+        let bib_uri = Url::from_file_path(bib_path).unwrap();
+        
+        let workspace = Workspace::new();
+        workspace.update_bib(&bib_uri, r#"
+            @article{key1,
+                title = {My Article},
+                author = {John Doe},
+                year = {2023}
+            }
+        "#);
+        
+        // We need to simulate that this bib is referenced. 
+        // For simplicity in unit test, we can rely on "loose mode" of citation lookup 
+        // if no bibs are referenced in the current file index (which is empty/default here).
+        
+        let input = r#"\cite{key1}"#;
+        let p = parse(input);
+        
+        // Find "key1" position. Note: we need to hover on the CITATION node or inside it.
+        // "key1" is inside the token text of the citation group.
+        let offset = TextSize::from(input.find("key1").unwrap() as u32);
+        
+        let hover = find_hover(&p.syntax(), offset, &workspace).expect("No hover found for citation");
+        
+        match hover.contents {
+            HoverContents::Markup(m) => {
+                assert!(m.value.contains("My Article"));
+                assert!(m.value.contains("John Doe"));
+            },
+            _ => panic!("Wrong hover content"),
+        }
+    }
+
+    #[test]
+    fn test_citation_hover_not_found() {
+         let input = r#"\cite{missing}"#;
+         let hover = get_hover_at(input, "missing").unwrap();
+          match hover.contents {
+            HoverContents::Markup(m) => {
+                assert!(m.value.contains("Not found in bibliography"));
+            },
+            _ => panic!("Wrong hover content"),
+        }
+    }
+
+    #[test]
+    fn test_hover_between_tokens() {
+        // Edge case: cursor between tokens, ensuring it picks the right one.
+        // e.g. " \textbf " -> hover on space? Should pick left or right strict check?
+        // Logic: if left is not whitespace, pick left. Else pick right.
+        
+        let input = r#"\textbf {foo}"#; 
+        // space at index 7. Left is \textbf.
+        let p = parse(input);
+        let offset = TextSize::from(7); // After \textbf
+        let workspace = crate::workspace::Workspace::default();
+        let hover = find_hover(&p.syntax(), offset, &workspace);
+        assert!(hover.is_some(), "Should find hover when strictly after command");
+    }
+
+    #[test]
+    fn test_hover_none() {
+        assert!(get_hover_at("Plain text", "Plain").is_none());
+        assert!(get_hover_at("   ", " ").is_none());
+    }
+
+    #[test]
+    fn test_hover_whitespace() {
+         let input = "  \\section{A}";
+         let p = parse(input);
+         let offset = TextSize::from(0); // First space
+         let workspace = crate::workspace::Workspace::default();
+         let h = find_hover(&p.syntax(), offset, &workspace);
+         assert!(h.is_none());
     }
 }

@@ -35,8 +35,10 @@ enum Commands {
 }
 
 fn main() -> anyhow::Result<()> {
-    let cli = Cli::parse();
+    run(Cli::parse())
+}
 
+fn run(cli: Cli) -> anyhow::Result<()> {
     match &cli.command {
         Commands::Parse { path } => {
             let content = fs::read_to_string(path)?;
@@ -49,6 +51,37 @@ fn main() -> anyhow::Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    #[test]
+    fn test_parse_command() -> anyhow::Result<()> {
+        let temp_dir = tempfile::tempdir()?;
+        let log_path = temp_dir.path().join("test.log");
+        let mut file = File::create(&log_path)?;
+        writeln!(file, "This is TeX, Version 3.1415926")?;
+        
+        let cli = Cli {
+            command: Commands::Parse { path: log_path },
+        };
+        
+        // We can't easily capture stdout here without more refactoring,
+        // but this ensures the code path runs and doesn't crash.
+        run(cli)?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_missing_file() {
+        let cli = Cli {
+            command: Commands::Parse { path: PathBuf::from("nonexistent.log") },
+        };
+        assert!(run(cli).is_err());
+    }
 }
 
 /// Watches a log file for changes and prints new events as JSON.
