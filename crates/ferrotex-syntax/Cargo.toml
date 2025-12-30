@@ -1,6 +1,6 @@
 ﻿[package]
 name = "ferrotex-syntax"
-version = "0.19.1"
+version = "0.19.2"
 edition = "2024"
 description = "Fault-tolerant LaTeX parser for FerroTeX"
 license = "Apache-2.0 OR MIT"
@@ -8,4 +8,5 @@ repository = "https://github.com/jxoesneon/FerroTeX"
 
 [dependencies]
 rowan = "0.15"
+
 
