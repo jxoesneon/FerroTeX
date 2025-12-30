@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "ferrotex",
   "displayName": "FerroTeX",
   "description": "High-performance LaTeX language support with IDE features, PDF preview, and intelligent diagnostics.",
@@ -464,4 +464,3 @@
     "vscode-languageclient": "^8.1.0"
   }
 }
-
