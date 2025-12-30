@@ -1,6 +1,6 @@
 ﻿[package]
 name = "ferrotexd"
-version = "0.19.1"
+version = "0.19.2"
 edition = "2021"
 
 [dependencies]
@@ -38,4 +38,5 @@ tectonic = { version = "0.15", default-features = false, features = ["external-h
 
 [dev-dependencies]
 tempfile = "3.8"
+
 

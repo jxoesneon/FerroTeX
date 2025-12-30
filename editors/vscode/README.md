@@ -1,6 +1,8 @@
 # FerroTeX
 
-![FerroTeX Hero](images/hero_banner.png)
+<p align="center">
+  <img src="https://github.com/jxoesneon/FerroTeX/raw/main/editors/vscode/images/hero_banner.png" alt="FerroTeX Hero Banner" width="100%">
+</p>
 
 > **"Stop fighting with your LaTeX editor. FerroTeX brings the intelligence of a modern IDE to your scientific writing."**
 
@@ -28,19 +30,19 @@ FerroTeX is strictly tested on **Windows**, ensuring a first-class experience fo
 
 Stop visualizing the package documentation in your head. FerroTeX scans your `\usepackage` graph to provide accurate completions for environments and commands.
 
-![Smart Completion](images/feature_completion.png)
+<img src="https://github.com/jxoesneon/FerroTeX/raw/main/editors/vscode/images/feature_completion.png" alt="Intelligent Autocompletion" width="100%">
 
 ### 2. Human-Readable Diagnostics
 
 FerroTeX translates cryptic TeX logs into plain English. We identify over 50 common error patterns and provide actionable fixes directly in your editor.
 
-![Diagnostics](images/feature_diagnostics.png)
+<img src="https://github.com/jxoesneon/FerroTeX/raw/main/editors/vscode/images/feature_diagnostics.png" alt="Real-time Diagnostics" width="100%">
 
 ### 3. Rich Hovers
 
 Inspect your bibliography without leaving the file. Hover over any `\cite` key to see the full title, author, and year.
 
-![Rich Hovers](images/feature_hover.png)
+<img src="https://github.com/jxoesneon/FerroTeX/raw/main/editors/vscode/images/feature_hover.png" alt="Rich Hover Documentation" width="100%">
 
 ### 4. Zero-Config Build
 
@@ -62,7 +64,7 @@ FerroTeX is uniquely designed to be **Zero Dependency**.
 
 Customize your experience via VS Code Settings:
 
-![Settings UI](images/feature_settings.png)
+<img src="https://github.com/jxoesneon/FerroTeX/raw/main/editors/vscode/images/feature_settings.png" alt="Comprehensive Settings" width="100%">
 
 | Setting                 | Default     | Description                             |
 | :---------------------- | :---------- | :-------------------------------------- |

@@ -6,6 +6,12 @@ The format is based on **Keep a Changelog**, and this project intends to follow 
 
 ## [Unreleased]
 
+## [0.19.2] - 2025-12-29
+
+### Documentation
+
+- **Fixed**: Marketplace images now use absolute GitHub URLs to resolve 404 errors on Open VSX.
+
 ## [0.19.1] - 2025-12-29
 
 ### Asset Refresh
