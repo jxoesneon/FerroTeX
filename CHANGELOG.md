@@ -6,6 +6,15 @@ The format is based on **Keep a Changelog**, and this project intends to follow 
 
 ## [Unreleased]
 
+## [0.19.1] - 2025-12-29
+
+### Asset Refresh
+
+- Updated marketplace assets:
+  - New `hero_banner.png` with modern branding.
+  - Refreshed feature screenshots (`completion`, `diagnostics`, `hover`, `settings`).
+  - Improved `icon.png` visibility.
+
 ## [0.19.0] - 2025-12-29
 
 ### Added
