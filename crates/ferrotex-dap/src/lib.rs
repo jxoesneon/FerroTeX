@@ -76,12 +76,15 @@ impl<A: DebugAdapter> DebugSession<A> {
     /// Starts the message loop, reading from stdin and writing to stdout.
     /// This is the entry point for the DAP server.
     pub fn run_loop(&mut self) -> Result<()> {
-        use std::io::{BufRead, BufReader, Read};
-        
         let stdin = std::io::stdin();
-        let mut reader = BufReader::new(stdin.lock());
         let mut stdout = std::io::stdout();
+        self.run_session(&mut stdin.lock(), &mut stdout)
+    }
 
+    /// Internal logic for the DAP session, allowing mocking of I/O.
+    pub fn run_session(&mut self, reader: &mut impl std::io::BufRead, stdout: &mut impl std::io::Write) -> Result<()> {
+        use std::io::Read;
+        
         loop {
             // 1. Read Headers (Content-Length)
             let mut content_length = 0;
@@ -91,7 +94,7 @@ impl<A: DebugAdapter> DebugSession<A> {
                     return Ok(()); // EOF
                 }
                 
-                // Trim windows endings
+                // Trim
                 let line = line.trim();
                 
                 if line.is_empty() {
@@ -99,14 +102,15 @@ impl<A: DebugAdapter> DebugSession<A> {
                     break;
                 }
                 
-                if line.starts_with("Content-Length: ")
-                    && let Ok(len) = line["Content-Length: ".len()..].parse::<usize>() {
-                    content_length = len;
+                if line.to_lowercase().starts_with("content-length: ") {
+                    if let Ok(len) = line["content-length: ".len()..].parse::<usize>() {
+                        content_length = len;
+                    }
                 }
             }
             
             if content_length == 0 {
-                continue; // Should probably error or wait
+                continue; 
             }
 
             // 2. Read Body
@@ -114,11 +118,12 @@ impl<A: DebugAdapter> DebugSession<A> {
             reader.read_exact(&mut buffer)?;
             
             let message_str = String::from_utf8_lossy(&buffer);
-            // log::debug!("Received: {}", message_str);
 
             // 3. Parse & Dispatch
-            if let Ok(ProtocolMessage::Request { seq, command, arguments }) = serde_json::from_str::<ProtocolMessage>(&message_str) {
-                self.handle_request(seq, &command, arguments, &mut stdout)?;
+            if let Ok(msg) = serde_json::from_str::<ProtocolMessage>(&message_str) {
+                if let ProtocolMessage::Request { seq, command, arguments } = msg {
+                    self.handle_request(seq, &command, arguments, stdout)?;
+                }
             }
         }
     }
@@ -306,62 +311,65 @@ impl<A: DebugAdapter> DebugSession<A> {
     }
 
 pub fn run_mock_session() -> Result<()> {
-    use crate::shim::{Shim, MockShim, EngineCommand};
-    use std::sync::mpsc::Sender;
-    
-    struct MockAdapter {
-        shim_tx: Option<Sender<EngineCommand>>,
+    let stdin = std::io::stdin();
+    let mut stdout = std::io::stdout();
+    run_mock_session_with_io(&mut stdin.lock(), &mut stdout)
+}
+
+struct MockAdapter {
+    shim_tx: Option<std::sync::mpsc::Sender<crate::shim::EngineCommand>>,
+}
+
+impl DebugAdapter for MockAdapter {
+    fn initialize(&mut self, _args: serde_json::Value) -> Result<serde_json::Value> {
+        Ok(serde_json::json!({
+            "supportsConfigurationDoneRequest": true,
+            "supportsFunctionBreakpoints": false,
+            "supportsConditionalBreakpoints": false,
+        }))
     }
 
-    impl DebugAdapter for MockAdapter {
-        fn initialize(&mut self, _args: serde_json::Value) -> Result<serde_json::Value> {
-            Ok(serde_json::json!({
-                "supportsConfigurationDoneRequest": true,
-                "supportsFunctionBreakpoints": false,
-                "supportsConditionalBreakpoints": false,
-            }))
-        }
-    
-        fn launch(&mut self, _args: serde_json::Value) -> Result<()> {
-            let shim = MockShim;
-            let (tx, _rx) = shim.spawn();
-            self.shim_tx = Some(tx);
-            // log::info!("Mock Shim Spawned!");
-            Ok(())
-        }
-    
-        fn continue_execution(&mut self) -> Result<()> { 
-            if let Some(tx) = &self.shim_tx {
-                tx.send(EngineCommand::Continue)?;
-            }
-            Ok(())
-        }
-    
-        fn next(&mut self) -> Result<()> { 
-            if let Some(tx) = &self.shim_tx {
-                tx.send(EngineCommand::Step)?;
-            }
-            Ok(())
-        }
-        
-        fn step_in(&mut self) -> Result<()> { Ok(()) }
-        fn scopes(&mut self, _args: serde_json::Value) -> Result<serde_json::Value> {
-             Ok(serde_json::json!({ "scopes": [ { "name": "Global", "variablesReference": 1, "expensive": false } ] }))
-        }
-        fn variables(&mut self, _args: serde_json::Value) -> Result<serde_json::Value> {
-             Ok(serde_json::json!({ "variables": [ { "name": "dummy", "value": "0", "variablesReference": 0 } ] }))
-        }
-        fn disconnect(&mut self) -> Result<()> { 
-             if let Some(tx) = &self.shim_tx {
-                let _ = tx.send(EngineCommand::Terminate);
-            }
-            Ok(()) 
-        }
+    fn launch(&mut self, _args: serde_json::Value) -> Result<()> {
+        use crate::shim::Shim;
+        let shim = crate::shim::MockShim;
+        let (tx, _rx) = shim.spawn();
+        self.shim_tx = Some(tx);
+        Ok(())
     }
 
+    fn continue_execution(&mut self) -> Result<()> { 
+        if let Some(tx) = &self.shim_tx {
+            tx.send(crate::shim::EngineCommand::Continue)?;
+        }
+        Ok(())
+    }
+
+    fn next(&mut self) -> Result<()> { 
+        if let Some(tx) = &self.shim_tx {
+            tx.send(crate::shim::EngineCommand::Step)?;
+        }
+        Ok(())
+    }
+    
+    fn step_in(&mut self) -> Result<()> { Ok(()) }
+    fn scopes(&mut self, _args: serde_json::Value) -> Result<serde_json::Value> {
+         Ok(serde_json::json!({ "scopes": [ { "name": "Global", "variablesReference": 1, "expensive": false } ] }))
+    }
+    fn variables(&mut self, _args: serde_json::Value) -> Result<serde_json::Value> {
+         Ok(serde_json::json!({ "variables": [ { "name": "dummy", "value": "0", "variablesReference": 0 } ] }))
+    }
+    fn disconnect(&mut self) -> Result<()> { 
+         if let Some(tx) = &self.shim_tx {
+            let _ = tx.send(crate::shim::EngineCommand::Terminate);
+        }
+        Ok(()) 
+    }
+}
+
+pub fn run_mock_session_with_io(reader: &mut impl std::io::BufRead, writer: &mut impl std::io::Write) -> Result<()> {
     let adapter = MockAdapter { shim_tx: None };
     let mut session = DebugSession::new(adapter);
-    session.run_loop()?;
+    session.run_session(reader, writer)?;
     Ok(())
 }
 
@@ -371,4 +379,129 @@ pub fn run_tectonic_session() -> Result<()> {
     let mut session = DebugSession::new(adapter);
     session.run_loop()?;
     Ok(())
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_protocol_message_serialization() {
+        let msg = ProtocolMessage::Request {
+            seq: 1,
+            command: "initialize".to_string(),
+            arguments: Some(json!({"adapterID": "ferrotex"})),
+        };
+        let js = serde_json::to_string(&msg).unwrap();
+        assert!(js.contains("\"type\":\"request\""));
+        assert!(js.contains("\"command\":\"initialize\""));
+        
+        let back: ProtocolMessage = serde_json::from_str(&js).unwrap();
+        match back {
+            ProtocolMessage::Request { seq, .. } => assert_eq!(seq, 1),
+            _ => panic!("Wrong type"),
+        }
+    }
+
+    struct SimpleAdapter;
+    impl DebugAdapter for SimpleAdapter {
+        fn initialize(&mut self, _args: serde_json::Value) -> Result<serde_json::Value> { Ok(json!({"ok": true})) }
+        fn launch(&mut self, _args: serde_json::Value) -> Result<()> { Ok(()) }
+        fn continue_execution(&mut self) -> Result<()> { Ok(()) }
+        fn next(&mut self) -> Result<()> { Ok(()) }
+        fn step_in(&mut self) -> Result<()> { Ok(()) }
+        fn scopes(&mut self, _args: serde_json::Value) -> Result<serde_json::Value> { Ok(json!({})) }
+        fn variables(&mut self, _args: serde_json::Value) -> Result<serde_json::Value> { Ok(json!({})) }
+        fn disconnect(&mut self) -> Result<()> { Ok(()) }
+    }
+
+    #[test]
+    fn test_session_handle_request() {
+        let mut session = DebugSession::new(SimpleAdapter);
+        let mut stdout = Vec::new();
+        
+        session.handle_request(1, "initialize", None, &mut stdout).unwrap();
+        
+        let out_str = String::from_utf8(stdout).unwrap();
+        assert!(out_str.contains("Content-Length:"));
+        assert!(out_str.contains("\"success\":true"));
+        assert!(out_str.contains("\"ok\":true"));
+    }
+
+    #[test]
+    fn test_session_run_loop_mock() {
+        let mut session = DebugSession::new(SimpleAdapter);
+        let body = json!({"type":"request","seq":1,"command":"next"}).to_string();
+        let input_data = format!("Content-Length: {}\r\n\r\n{}", body.len(), body);
+        let mut reader = std::io::Cursor::new(input_data);
+        let mut stdout = Vec::new();
+        
+        session.run_session(&mut reader, &mut stdout).unwrap();
+        
+        let out_str = String::from_utf8(stdout).unwrap();
+        assert!(out_str.contains("\"command\":\"next\""));
+        assert!(out_str.contains("\"success\":true"));
+    }
+
+    #[test]
+    fn test_adapter_error() {
+        struct FailingAdapter;
+        impl DebugAdapter for FailingAdapter {
+            fn initialize(&mut self, _args: serde_json::Value) -> Result<serde_json::Value> { Err(anyhow::anyhow!("fail")) }
+            fn launch(&mut self, _args: serde_json::Value) -> Result<()> { Ok(()) }
+            fn continue_execution(&mut self) -> Result<()> { Ok(()) }
+            fn next(&mut self) -> Result<()> { Ok(()) }
+            fn step_in(&mut self) -> Result<()> { Ok(()) }
+            fn scopes(&mut self, _args: serde_json::Value) -> Result<serde_json::Value> { Ok(json!({})) }
+            fn variables(&mut self, _args: serde_json::Value) -> Result<serde_json::Value> { Ok(json!({})) }
+            fn disconnect(&mut self) -> Result<()> { Ok(()) }
+        }
+
+        let mut session = DebugSession::new(FailingAdapter);
+        let mut stdout = Vec::new();
+        session.handle_request(1, "initialize", None, &mut stdout).unwrap();
+        let out_str = String::from_utf8(stdout).unwrap();
+        assert!(out_str.contains("\"success\":false"));
+        assert!(out_str.contains("\"message\":\"fail\""));
+    }
+
+    #[test]
+    fn test_run_mock_session_with_io() {
+        let commands = vec![
+            json!({"type":"request","seq":1,"command":"initialize","arguments":{"adapterID":"test"}}),
+            json!({"type":"request","seq":2,"command":"launch","arguments":{"program":"test"}}),
+            json!({"type":"request","seq":3,"command":"continue"}),
+            json!({"type":"request","seq":4,"command":"next"}),
+            json!({"type":"request","seq":5,"command":"stepIn"}),
+            json!({"type":"request","seq":6,"command":"scopes","arguments":{"frameId":1}}),
+            json!({"type":"request","seq":7,"command":"variables","arguments":{"variablesReference":1}}),
+            json!({"type":"request","seq":8,"command":"disconnect"}),
+        ];
+        
+        let mut input_data = String::new();
+        for cmd in commands {
+            let body = cmd.to_string();
+            input_data.push_str(&format!("Content-Length: {}\r\n\r\n{}", body.len(), body));
+        }
+        
+        let mut reader = std::io::Cursor::new(input_data);
+        let mut stdout = Vec::new();
+        
+        run_mock_session_with_io(&mut reader, &mut stdout).unwrap();
+        
+        let out_str = String::from_utf8(stdout).unwrap();
+        assert!(out_str.contains("\"command\":\"initialize\""));
+        assert!(out_str.contains("\"command\":\"launch\""));
+        assert!(out_str.contains("\"command\":\"continue\""));
+        assert!(out_str.contains("\"command\":\"next\""));
+        assert!(out_str.contains("\"command\":\"disconnect\""));
+    }
+
+    #[test]
+    fn test_session_eof() {
+        let mut session = DebugSession::new(SimpleAdapter);
+        let mut reader = std::io::Cursor::new("");
+        let mut stdout = Vec::new();
+        assert!(session.run_session(&mut reader, &mut stdout).is_ok());
+    }
 }

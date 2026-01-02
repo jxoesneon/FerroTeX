@@ -161,3 +161,97 @@ impl BuildGraph {
         Ok(())
     }
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    #[test]
+    fn test_lockfile_roundtrip() {
+        let mut lock = Lockfile::new();
+        lock.entries.insert("file.tex".to_string(), "hash123".to_string());
+        
+        let temp_file = std::env::current_dir().unwrap().join("target").join("test_lock.json");
+        std::fs::create_dir_all(temp_file.parent().unwrap()).unwrap();
+        
+        lock.save(&temp_file).unwrap();
+        let loaded = Lockfile::load(&temp_file).unwrap();
+        
+        assert_eq!(loaded.entries.get("file.tex").unwrap(), "hash123");
+        let _ = std::fs::remove_file(temp_file);
+    }
+
+    struct MockArtifact(ArtifactId);
+    impl Artifact for MockArtifact {
+        fn id(&self) -> ArtifactId { self.0.clone() }
+        fn fingerprint(&self) -> String { "const".to_string() }
+        fn path(&self) -> Option<PathBuf> { None }
+    }
+
+    struct MockTransform {
+        inputs: HashSet<ArtifactId>,
+        outputs: HashSet<ArtifactId>,
+    }
+    impl Transform for MockTransform {
+        fn description(&self) -> String { "mock".to_string() }
+        fn inputs(&self) -> HashSet<ArtifactId> { self.inputs.clone() }
+        fn outputs(&self) -> HashSet<ArtifactId> { self.outputs.clone() }
+        fn execute(&self) -> Result<(), String> { Ok(()) }
+    }
+
+    #[test]
+    fn test_build_graph_validation() {
+        let mut graph = BuildGraph::new();
+        let a1 = ArtifactId("a1".to_string());
+        let a2 = ArtifactId("a2".to_string());
+        
+        graph.add_artifact(Box::new(MockArtifact(a1.clone())));
+        graph.add_artifact(Box::new(MockArtifact(a2.clone())));
+        
+        let mut inputs = HashSet::new();
+        inputs.insert(a1.clone());
+        let mut outputs = HashSet::new();
+        outputs.insert(a2.clone());
+        
+        graph.add_transform(Box::new(MockTransform { inputs, outputs }));
+        
+        assert!(graph.validate().is_ok());
+    }
+
+    #[test]
+    fn test_build_graph_cycle() {
+        let mut graph = BuildGraph::new();
+        let a1 = ArtifactId("a1".to_string());
+        
+        let mut inputs = HashSet::new();
+        inputs.insert(a1.clone());
+        let mut outputs = HashSet::new();
+        outputs.insert(a1.clone());
+        
+        graph.add_transform(Box::new(MockTransform { inputs, outputs }));
+        
+        assert!(graph.validate().is_err()); // Self-cycle
+    }
+
+    #[test]
+    fn test_build_graph_complex_cycle() {
+        let mut graph = BuildGraph::new();
+        let a1 = ArtifactId("a1".to_string());
+        let a2 = ArtifactId("a2".to_string());
+
+        graph.add_artifact(Box::new(MockArtifact(a1.clone())));
+        graph.add_artifact(Box::new(MockArtifact(a2.clone())));
+        
+        // T1: a1 -> a2
+        let mut i1 = HashSet::new(); i1.insert(a1.clone());
+        let mut o1 = HashSet::new(); o1.insert(a2.clone());
+        graph.add_transform(Box::new(MockTransform { inputs: i1, outputs: o1 }));
+        
+        // T2: a2 -> a1
+        let mut i2 = HashSet::new(); i2.insert(a2.clone());
+        let mut o2 = HashSet::new(); o2.insert(a1.clone());
+        graph.add_transform(Box::new(MockTransform { inputs: i2, outputs: o2 }));
+        
+        assert!(graph.validate().is_err()); // Multi-step cycle
+    }
+}

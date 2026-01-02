@@ -80,6 +80,26 @@ impl<'a> Parser<'a> {
         self.errors.push(SyntaxError { message, range });
     }
 
+    /// Peeks ahead to extract the text content of the next group (e.g., `{name}`)
+    /// without consuming tokens. Returns empty string if not a group.
+    fn get_group_text_peek(&mut self) -> String {
+        let mut lexer_clone = self.lexer.clone();
+        // Skip the current command token (e.g., \begin)
+        lexer_clone.next();
+        if let Some((SyntaxKind::LBrace, _)) = lexer_clone.next() {
+            let mut text = String::new();
+            while let Some((kind, content)) = lexer_clone.next() {
+                match kind {
+                    SyntaxKind::RBrace | SyntaxKind::Eof => break,
+                    _ => text.push_str(content),
+                }
+            }
+            text
+        } else {
+            String::new()
+        }
+    }
+
     fn parse_element(&mut self) {
         match self.peek() {
             SyntaxKind::Command => self.parse_command_or_environment(),
@@ -261,6 +281,7 @@ impl<'a> Parser<'a> {
 
     fn parse_environment(&mut self) {
         self.builder.start_node(SyntaxKind::Environment.into());
+        let begin_name = self.get_group_text_peek();
         self.bump(); // Consume \begin
 
         // Expect {name}
@@ -280,6 +301,14 @@ impl<'a> Parser<'a> {
                 SyntaxKind::Command => {
                     if let Some((_, text)) = self.lexer.peek() {
                         if *text == "\\end" {
+                            let end_name = self.get_group_text_peek();
+                            if !begin_name.is_empty() && !end_name.is_empty() && begin_name != end_name {
+                                self.error(format!(
+                                    "Mismatched environment: began with '{}', but ended with '{}'",
+                                    begin_name, end_name
+                                ));
+                            }
+
                             self.bump(); // Consume \end
                             if self.peek() == SyntaxKind::LBrace {
                                 self.parse_group(); // The argument of end
@@ -300,7 +329,6 @@ impl<'a> Parser<'a> {
                 SyntaxKind::RBrace => {
                     self.error("Unmatched '}' inside environment".into());
                     self.builder.start_node(SyntaxKind::Error.into());
-                    // Removed the extra self.builder.finish_node(); here
                 }
                 _ => self.bump(), // Consume other tokens
             }
@@ -488,5 +516,31 @@ mod tests {
         assert_eq!(children.len(), 2);
         assert_eq!(children[0].kind(), SyntaxKind::Bibliography);
         assert_eq!(children[1].kind(), SyntaxKind::Bibliography);
+    }
+
+    #[test]
+    fn test_parser_complex_nesting() {
+        let input = r"\begin{quote} { Text \begin{center} center \end{center} } \end{quote}";
+        let result = parse(input);
+        assert!(result.errors.is_empty(), "Should parse nested structures without errors: {:?}", result.errors);
+    }
+
+    #[test]
+    fn test_parser_unclosed_group_recovery() {
+        let input = r"{ \section{No close} ";
+        let result = parse(input);
+        assert!(!result.errors.is_empty());
+        // Verify we still have the section
+        let node = result.syntax();
+        assert!(node.children().any(|c| c.kind() == SyntaxKind::Group));
+    }
+
+    #[test]
+    fn test_parser_mismatched_environment() {
+        let input = r"\begin{itemize} \item A \end{enumerate}";
+        let result = parse(input);
+        // This should probably be an error, although some parsers might just close the current env.
+        // Let's see what our current implementation does.
+        assert!(!result.errors.is_empty());
     }
 }

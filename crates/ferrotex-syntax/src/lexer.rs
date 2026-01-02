@@ -53,6 +53,7 @@ use crate::SyntaxKind;
 /// let (kind, text) = lexer.next().unwrap();
 /// assert_eq!(text, "Émilie"); // Correctly handles é
 /// ```
+#[derive(Clone)]
 pub struct Lexer<'a> {
     /// The input source text being lexed.
     input: &'a str,
@@ -279,5 +280,64 @@ mod tests {
         let input = "% comment\rnext";
         let tokens = tokenize(input);
         assert_eq!(tokens[0], (SyntaxKind::Comment, "% comment"));
+    }
+
+    #[test]
+    fn test_lexer_all_special_chars() {
+        let input = r"\{ \} \[ \] \$ \%";
+        let tokens = tokenize(input);
+        // These are all commands because they start with \
+        for (kind, text) in tokens {
+            if kind != SyntaxKind::Whitespace {
+                assert_eq!(kind, SyntaxKind::Command);
+                assert!(text.starts_with('\\'));
+            }
+        }
+        
+        // Literal ones
+        let input2 = "{ } [ ] $ %";
+        let tokens2 = tokenize(input2);
+        let kinds: Vec<_> = tokens2.into_iter().map(|(k, _)| k).filter(|k| *k != SyntaxKind::Whitespace).collect();
+        assert_eq!(kinds, vec![
+            SyntaxKind::LBrace, SyntaxKind::RBrace,
+            SyntaxKind::LBracket, SyntaxKind::RBracket,
+            SyntaxKind::Dollar, SyntaxKind::Comment
+        ]);
+    }
+
+    #[test]
+    fn test_single_symbol_commands() {
+        let input = r"\_ \# \@";
+        let tokens = tokenize(input);
+        assert_eq!(tokens[0].0, SyntaxKind::Command);
+        assert_eq!(tokens[0].1, r"\_");
+    }
+
+    #[test]
+    fn test_lexer_complex_commands() {
+        let input = r"\newcommand{\foo}[2]{#1 #2}";
+        let tokens = tokenize(input);
+        assert!(tokens.iter().any(|(k, v)| *k == SyntaxKind::Command && *v == "\\newcommand"));
+        assert!(tokens.iter().any(|(k, v)| *k == SyntaxKind::Command && *v == "\\foo"));
+    }
+
+    #[test]
+    fn test_lexer_bibtex_patterns() {
+        let input = r#"author = {López and Müller}, key = "v""#;
+        let tokens = tokenize(input);
+        // Lexer just tokens, parser will handle the rest
+        assert!(tokens.iter().any(|(_, v)| *v == "López"));
+        assert!(tokens.iter().any(|(_, v)| *v == "Müller"));
+    }
+
+    #[test]
+    fn test_lexer_unusual_whitespace() {
+        let input = "a\u{00A0}b"; // non-breaking space
+        let tokens = tokenize(input);
+        // NBSP is considered whitespace in Rust's char::is_whitespace
+        assert_eq!(tokens.len(), 3);
+        assert_eq!(tokens[0], (SyntaxKind::Text, "a"));
+        assert_eq!(tokens[1], (SyntaxKind::Whitespace, "\u{00A0}"));
+        assert_eq!(tokens[2], (SyntaxKind::Text, "b"));
     }
 }

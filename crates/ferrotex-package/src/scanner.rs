@@ -128,4 +128,50 @@ mod tests {
         assert!(metadata.environments.contains(&"myenv".to_string()));
         assert!(metadata.environments.contains(&"starenv*".to_string()));
     }
+
+    #[test]
+    fn test_find_tex_root_heuristic() {
+        // This might return None on CI, but we test the logic doesn't crash
+        let _root = PackageScanner::find_tex_root();
+    }
+
+    #[test]
+    fn test_scan_empty() {
+        let mut scanner = PackageScanner::new();
+        scanner.tex_root = Some(PathBuf::from("/non/existent/path"));
+        let index = scanner.scan();
+        assert!(index.packages.is_empty());
+    }
+
+    #[test]
+    fn test_scan_with_files() {
+        let temp_dir = std::env::current_dir().unwrap().join("target").join("test_texmf_2");
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        let sty_file = temp_dir.join("testpkg.sty");
+        std::fs::write(&sty_file, r"\newcommand{\testcmd}{text}").unwrap();
+
+        let mut scanner = PackageScanner::new();
+        scanner.tex_root = Some(temp_dir.clone());
+        let index = scanner.scan();
+        
+        assert!(index.get("testpkg").is_some());
+        assert!(index.get("testpkg").unwrap().commands.contains(&"testcmd".to_string()));
+
+        // Cleanup
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_scanner_default() {
+        let scanner = PackageScanner::default();
+        let _ = scanner.scan();
+    }
+
+    #[test]
+    fn test_scan_no_root() {
+        let mut scanner = PackageScanner::new();
+        scanner.tex_root = None;
+        let index = scanner.scan();
+        assert!(index.packages.is_empty());
+    }
 }

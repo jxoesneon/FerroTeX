@@ -347,3 +347,56 @@ impl Shim for TectonicShim {
         (cmd_tx, event_rx)
     }
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_mock_shim_basic() {
+        let shim = MockShim;
+        let (tx, rx) = shim.spawn();
+        
+        tx.send(EngineCommand::Step).unwrap();
+        let event1 = rx.recv().unwrap();
+        match event1 {
+            EngineEvent::Output(s) => assert!(s.contains("Step 0")),
+            _ => panic!("Expected output event"),
+        }
+        
+        let event2 = rx.recv().unwrap();
+        match event2 {
+            EngineEvent::Stopped { reason, .. } => assert_eq!(reason, "step"),
+            _ => panic!("Expected stopped event"),
+        }
+    }
+        
+    #[test]
+    fn test_mock_shim_continue_terminate() {
+        let shim = MockShim;
+        let (tx, rx) = shim.spawn();
+        
+        for i in 0..=5 {
+            tx.send(EngineCommand::Continue).unwrap();
+            let event = rx.recv().unwrap();
+            match event {
+                EngineEvent::Output(s) => assert!(s.contains(&format!("Processing chunk {}", i))),
+                _ => panic!("Expected output event at step {}", i),
+            }
+        }
+        
+        let event = rx.recv().unwrap();
+        match event {
+            EngineEvent::Terminated => (),
+            _ => panic!("Expected terminated event"),
+        }
+    }
+        
+    #[test]
+    fn test_mock_shim_terminate() {
+        let shim = MockShim;
+        let (tx, _rx) = shim.spawn();
+        tx.send(EngineCommand::Terminate).unwrap();
+        // The thread should exit immediately
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+}

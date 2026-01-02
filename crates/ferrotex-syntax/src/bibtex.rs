@@ -195,12 +195,20 @@ fn read_value(chars: &mut Peekable<CharIndices>) -> Option<String> {
     if c == '"' {
         chars.next(); // consume "
         // Read until "
-        // Handle escaped quotes? Simplified: no escapes for now or simplistic.
         let mut val = String::new();
         while let Some(&(_, ch)) = chars.peek() {
             if ch == '"' {
                 chars.next();
                 break;
+            }
+            if ch == '\\' {
+                chars.next(); // consume backslash
+                val.push('\\');
+                if let Some(&(_, escaped)) = chars.peek() {
+                     val.push(escaped);
+                     chars.next(); 
+                }
+                continue;
             }
             val.push(ch);
             chars.next();
@@ -383,5 +391,32 @@ mod tests {
         let input = r#"@misc{k, title = {{Double {Nested}}}}"#;
         let entries = parse_bibtex(input);
         assert_eq!(entries.entries[0].fields.get("title"), Some(&"{Double {Nested}}".to_string()));
+    }
+
+    #[test]
+    fn test_bib_multiline_field() {
+        let input = r#"@misc{k, 
+        title = {Line1
+        Line2}
+        }"#;
+        let entries = parse_bibtex(input);
+        // Our parser likely preserves newlines in brace-delimited strings
+        let val = entries.entries[0].fields.get("title").unwrap();
+        assert!(val.contains("Line1"));
+        assert!(val.contains("Line2"));
+    }
+
+    #[test]
+    fn test_bib_escaped_chars() {
+        let input = r#"@misc{k, title = "O\"Hare"}"#;
+        // The parser might treat \" as two chars \ and " or as an escaped quote.
+        // Standard BibTeX often just treats it as text inside curlies, but quotes need care.
+        // Let's see what happens.
+        let entries = parse_bibtex(input);
+        // If it parses correctly, we get the entry.
+        assert_eq!(entries.entries.len(), 1);
+        let val = entries.entries[0].fields.get("title").unwrap();
+        // If our parser handles escaped quotes in quoted strings:
+        assert!(val.contains("O\\\"Hare") || val.contains("O\"Hare"), "Value was: {}", val);
     }
 }
