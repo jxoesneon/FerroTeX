@@ -32,6 +32,23 @@ enum Commands {
         #[arg(value_name = "FILE")]
         path: PathBuf,
     },
+    /// Start the Debug Adapter Protocol (DAP) server.
+    Debug,
+    /// Build a TeX document using pdflatex.
+    Build {
+        /// Path to the .tex file to compile.
+        #[arg(value_name = "FILE")]
+        path: PathBuf,
+        /// Output directory (defaults to current directory).
+        #[arg(short, long, default_value = ".")]
+        output_dir: PathBuf,
+    },
+    /// Verify the current source files against ferrotex.lock.
+    Verify {
+        /// Path to the .lock file.
+        #[arg(value_name = "LOCKFILE", default_value = "ferrotex.lock")]
+        path: PathBuf,
+    },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -47,7 +64,93 @@ fn main() -> anyhow::Result<()> {
         Commands::Watch { path } => {
             watch_log(path)?;
         }
+        Commands::Debug => {
+            #[cfg(feature = "tectonic-engine")]
+            {
+                ferrotex_dap::run_tectonic_session()?;
+            }
+            #[cfg(not(feature = "tectonic-engine"))]
+            {
+                ferrotex_dap::run_mock_session()?;
+            }
+        }
+        Commands::Build { path, output_dir } => {
+            build_tex(path, output_dir)?;
+        }
+        Commands::Verify { path } => {
+            verify_lock(path)?;
+        }
     }
+    Ok(())
+}
+
+fn build_tex(tex_path: &Path, output_dir: &Path) -> anyhow::Result<()> {
+    use ferrotex_build::{ArtifactId, PdfLatexTransform, Transform};
+
+    let input_id = ArtifactId(tex_path.to_string_lossy().to_string());
+    let output_id = ArtifactId(
+        tex_path
+            .with_extension("pdf")
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .to_string(),
+    );
+
+    let transform = PdfLatexTransform::new(
+        input_id,
+        output_id,
+        tex_path.to_path_buf(),
+        output_dir.to_path_buf(),
+    );
+
+    println!("Running: {}", transform.description());
+    match transform.execute() {
+        Ok(()) => println!("Build successful!"),
+        Err(e) => eprintln!("Build failed: {}", e),
+    }
+
+    Ok(())
+}
+
+fn verify_lock(lock_path: &Path) -> anyhow::Result<()> {
+    use ferrotex_build::Lockfile;
+    use sha2::{Sha256, Digest};
+
+    let lockfile = Lockfile::load(lock_path)?;
+    println!("🔍 Verifying build against lockfile: {}", lock_path.display());
+
+    let mut all_match = true;
+    for (path_str, expected_hash) in &lockfile.entries {
+        let path = Path::new(path_str);
+        if !path.exists() {
+            println!("❌ Missing file: {}", path_str);
+            all_match = false;
+            continue;
+        }
+
+        let data = fs::read(path)?;
+        let mut hasher = Sha256::new();
+        hasher.update(&data);
+        let actual_hash = hex::encode(hasher.finalize());
+
+        if actual_hash == *expected_hash {
+            println!("✅ OK: {}", path_str);
+        } else {
+            println!("❌ MISMATCH: {}", path_str);
+            println!("   Expected: {}", expected_hash);
+            println!("   Actual:   {}", actual_hash);
+            all_match = false;
+        }
+    }
+
+    if all_match {
+        println!("\n✨ Build is verified and reproducible!");
+    } else {
+        println!("\n⚠️ Build integrity verification failed!");
+        std::process::exit(1);
+    }
+
     Ok(())
 }
 

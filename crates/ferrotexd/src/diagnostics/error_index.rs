@@ -204,14 +204,12 @@ pub fn extract_undefined_command(message: &str) -> Option<String> {
 
 /// Provides a helpful suggestion for an undefined command
 pub fn suggest_package(command: &str) -> Option<String> {
-    if let Some(info) = COMMAND_PACKAGES.get(command) {
-        Some(format!(
+    COMMAND_PACKAGES.get(command).map(|info| {
+        format!(
             "💡 Add `\\usepackage{{{}}}` to use `{}` ({})",
             info.package,
             command,
             info.description
-        ))
-    } else {
-        None
-    }
+        )
+    })
 }

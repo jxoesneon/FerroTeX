@@ -1,0 +1,33 @@
+Latexmk: This is Latexmk, John Collins, 17 Nov 2021.
+Latexmk: applying rule 'pdflatex'...
+Rule 'pdflatex': The following rules & subrules became out-of-date:
+      'pdflatex'
+------------
+Run number 1 of rule 'pdflatex'
+------------
+------------
+Running 'pdflatex  -synctex=1 -interaction=nonstopmode -file-line-error -recorder  "main.tex"'
+------------
+This is pdfTeX, Version 3.14159265-2.6-1.40.21 (TeX Live 2020) (preloaded format=pdflatex)
+ restricted \write18 enabled.
+entering extended mode
+(./main.tex
+LaTeX2e <2020-10-01> patch level 2
+L3 programming layer <2020-10-27> xparse <2020-03-03>
+(/usr/local/texlive/2020/texmf-dist/tex/latex/base/article.cls
+Document Class: article 2020/04/10 v1.4m Standard LaTeX document class
+(/usr/local/texlive/2020/texmf-dist/tex/latex/base/size10.clo))
+Latexmk: (Info) Some random tool output with parentheses
+(./setup.tex
+Package: geometry 2020/01/02 v5.9 Page geometry
+)
+! Undefined control sequence.
+l.10 \foobar
+            
+(./chapter1.tex [1] [2])
+(./chapter2.tex
+LaTeX Warning: Reference `sec:oops' on page 3 undefined on input line 5.
+) [3] (./main.aux) )
+Output written on main.pdf (3 pages, 12345 bytes).
+Transcript written on main.log.
+Latexmk: Log file says output to 'main.pdf'

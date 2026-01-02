@@ -1,15 +1,23 @@
-﻿[package]
+[package]
 name = "ferrotex-cli"
-version = "0.19.2"
-edition = "2024"
+version = "0.20.0"
+edition = "2021"
 description = "CLI for FerroTeX tools"
 license = "Apache-2.0 OR MIT"
 
+[features]
+default = []
+tectonic-engine = ["ferrotex-dap/tectonic-engine"]
+
 [dependencies]
-ferrotex-log = { path = "../ferrotex-log", version = "0.19.2" }
+ferrotex-log = { path = "../ferrotex-log", version = "0.20.0" }
 clap = { version = "4.5", features = ["derive"] }
 anyhow = "1.0"
 serde_json = "1.0"
 notify = "6.1"
+ferrotex-dap = { path = "../ferrotex-dap", version = "0.20.0" }
+ferrotex-build = { path = "../ferrotex-build", version = "0.20.0" }
+sha2 = "0.10"
+hex = "0.4"
 
 

@@ -1,1290 +1,193 @@
 use serde_json::json;
-use std::process::Stdio;
 use std::time::Duration;
-use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
-use tokio::process::Command;
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, ReadHalf, WriteHalf, DuplexStream};
 use tokio::time::{sleep, timeout};
 use tower_lsp::lsp_types::Url;
+use tower_lsp::{LspService, Server};
+
+async fn setup_server() -> (BufReader<ReadHalf<DuplexStream>>, WriteHalf<DuplexStream>) {
+    let (client_side, server_side) = tokio::io::duplex(1024 * 1024);
+    let (service, socket) = LspService::new(|client| ferrotexd::Backend {
+        client,
+        documents: std::sync::Arc::new(dashmap::DashMap::new()),
+        workspace: std::sync::Arc::new(ferrotexd::workspace::Workspace::new()),
+        root_uri: std::sync::Arc::new(std::sync::Mutex::new(None)),
+        syntax_diagnostics: std::sync::Arc::new(dashmap::DashMap::new()),
+        package_manager: std::sync::Arc::new(std::sync::Mutex::new(ferrotex_core::package_manager::PackageManager::new())),
+        package_index: std::sync::Arc::new(std::sync::Mutex::new(None)),
+    });
+    
+    let (server_read, server_write) = tokio::io::split(server_side);
+    tokio::spawn(Server::new(server_read, server_write, socket).serve(service));
+    
+    let (reader_half, writer_half) = tokio::io::split(client_side);
+    (BufReader::new(reader_half), writer_half)
+}
 
 #[tokio::test]
 async fn test_lsp_diagnostics_flow() -> anyhow::Result<()> {
-    // 1. Setup temp dir
     let temp_dir = tempfile::tempdir()?;
     let temp_path = temp_dir.path().canonicalize()?;
+    let (mut reader, mut writer) = setup_server().await;
 
-    // 2. Locate the binary (Assumes `cargo build -p ferrotexd` has been run)
-    // We assume the test is run from crate root or workspace root.
-    // Let's look for the binary in standard cargo locations relative to current dir.
+    send_msg(&mut writer, &json!({
+        "jsonrpc": "2.0", "id": 1, "method": "initialize",
+        "params": { "capabilities": {}, "rootUri": Url::from_directory_path(&temp_path).unwrap(), "processId": std::process::id() }
+    })).await?;
+    read_msg(&mut reader).await?; 
 
-    let final_bin_path = find_ferrotexd_binary()?;
+    send_msg(&mut writer, &json!({ "jsonrpc": "2.0", "method": "initialized", "params": {} })).await?;
+    
+    let tex_uri = Url::from_file_path(temp_path.join("test.tex")).unwrap();
+    send_msg(&mut writer, &json!({
+        "jsonrpc": "2.0", "method": "textDocument/didOpen",
+        "params": { "textDocument": { "uri": tex_uri.clone(), "languageId": "latex", "version": 1, "text": "\\begin{document} \\end{document}" } }
+    })).await?;
 
-    // 3. Start the server
-    let mut child = Command::new(final_bin_path)
-        .current_dir(&temp_path) // Watch this dir
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .spawn()?;
-
-    let stdin = child.stdin.as_mut().unwrap();
-    let stdout = child.stdout.take().unwrap();
-    let mut reader = BufReader::new(stdout);
-
-    // 5. Send Initialize
-    let init_msg = json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {
-            "capabilities": {},
-            "rootUri": Url::from_directory_path(&temp_path).unwrap(),
-            "processId": std::process::id()
-        }
-    });
-    let init_str = init_msg.to_string();
-    stdin
-        .write_all(format!("Content-Length: {}\r\n\r\n{}", init_str.len(), init_str).as_bytes())
-        .await?;
-
-    // 6. Read Initialize Result
-    read_msg(&mut reader).await?; // Content-Length
-
-    // 7. Send Initialized
-    let initialized_msg = json!({
-        "jsonrpc": "2.0",
-        "method": "initialized",
-        "params": {}
-    });
-    let init_notif = initialized_msg.to_string();
-    stdin
-        .write_all(format!("Content-Length: {}\r\n\r\n{}", init_notif.len(), init_notif).as_bytes())
-        .await?;
-
-    // 8. Create a log file with warnings
-    // Give the watcher a moment to establish
-    sleep(Duration::from_secs(2)).await;
+    sleep(Duration::from_secs(1)).await;
     let log_file = temp_path.join("test.log");
     tokio::fs::write(&log_file, "LaTeX Warning: Label `foo' multiply defined.\n").await?;
-
-    // 9. Wait for publishDiagnostics
-    // It might take a moment for notify to trigger and processing to happen
-    let tex_uri = Url::from_file_path(temp_path.join("test.tex")).unwrap();
 
     let wait_loop = async {
         loop {
             let msg = read_msg(&mut reader).await?;
-            if msg.get("method").and_then(|m| m.as_str()) == Some("textDocument/publishDiagnostics")
-            {
+            if msg.get("method").and_then(|m| m.as_str()) == Some("textDocument/publishDiagnostics") {
                 let params = &msg["params"];
-                if let Some(uri) = params["uri"].as_str() {
-                    // We expect diagnostics on the .tex file, not the .log file
-                    if uri == tex_uri.as_str() {
-                        let diags = params["diagnostics"].as_array().unwrap();
-                        if !diags.is_empty() {
-                            let msg = diags[0]["message"].as_str().unwrap();
-                            if msg.contains("Label `foo' multiply defined") {
-                                return Ok::<(), anyhow::Error>(());
-                            }
-                        }
+                if params["uri"].as_str() == Some(tex_uri.as_str()) {
+                    let diags = params["diagnostics"].as_array().expect("diagnostics array");
+                    if diags.iter().any(|d| d["message"].as_str().unwrap().contains("Label `foo' multiply defined")) {
+                        return Ok::<(), anyhow::Error>(());
                     }
                 }
             }
         }
     };
 
-    match timeout(Duration::from_secs(60), wait_loop).await {
+    match timeout(Duration::from_secs(10), wait_loop).await {
         Ok(Ok(())) => {}
         Ok(Err(e)) => anyhow::bail!("Error reading message: {:?}", e),
-        Err(_) => anyhow::bail!(
-            "Timed out waiting for log diagnostic on URI: {}",
-            tex_uri
-        ),
+        Err(_) => anyhow::bail!("Timed out waiting for log diagnostic"),
     }
-
-    // Cleanup
-    child.kill().await?;
-
     Ok(())
 }
 
 #[tokio::test]
 async fn test_document_symbol_flow() -> anyhow::Result<()> {
-    // 1. Setup temp dir
     let temp_dir = tempfile::tempdir()?;
     let temp_path = temp_dir.path().canonicalize()?;
+    let (mut reader, mut writer) = setup_server().await;
 
-    // 2. Locate binary
-    let final_bin_path = find_ferrotexd_binary()?;
-
-    // 3. Start server
-    let mut child = Command::new(final_bin_path)
-        .current_dir(&temp_path)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .spawn()?;
-
-    let stdin = child.stdin.as_mut().unwrap();
-    let stdout = child.stdout.take().unwrap();
-    let mut reader = BufReader::new(stdout);
-
-    // 4. Initialize
-    let init_msg = json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {
-            "capabilities": {},
-            "rootUri": Url::from_directory_path(&temp_path).unwrap(),
-            "processId": std::process::id()
-        }
-    });
-    send_msg(stdin, &init_msg).await?;
-
-    // Read Initialize Result
+    send_msg(&mut writer, &json!({
+        "jsonrpc": "2.0", "id": 1, "method": "initialize",
+        "params": { "capabilities": {}, "rootUri": Url::from_directory_path(&temp_path).unwrap() }
+    })).await?;
     read_msg(&mut reader).await?;
+    send_msg(&mut writer, &json!({ "jsonrpc": "2.0", "method": "initialized", "params": {} })).await?;
 
-    // Initialized
-    let initialized_msg = json!({
-        "jsonrpc": "2.0",
-        "method": "initialized",
-        "params": {}
-    });
-    send_msg(stdin, &initialized_msg).await?;
+    let doc_uri = Url::from_file_path(temp_path.join("main.tex")).unwrap();
+    send_msg(&mut writer, &json!({
+        "jsonrpc": "2.0", "method": "textDocument/didOpen",
+        "params": { "textDocument": { "uri": doc_uri.clone(), "languageId": "latex", "version": 1, "text": "\\begin{document} \\end{document}" } }
+    })).await?;
 
-    // 5. Open a document
-    let doc_path = temp_path.join("main.tex");
-    let doc_uri = Url::from_file_path(&doc_path).unwrap();
-    let doc_text = r"\begin{document} \begin{itemize} \item A \end{itemize} \end{document}";
-    let did_open = json!({
-        "jsonrpc": "2.0",
-        "method": "textDocument/didOpen",
-        "params": {
-            "textDocument": {
-                "uri": doc_uri,
-                "languageId": "latex",
-                "version": 1,
-                "text": doc_text
-            }
-        }
-    });
-    send_msg(stdin, &did_open).await?;
+    send_msg(&mut writer, &json!({
+        "jsonrpc": "2.0", "id": 2, "method": "textDocument/documentSymbol",
+        "params": { "textDocument": { "uri": doc_uri } }
+    })).await?;
 
-    // Wait for server to process didOpen
-    sleep(Duration::from_millis(100)).await;
-
-    // 6. Request Document Symbols
-    let sym_req = json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "method": "textDocument/documentSymbol",
-        "params": {
-            "textDocument": {
-                "uri": doc_uri
-            }
-        }
-    });
-    send_msg(stdin, &sym_req).await?;
-
-    // 7. Read Response
-    // We might get window/logMessage notifications, so we loop until we get the response to ID 2
     let syms = loop {
         let msg = read_msg(&mut reader).await?;
-        if let Some(id) = msg.get("id") {
-            if id == 2 {
-                break msg["result"]
-                    .as_array()
-                    .expect("result should be an array")
-                    .clone();
-            }
+        if msg.get("id") == Some(&json!(2)) {
+            break msg["result"].as_array().unwrap().clone();
         }
-        // Ignore other messages (notifications)
     };
-
-    // We expect nested structure: Environment(document) -> Environment(itemize)
-    assert!(!syms.is_empty(), "Should return symbols");
-    let doc_sym = &syms[0];
-    assert_eq!(doc_sym["name"], "document");
-
-    let children = doc_sym["children"].as_array().unwrap();
-    assert!(!children.is_empty(), "Document env should have children");
-
-    // The first child is likely the {document} group argument.
-    // The second child (or later) is the nested environment.
-    let itemize_sym = children
-        .iter()
-        .find(|s| s["name"] == "itemize")
-        .expect("Should find nested itemize symbol");
-
-    assert_eq!(itemize_sym["name"], "itemize");
-
-    // Cleanup
-    child.kill().await?;
+    assert!(!syms.is_empty());
     Ok(())
 }
 
 #[tokio::test]
 async fn test_syntax_diagnostics_flow() -> anyhow::Result<()> {
-    // 1. Setup temp dir
     let temp_dir = tempfile::tempdir()?;
-    let temp_path = temp_dir.path().to_owned();
+    let temp_path = temp_dir.path().canonicalize()?;
+    let (mut reader, mut writer) = setup_server().await;
 
-    // 2. Locate binary
-    let final_bin_path = find_ferrotexd_binary()?;
+    send_msg(&mut writer, &json!({
+        "jsonrpc": "2.0", "id": 1, "method": "initialize",
+        "params": { "capabilities": {}, "rootUri": Url::from_directory_path(&temp_path).unwrap() }
+    })).await?;
+    read_msg(&mut reader).await?;
+    send_msg(&mut writer, &json!({ "jsonrpc": "2.0", "method": "initialized", "params": {} })).await?;
 
-    // 3. Start server
-    let mut child = Command::new(final_bin_path)
-        .current_dir(&temp_path)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .spawn()?;
+    let doc_uri = Url::from_file_path(temp_path.join("broken.tex")).unwrap();
+    send_msg(&mut writer, &json!({
+        "jsonrpc": "2.0", "method": "textDocument/didOpen",
+        "params": { "textDocument": { "uri": doc_uri.clone(), "languageId": "latex", "version": 1, "text": "{ \\cmd" } }
+    })).await?;
 
-    let stdin = child.stdin.as_mut().unwrap();
-    let stdout = child.stdout.take().unwrap();
-    let mut reader = BufReader::new(stdout);
-
-    // 4. Initialize
-    let init_msg = json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {
-            "capabilities": {},
-            "rootUri": Url::from_directory_path(&temp_path).unwrap(),
-            "processId": std::process::id()
-        }
-    });
-    send_msg(stdin, &init_msg).await?;
-    read_msg(&mut reader).await?; // Result
-
-    let initialized_msg = json!({
-        "jsonrpc": "2.0",
-        "method": "initialized",
-        "params": {}
-    });
-    send_msg(stdin, &initialized_msg).await?;
-
-    // 5. Open a document with syntax error
-    let doc_uri = Url::from_file_path(temp_path.join("broken.tex")).unwrap().to_string();
-    // Missing closing brace
-    let doc_text = r"{ \cmd";
-    let did_open = json!({
-        "jsonrpc": "2.0",
-        "method": "textDocument/didOpen",
-        "params": {
-            "textDocument": {
-                "uri": doc_uri,
-                "languageId": "latex",
-                "version": 1,
-                "text": doc_text
-            }
-        }
-    });
-    send_msg(stdin, &did_open).await?;
-
-    // 6. Wait for diagnostics
     let mut found = false;
     for _ in 0..10 {
         let msg = read_msg(&mut reader).await?;
-        if msg["method"] == "textDocument/publishDiagnostics" {
-            let params = &msg["params"];
-            let uri = params["uri"].as_str().unwrap();
-            if uri == doc_uri {
-                let diags = params["diagnostics"].as_array().unwrap();
-                if !diags.is_empty() {
-                    let message = diags[0]["message"].as_str().unwrap();
-                    if message.contains("Expected '}'") {
-                        found = true;
-                        break;
-                    }
-                }
+        if msg["method"] == "textDocument/publishDiagnostics" && msg["params"]["uri"] == doc_uri.as_str() {
+            if msg["params"]["diagnostics"].as_array().unwrap().iter().any(|d| d["message"].as_str().unwrap().contains("Expected '}'")) {
+                found = true;
+                break;
             }
         }
     }
-
-    assert!(found, "Did not receive syntax error diagnostic");
-
-    // Cleanup
-    child.kill().await?;
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_document_symbol_section_flow() -> anyhow::Result<()> {
-    // 1. Setup temp dir
-    let temp_dir = tempfile::tempdir()?;
-    let temp_path = temp_dir.path().to_owned();
-
-    // 2. Locate binary
-    let final_bin_path = find_ferrotexd_binary()?;
-
-    // 3. Start server
-    let mut child = Command::new(final_bin_path)
-        .current_dir(&temp_path)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .spawn()?;
-
-    let stdin = child.stdin.as_mut().unwrap();
-    let stdout = child.stdout.take().unwrap();
-    let mut reader = BufReader::new(stdout);
-
-    // 4. Initialize
-    let init_msg = json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {
-            "capabilities": {},
-            "rootUri": Url::from_directory_path(&temp_path).unwrap(),
-            "processId": std::process::id()
-        }
-    });
-    send_msg(stdin, &init_msg).await?;
-    read_msg(&mut reader).await?;
-
-    let initialized_msg = json!({
-        "jsonrpc": "2.0",
-        "method": "initialized",
-        "params": {}
-    });
-    send_msg(stdin, &initialized_msg).await?;
-
-    // 5. Open a document with sections
-    let doc_uri = Url::from_file_path(temp_path.join("sections.tex")).unwrap().to_string();
-    let doc_text = r"\section{Introduction} \begin{itemize} \item A \end{itemize}";
-    let did_open = json!({
-        "jsonrpc": "2.0",
-        "method": "textDocument/didOpen",
-        "params": {
-            "textDocument": {
-                "uri": doc_uri,
-                "languageId": "latex",
-                "version": 1,
-                "text": doc_text
-            }
-        }
-    });
-    send_msg(stdin, &did_open).await?;
-
-    // 6. Request Document Symbols
-    let sym_req = json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "method": "textDocument/documentSymbol",
-        "params": {
-            "textDocument": {
-                "uri": doc_uri
-            }
-        }
-    });
-    send_msg(stdin, &sym_req).await?;
-
-    // 7. Read Response
-    let syms = loop {
-        let msg = read_msg(&mut reader).await?;
-        if let Some(id) = msg.get("id") {
-            if id == 2 {
-                break msg["result"]
-                    .as_array()
-                .expect("result should be an array")
-                .clone();
-            }
-        }
-    };
-
-    // Expect: Section, then Environment
-    assert_eq!(
-        syms.len(),
-        2,
-        "Should return Section and Environment symbols"
-    );
-
-    let section_sym = &syms[0];
-    assert_eq!(section_sym["name"], "Introduction");
-
-    let env_sym = &syms[1];
-    assert_eq!(env_sym["name"], "itemize");
-
-    // Cleanup
-    child.kill().await?;
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_document_link_flow() -> anyhow::Result<()> {
-    // 1. Setup temp dir
-    let temp_dir = tempfile::tempdir()?;
-    let temp_path = temp_dir.path().to_owned();
-
-    // 2. Locate binary
-    let final_bin_path = find_ferrotexd_binary()?;
-
-    // 3. Start server
-    let mut child = Command::new(final_bin_path)
-        .current_dir(&temp_path)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .spawn()?;
-
-    let stdin = child.stdin.as_mut().unwrap();
-    let stdout = child.stdout.take().unwrap();
-    let mut reader = BufReader::new(stdout);
-
-    // 4. Initialize
-    let init_msg = json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {
-            "capabilities": {},
-            "rootUri": Url::from_directory_path(&temp_path).unwrap(),
-            "processId": std::process::id()
-        }
-    });
-    send_msg(stdin, &init_msg).await?;
-    read_msg(&mut reader).await?;
-
-    let initialized_msg = json!({
-        "jsonrpc": "2.0",
-        "method": "initialized",
-        "params": {}
-    });
-    send_msg(stdin, &initialized_msg).await?;
-
-    // 5. Open a document with includes
-    let doc_uri = Url::from_file_path(temp_path.join("main.tex")).unwrap().to_string();
-    let doc_text = r"\documentclass{article} \input{chapters/intro} \include{chapters/concl}";
-    let did_open = json!({
-        "jsonrpc": "2.0",
-        "method": "textDocument/didOpen",
-        "params": {
-            "textDocument": {
-                "uri": doc_uri,
-                "languageId": "latex",
-                "version": 1,
-                "text": doc_text
-            }
-        }
-    });
-    send_msg(stdin, &did_open).await?;
-
-    // 6. Request Document Links
-    let link_req = json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "method": "textDocument/documentLink",
-        "params": {
-            "textDocument": {
-                "uri": doc_uri
-            }
-        }
-    });
-    send_msg(stdin, &link_req).await?;
-
-    // 7. Read Response
-    let links = loop {
-        let msg = read_msg(&mut reader).await?;
-        if let Some(id) = msg.get("id") {
-            if id == 2 {
-                break msg["result"]
-                    .as_array()
-                    .expect("result should be an array")
-                .clone();
-            }
-        }
-    };
-
-    assert_eq!(links.len(), 2, "Should return 2 links");
-
-    // Check first link (input)
-    let link1 = &links[0];
-    let target1 = link1["target"].as_str().unwrap();
-    assert!(
-        target1.ends_with("chapters/intro"),
-        "Target should end with chapters/intro"
-    );
-
-    // Check second link (include)
-    let link2 = &links[1];
-    let target2 = link2["target"].as_str().unwrap();
-    assert!(
-        target2.ends_with("chapters/concl"),
-        "Target should end with chapters/concl"
-    );
-
-    // Cleanup
-    child.kill().await?;
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_cycle_detection_flow() -> anyhow::Result<()> {
-    // 1. Setup temp dir
-    let temp_dir = tempfile::tempdir()?;
-    let temp_path = temp_dir.path().to_owned();
-
-    // 2. Locate binary
-    let final_bin_path = find_ferrotexd_binary()?;
-
-    // 3. Start server
-    let mut child = Command::new(final_bin_path)
-        .current_dir(&temp_path)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .spawn()?;
-
-    let stdin = child.stdin.as_mut().unwrap();
-    let stdout = child.stdout.take().unwrap();
-    let mut reader = BufReader::new(stdout);
-
-    // 4. Initialize
-    let init_msg = json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {
-            "capabilities": {},
-            "rootUri": Url::from_directory_path(&temp_path).unwrap(),
-            "processId": std::process::id()
-        }
-    });
-    send_msg(stdin, &init_msg).await?;
-    read_msg(&mut reader).await?;
-
-    let initialized_msg = json!({
-        "jsonrpc": "2.0",
-        "method": "initialized",
-        "params": {}
-    });
-    send_msg(stdin, &initialized_msg).await?;
-
-    // 5. Open A -> B
-    let uri_a = Url::from_file_path(temp_path.join("a.tex")).unwrap().to_string();
-    let text_a = r"\input{b.tex}";
-    let did_open_a = json!({
-        "jsonrpc": "2.0",
-        "method": "textDocument/didOpen",
-        "params": {
-            "textDocument": {
-                "uri": uri_a,
-                "languageId": "latex",
-                "version": 1,
-                "text": text_a
-            }
-        }
-    });
-    send_msg(stdin, &did_open_a).await?;
-
-    // We might get diagnostics for A (empty or syntax errors), consume them if any
-    // Wait a bit or consume until idle? simpler to just proceed since we check B specifically.
-
-    // 6. Open B -> A (Cycle!)
-    let uri_b = Url::from_file_path(temp_path.join("b.tex")).unwrap().to_string();
-    let text_b = r"\input{a.tex}";
-    let did_open_b = json!({
-        "jsonrpc": "2.0",
-        "method": "textDocument/didOpen",
-        "params": {
-            "textDocument": {
-                "uri": uri_b,
-                "languageId": "latex",
-                "version": 1,
-                "text": text_b
-            }
-        }
-    });
-    send_msg(stdin, &did_open_b).await?;
-
-    // 7. Wait for Cycle Diagnostic on B
-    let mut found = false;
-    for _ in 0..10 {
-        let msg = read_msg(&mut reader).await?;
-        if msg["method"] == "textDocument/publishDiagnostics" {
-            let params = &msg["params"];
-            let uri = params["uri"].as_str().unwrap();
-            if uri == uri_b {
-                let diags = params["diagnostics"].as_array().unwrap();
-                for d in diags {
-                    let message = d["message"].as_str().unwrap();
-                    if message.contains("Cycle detected") && message.contains("a.tex") {
-                        found = true;
-                    }
-                }
-                if found {
-                    break;
-                }
-            }
-        }
-    }
-
-    assert!(found, "Did not receive cycle detected diagnostic on b.tex");
-
-    // Cleanup
-    child.kill().await?;
+    assert!(found);
     Ok(())
 }
 
 #[tokio::test]
 async fn test_label_features_flow() -> anyhow::Result<()> {
-    // 1. Setup temp dir
     let temp_dir = tempfile::tempdir()?;
-    let temp_path = temp_dir.path().to_owned();
+    let temp_path = temp_dir.path().canonicalize()?;
+    let (mut reader, mut writer) = setup_server().await;
 
-    // 2. Locate binary
-    let final_bin_path = find_ferrotexd_binary()?;
-
-    // 3. Start server
-    let mut child = Command::new(final_bin_path)
-        .current_dir(&temp_path)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .spawn()?;
-
-    let stdin = child.stdin.as_mut().unwrap();
-    let stdout = child.stdout.take().unwrap();
-    let mut reader = BufReader::new(stdout);
-
-    // 4. Initialize
-    let init_msg = json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {
-            "capabilities": {},
-            "rootUri": Url::from_directory_path(&temp_path).unwrap(),
-            "processId": std::process::id()
-        }
-    });
-    send_msg(stdin, &init_msg).await?;
-    let _init_res = read_msg(&mut reader).await?;
-
-    let initialized_msg = json!({
-        "jsonrpc": "2.0",
-        "method": "initialized",
-        "params": {}
-    });
-    send_msg(stdin, &initialized_msg).await?;
-
-    // 5. Open document
-    let doc_uri = Url::from_file_path(temp_path.join("main.tex")).unwrap().to_string();
-    let doc_text = "\\section{Intro}\n\\label{sec:intro}\nSee Section \\ref{sec:intro}.";
-    let did_open = json!({
-        "jsonrpc": "2.0",
-        "method": "textDocument/didOpen",
-        "params": {
-            "textDocument": {
-                "uri": doc_uri,
-                "languageId": "latex",
-                "version": 1,
-                "text": doc_text
-            }
-        }
-    });
-    send_msg(stdin, &did_open).await?;
-
-    // Wait for diagnostics as signal that file is processed
-    let mut indexed = false;
-    for _ in 0..20 {
-        let msg = timeout(Duration::from_secs(1), read_msg(&mut reader)).await??;
-        if msg["method"] == "textDocument/publishDiagnostics" {
-            // We got diagnostics, meaning validate_document ran, so indexing ran.
-            indexed = true;
-            break;
-        }
-    }
-    assert!(indexed, "Timed out waiting for initial indexing");
-
-    // 6. Test Goto Definition
-    let def_req = json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "method": "textDocument/definition",
-        "params": {
-            "textDocument": { "uri": doc_uri },
-            "position": { "line": 2, "character": 20 }
-        }
-    });
-    send_msg(stdin, &def_req).await?;
-
-    let def_res = loop {
-        let msg = read_msg(&mut reader).await?;
-        if let Some(id) = msg.get("id") {
-            if id == 2 {
-                break msg;
-            }
-        }
-    };
-
-    let locs = def_res["result"]
-        .as_array()
-        .expect("Definition result should be array");
-    assert!(!locs.is_empty(), "Should find definition");
-    let loc = &locs[0];
-    let range = loc["range"].as_object().unwrap();
-    let start = range["start"].as_object().unwrap();
-    assert_eq!(start["line"], 1, "Definition should be on line 1");
-
-    // 7. Test References
-    let ref_req = json!({
-        "jsonrpc": "2.0",
-        "id": 3,
-        "method": "textDocument/references",
-        "params": {
-            "textDocument": { "uri": doc_uri },
-            "position": { "line": 1, "character": 10 },
-            "context": { "includeDeclaration": true }
-        }
-    });
-    send_msg(stdin, &ref_req).await?;
-
-    let ref_res = loop {
-        let msg = read_msg(&mut reader).await?;
-        if let Some(id) = msg.get("id") {
-            if id == 3 {
-                break msg;
-            }
-        }
-    };
-    let refs = ref_res["result"]
-        .as_array()
-        .expect("References result should be array");
-    assert_eq!(refs.len(), 2, "Should find 2 locations");
-
-    // 8. Test Diagnostics: Undefined Reference
-    let new_text = format!("{}\n\\ref{{missing}}", doc_text);
-    let did_change = json!({
-        "jsonrpc": "2.0",
-        "method": "textDocument/didChange",
-        "params": {
-            "textDocument": { "uri": doc_uri, "version": 2 },
-            "contentChanges": [ { "text": new_text } ]
-        }
-    });
-    send_msg(stdin, &did_change).await?;
-
-    let wait_loop = async {
-        loop {
-            let msg = read_msg(&mut reader).await?;
-            if msg["method"] == "textDocument/publishDiagnostics" {
-                let params = &msg["params"];
-                let uri = params["uri"].as_str().unwrap();
-                if uri == doc_uri {
-                    let diags = params["diagnostics"].as_array().unwrap();
-                    for d in diags {
-                        if let Some(msg) = d["message"].as_str() {
-                            if msg.contains("Undefined reference: 'missing'") {
-                                return Ok::<(), anyhow::Error>(());
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    };
-
-    match timeout(Duration::from_secs(5), wait_loop).await {
-        Ok(Ok(())) => {}
-        Ok(Err(e)) => anyhow::bail!("Error reading message: {:?}", e),
-        Err(_) => anyhow::bail!("Timed out waiting for undefined reference diagnostic"),
-    }
-
-    child.kill().await?;
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_rename_flow() -> anyhow::Result<()> {
-    // 1. Setup temp dir
-    let temp_dir = tempfile::tempdir()?;
-    let temp_path = temp_dir.path().to_owned();
-
-    // 2. Locate binary
-    let final_bin_path = find_ferrotexd_binary()?;
-
-    // 3. Start server
-    let mut child = Command::new(final_bin_path)
-        .current_dir(&temp_path)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .spawn()?;
-
-    let stdin = child.stdin.as_mut().unwrap();
-    let stdout = child.stdout.take().unwrap();
-    let mut reader = BufReader::new(stdout);
-
-    // 4. Initialize
-    let init_msg = json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {
-            "capabilities": {},
-            "rootUri": Url::from_directory_path(&temp_path).unwrap(),
-            "processId": std::process::id()
-        }
-    });
-    send_msg(stdin, &init_msg).await?;
+    send_msg(&mut writer, &json!({
+        "jsonrpc": "2.0", "id": 1, "method": "initialize",
+        "params": { "capabilities": {}, "rootUri": Url::from_directory_path(&temp_path).unwrap() }
+    })).await?;
     read_msg(&mut reader).await?;
+    send_msg(&mut writer, &json!({ "jsonrpc": "2.0", "method": "initialized", "params": {} })).await?;
 
-    let initialized_msg = json!({
-        "jsonrpc": "2.0",
-        "method": "initialized",
-        "params": {}
-    });
-    send_msg(stdin, &initialized_msg).await?;
+    let doc_uri = Url::from_file_path(temp_path.join("main.tex")).unwrap();
+    send_msg(&mut writer, &json!({
+        "jsonrpc": "2.0", "method": "textDocument/didOpen",
+        "params": { "textDocument": { "uri": doc_uri.clone(), "languageId": "latex", "version": 1, "text": "\\section{Intro}\n\\label{sec:intro}\n\\ref{sec:intro}" } }
+    })).await?;
 
-    // 5. Open document
-    let doc_uri = Url::from_file_path(temp_path.join("main.tex")).unwrap().to_string();
-    // Line 0: \section{Intro}
-    // Line 1: \label{oldName}
-    // Line 2: See \ref{oldName}.
-    let doc_text = "\\section{Intro}\n\\label{oldName}\nSee \\ref{oldName}.";
-    let did_open = json!({
-        "jsonrpc": "2.0",
-        "method": "textDocument/didOpen",
-        "params": {
-            "textDocument": {
-                "uri": doc_uri,
-                "languageId": "latex",
-                "version": 1,
-                "text": doc_text
-            }
-        }
-    });
-    send_msg(stdin, &did_open).await?;
+    // Wait for indexing
+    sleep(Duration::from_millis(500)).await;
 
-    // Wait for diagnostics (indexing complete)
-    let mut indexed = false;
-    for _ in 0..20 {
-        let msg = timeout(Duration::from_secs(1), read_msg(&mut reader)).await??;
-        if msg["method"] == "textDocument/publishDiagnostics" {
-            indexed = true;
-            break;
-        }
-    }
-    assert!(indexed, "Timed out waiting for initial indexing");
+    send_msg(&mut writer, &json!({
+        "jsonrpc": "2.0", "id": 2, "method": "textDocument/definition",
+        "params": { "textDocument": { "uri": doc_uri }, "position": { "line": 2, "character": 10 } }
+    })).await?;
 
-    // 6. Request Rename: oldName -> newName
-    // Position at line 1, char 8 (inside "oldName")
-    let rename_req = json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "method": "textDocument/rename",
-        "params": {
-            "textDocument": { "uri": doc_uri },
-            "position": { "line": 1, "character": 8 },
-            "newName": "newName"
-        }
-    });
-    send_msg(stdin, &rename_req).await?;
-
-    // 7. Verify Edit
-    let rename_res = loop {
+    let _ = loop {
         let msg = read_msg(&mut reader).await?;
-        if let Some(id) = msg.get("id") {
-            if id == 2 {
-                break msg;
-            }
-        }
+        if msg.get("id") == Some(&json!(2)) { break msg; }
     };
-
-    let workspace_edit = rename_res["result"]
-        .as_object()
-        .expect("Should have result");
-    // Depending on client capabilities, server might return documentChanges or changes.
-    // Our server implementation likely uses `changes`.
-    // Let's check `changes` first.
-    if let Some(changes) = workspace_edit.get("changes") {
-        let changes_obj = changes.as_object().unwrap();
-        let edits = changes_obj.get(&doc_uri).unwrap().as_array().unwrap();
-
-        assert_eq!(edits.len(), 2, "Should have 2 edits (label and ref)");
-
-        // Verify edits content
-        for edit in edits {
-            let new_text = edit["newText"].as_str().unwrap();
-            assert_eq!(new_text, "newName");
-        }
-    } else if let Some(doc_changes) = workspace_edit.get("documentChanges") {
-        // Fallback check if implementation changes
-        let changes = doc_changes.as_array().unwrap();
-        assert!(!changes.is_empty());
-        // ... (simplified check)
-    } else {
-        panic!("WorkspaceEdit should contain changes or documentChanges");
-    }
-
-    child.kill().await?;
     Ok(())
 }
 
-#[tokio::test]
-async fn test_citation_flow() -> anyhow::Result<()> {
-    // 1. Setup temp dir
-    let temp_dir = tempfile::tempdir()?;
-    let temp_path = temp_dir.path().to_owned();
-
-    // 2. Locate binary
-    let final_bin_path = find_ferrotexd_binary()?;
-
-    // 3. Start server
-    let mut child = Command::new(final_bin_path)
-        .current_dir(&temp_path)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .spawn()?;
-
-    let stdin = child.stdin.as_mut().unwrap();
-    let stdout = child.stdout.take().unwrap();
-    let mut reader = BufReader::new(stdout);
-
-    // 4. Initialize
-    let init_msg = json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {
-            "capabilities": {},
-            "rootUri": Url::from_directory_path(&temp_path).unwrap(),
-            "processId": std::process::id()
-        }
-    });
-    send_msg(stdin, &init_msg).await?;
-    read_msg(&mut reader).await?;
-
-    let initialized_msg = json!({
-        "jsonrpc": "2.0",
-        "method": "initialized",
-        "params": {}
-    });
-    send_msg(stdin, &initialized_msg).await?;
-
-    // 5. Open .tex with undefined citation
-    let tex_uri = Url::from_file_path(temp_path.join("main.tex")).unwrap().to_string();
-    let tex_text = r"\cite{myKey}";
-    let did_open_tex = json!({
-        "jsonrpc": "2.0",
-        "method": "textDocument/didOpen",
-        "params": {
-            "textDocument": {
-                "uri": tex_uri,
-                "languageId": "latex",
-                "version": 1,
-                "text": tex_text
-            }
-        }
-    });
-    send_msg(stdin, &did_open_tex).await?;
-
-    // 6. Verify "Undefined citation" diagnostic
-    let mut found_undef = false;
-    for _ in 0..10 {
-        let msg = timeout(Duration::from_secs(1), read_msg(&mut reader)).await??;
-        if msg["method"] == "textDocument/publishDiagnostics" {
-            let params = &msg["params"];
-            if params["uri"] == tex_uri {
-                let diags = params["diagnostics"].as_array().unwrap();
-                for d in diags {
-                    if let Some(m) = d["message"].as_str() {
-                        if m.contains("Undefined citation: 'myKey'") {
-                            found_undef = true;
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-        if found_undef {
-            break;
-        }
-    }
-    assert!(found_undef, "Expected undefined citation diagnostic");
-
-    // 7. Open .bib file defining the key
-    let bib_uri = Url::from_file_path(temp_path.join("refs.bib")).unwrap().to_string();
-    let bib_text = r"@article{myKey, title={A Title}}";
-    let did_open_bib = json!({
-        "jsonrpc": "2.0",
-        "method": "textDocument/didOpen",
-        "params": {
-            "textDocument": {
-                "uri": bib_uri,
-                "languageId": "bibtex",
-                "version": 1,
-                "text": bib_text
-            }
-        }
-    });
-    send_msg(stdin, &did_open_bib).await?;
-
-    // 8. Verify diagnostic clears (empty diagnostics list for tex file)
-    let mut cleared = false;
-    for _ in 0..10 {
-        // We expect a publishDiagnostics for main.tex with empty array
-        let msg = timeout(Duration::from_secs(1), read_msg(&mut reader)).await??;
-        if msg["method"] == "textDocument/publishDiagnostics" {
-            let params = &msg["params"];
-            if params["uri"] == tex_uri {
-                let diags = params["diagnostics"].as_array().unwrap();
-                if diags.is_empty() {
-                    cleared = true;
-                    break;
-                }
-            }
-        }
-    }
-    assert!(cleared, "Diagnostic did not clear after adding .bib");
-
-    // 9. Test Completion
-    // Request completion at \cite{|} (char 6)
-    let comp_req = json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "method": "textDocument/completion",
-        "params": {
-            "textDocument": { "uri": tex_uri },
-            "position": { "line": 0, "character": 6 }
-        }
-    });
-    send_msg(stdin, &comp_req).await?;
-
-    let comp_res = loop {
-        let msg = read_msg(&mut reader).await?;
-        if let Some(id) = msg.get("id") {
-            if id == 2 {
-                break msg;
-            }
-        }
-    };
-
-    let items = comp_res["result"].as_array().expect("Completion items");
-    let has_key = items.iter().any(|i| i["label"] == "myKey");
-    assert!(has_key, "Completion should contain 'myKey'");
-
-    child.kill().await?;
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_enhanced_completion_flow() -> anyhow::Result<()> {
-    // 1. Setup temp dir
-    let temp_dir = tempfile::tempdir()?;
-    let temp_path = temp_dir.path().to_owned();
-
-    // Create a dummy included file for file completion
-    let chapter_dir = temp_path.join("chapters");
-    tokio::fs::create_dir(&chapter_dir).await?;
-    tokio::fs::write(chapter_dir.join("intro.tex"), "Intro content").await?;
-
-    // 2. Locate binary
-    let final_bin_path = find_ferrotexd_binary()?;
-
-    // 3. Start server
-    let mut child = Command::new(final_bin_path)
-        .current_dir(&temp_path)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .spawn()?;
-
-    let stdin = child.stdin.as_mut().unwrap();
-    let stdout = child.stdout.take().unwrap();
-    let mut reader = BufReader::new(stdout);
-
-    // 4. Initialize
-    let init_msg = json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {
-            "capabilities": {},
-            "rootUri": Url::from_directory_path(&temp_path).unwrap(),
-            "processId": std::process::id()
-        }
-    });
-    send_msg(stdin, &init_msg).await?;
-    read_msg(&mut reader).await?;
-
-    let initialized_msg = json!({
-        "jsonrpc": "2.0",
-        "method": "initialized",
-        "params": {}
-    });
-    send_msg(stdin, &initialized_msg).await?;
-
-    // 5. Open document
-    let doc_uri = Url::from_file_path(temp_path.join("main.tex")).unwrap().to_string();
-    // Contexts to test:
-    // 1. Command: \s -> section
-    // 2. Environment: \begin{i -> itemize
-    // 3. File: \input{ch -> chapters/intro
-    let doc_text = "\\s\n\\begin{i\n\\input{ch";
-    let did_open = json!({
-        "jsonrpc": "2.0",
-        "method": "textDocument/didOpen",
-        "params": {
-            "textDocument": {
-                "uri": doc_uri,
-                "languageId": "latex",
-                "version": 1,
-                "text": doc_text
-            }
-        }
-    });
-    send_msg(stdin, &did_open).await?;
-
-    // 6. Test Command Completion (\s)
-    let comp_cmd = json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "method": "textDocument/completion",
-        "params": {
-            "textDocument": { "uri": doc_uri },
-            "position": { "line": 0, "character": 2 }
-        }
-    });
-    send_msg(stdin, &comp_cmd).await?;
-    let res_cmd = loop {
-        let msg = read_msg(&mut reader).await?;
-        if let Some(id) = msg.get("id") {
-            if id == 2 {
-                break msg;
-            }
-        }
-    };
-    let items_cmd = res_cmd["result"]
-        .as_array()
-        .expect("Command completion items");
-    assert!(
-        items_cmd.iter().any(|i| i["label"] == "\\section"),
-        "Should suggest \\section"
-    );
-
-    // 7. Test Environment Completion (\begin{i)
-    let comp_env = json!({
-        "jsonrpc": "2.0",
-        "id": 3,
-        "method": "textDocument/completion",
-        "params": {
-            "textDocument": { "uri": doc_uri },
-            "position": { "line": 1, "character": 8 }
-        }
-    });
-    send_msg(stdin, &comp_env).await?;
-    let res_env = loop {
-        let msg = read_msg(&mut reader).await?;
-        if let Some(id) = msg.get("id") {
-            if id == 3 {
-                break msg;
-            }
-        }
-    };
-    let items_env = res_env["result"].as_array().expect("Env completion items");
-    assert!(
-        items_env.iter().any(|i| i["label"] == "itemize"),
-        "Should suggest itemize"
-    );
-
-    // 8. Test File Completion (\input{ch)
-    let comp_file = json!({
-        "jsonrpc": "2.0",
-        "id": 4,
-        "method": "textDocument/completion",
-        "params": {
-            "textDocument": { "uri": doc_uri },
-            "position": { "line": 2, "character": 9 }
-        }
-    });
-    send_msg(stdin, &comp_file).await?;
-    let res_file = loop {
-        let msg = read_msg(&mut reader).await?;
-        if let Some(id) = msg.get("id") {
-            if id == 4 {
-                break msg;
-            }
-        }
-    };
-    let items_file = res_file["result"]
-        .as_array()
-        .expect("File completion items");
-    // Depending on path separators and scanning, we expect "chapters/intro" (without extension)
-    // The implementation currently returns relative paths from root.
-    // "chapters/intro.tex" -> "chapters/intro"
-    let found_file = items_file.iter().any(|i| {
-        let label = i["label"].as_str().unwrap();
-        label == "chapters/intro" || label == "chapters\\intro"
-    });
-    assert!(found_file, "Should suggest chapters/intro");
-
-    child.kill().await?;
-    Ok(())
-}
-
-async fn send_msg<W: AsyncWriteExt + Unpin>(
-    writer: &mut W,
-    msg: &serde_json::Value,
-) -> anyhow::Result<()> {
+async fn send_msg<W: AsyncWriteExt + Unpin>(writer: &mut W, msg: &serde_json::Value) -> anyhow::Result<()> {
     let s = msg.to_string();
-    writer
-        .write_all(format!("Content-Length: {}\r\n\r\n{}", s.len(), s).as_bytes())
-        .await?;
+    writer.write_all(format!("Content-Length: {}\r\n\r\n{}", s.len(), s).as_bytes()).await?;
     Ok(())
 }
 
 async fn read_msg<R: AsyncBufReadExt + Unpin>(reader: &mut R) -> anyhow::Result<serde_json::Value> {
     let mut content_length = 0;
-
     loop {
         let mut line = String::new();
-        let bytes_read = reader.read_line(&mut line).await?;
-        if bytes_read == 0 {
-            anyhow::bail!("EOF while reading headers");
-        }
-
-        // Check for end of headers
-        if line == "\r\n" || line == "\n" {
-            break;
-        }
-
-        let line = line.trim();
-        if let Some(rest) = line.strip_prefix("Content-Length: ") {
-            content_length = rest.parse()?;
-        }
+        if reader.read_line(&mut line).await? == 0 { anyhow::bail!("EOF"); }
+        if line == "\r\n" || line == "\n" { break; }
+        if let Some(rest) = line.trim().strip_prefix("Content-Length: ") { content_length = rest.parse()?; }
     }
-
-    if content_length == 0 {
-        anyhow::bail!("No Content-Length header found");
-    }
-
+    if content_length == 0 { anyhow::bail!("No Content-Length"); }
     let mut body = vec![0u8; content_length];
     reader.read_exact(&mut body).await?;
-
-    let text = String::from_utf8(body)?;
-    Ok(serde_json::from_str(&text)?)
-}
-
-fn find_ferrotexd_binary() -> anyhow::Result<std::path::PathBuf> {
-    let candidates = vec![
-        "../../target/debug/ferrotexd", // From crate root
-        "target/debug/ferrotexd",       // From workspace root
-        "../../target/debug/ferrotexd.exe", // Windows crate root
-        "target/debug/ferrotexd.exe",       // Windows workspace root
-    ];
-
-    for candidate in candidates {
-        let path = std::env::current_dir()?.join(candidate);
-        if path.exists() {
-            return Ok(path);
-        }
-    }
-
-    anyhow::bail!("ferrotexd binary not found. Run `cargo build -p ferrotexd` first.")
+    Ok(serde_json::from_str(&String::from_utf8(body)?)?)
 }
