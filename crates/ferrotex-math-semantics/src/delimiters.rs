@@ -19,11 +19,11 @@ pub struct DelimiterError {
 pub fn check_delimiters(root: &SyntaxNode) -> Vec<DelimiterError> {
     let mut errors = Vec::new();
     let text = root.text().to_string();
-    
+
     // Track \left / \right pairs using text scanning
     let mut left_count = 0usize;
     let mut right_count = 0usize;
-    
+
     // Find all \left and \right in text
     for (idx, _) in text.match_indices("\\left") {
         left_count += 1;
@@ -33,7 +33,7 @@ pub fn check_delimiters(root: &SyntaxNode) -> Vec<DelimiterError> {
             // Already handled
         }
     }
-    
+
     for (idx, _) in text.match_indices("\\right") {
         right_count += 1;
         let lefts_before = text[..idx].matches("\\left").count();
@@ -45,54 +45,63 @@ pub fn check_delimiters(root: &SyntaxNode) -> Vec<DelimiterError> {
             });
         }
     }
-    
+
     if left_count > right_count {
         errors.push(DelimiterError {
             message: format!("{} unmatched \\left delimiter(s)", left_count - right_count),
             offset: 0, // Report at start of document
         });
     }
-    
+
     // Check basic bracket balance in math content
     let mut paren_stack: Vec<(char, usize)> = Vec::new();
-    
+
     for (idx, ch) in text.char_indices() {
         match ch {
             '(' | '[' | '{' => paren_stack.push((ch, idx)),
             ')' => {
-                if let Some((open, _)) = paren_stack.pop() {
-                    if open != '(' {
-                        errors.push(DelimiterError {
-                            message: format!("Mismatched delimiter: expected closing for '{}', found ')'", open),
-                            offset: idx,
-                        });
-                    }
+                if let Some((open, _)) = paren_stack.pop()
+                    && open != '('
+                {
+                    errors.push(DelimiterError {
+                        message: format!(
+                            "Mismatched delimiter: expected closing for '{}', found ')'",
+                            open
+                        ),
+                        offset: idx,
+                    });
                 }
             }
             ']' => {
-                if let Some((open, _)) = paren_stack.pop() {
-                    if open != '[' {
-                        errors.push(DelimiterError {
-                            message: format!("Mismatched delimiter: expected closing for '{}', found ']'", open),
-                            offset: idx,
-                        });
-                    }
+                if let Some((open, _)) = paren_stack.pop()
+                    && open != '['
+                {
+                    errors.push(DelimiterError {
+                        message: format!(
+                            "Mismatched delimiter: expected closing for '{}', found ']'",
+                            open
+                        ),
+                        offset: idx,
+                    });
                 }
             }
             '}' => {
-                if let Some((open, _)) = paren_stack.pop() {
-                    if open != '{' {
-                        errors.push(DelimiterError {
-                            message: format!("Mismatched delimiter: expected closing for '{}', found '}}'", open),
-                            offset: idx,
-                        });
-                    }
+                if let Some((open, _)) = paren_stack.pop()
+                    && open != '{'
+                {
+                    errors.push(DelimiterError {
+                        message: format!(
+                            "Mismatched delimiter: expected closing for '{}', found '}}'",
+                            open
+                        ),
+                        offset: idx,
+                    });
                 }
             }
             _ => {}
         }
     }
-    
+
     // Report unclosed delimiters
     for (open, offset) in paren_stack {
         errors.push(DelimiterError {
@@ -100,7 +109,7 @@ pub fn check_delimiters(root: &SyntaxNode) -> Vec<DelimiterError> {
             offset,
         });
     }
-    
+
     errors
 }
 
@@ -115,7 +124,10 @@ mod tests {
         let parsed = parse(input);
         let root = SyntaxNode::new_root(parsed.green_node());
         let errors = check_delimiters(&root);
-        assert!(errors.is_empty(), "Balanced delimiters should have no errors");
+        assert!(
+            errors.is_empty(),
+            "Balanced delimiters should have no errors"
+        );
     }
 
     #[test]
@@ -138,16 +150,18 @@ mod tests {
 
     #[test]
     fn test_mismatched_delimiters() {
-        let inputs = vec![
-            "( ]",
-            "[ }",
-            "{ )",
-        ];
+        let inputs = vec!["( ]", "[ }", "{ )"];
         for input in inputs {
             let parsed = parse(input);
             let root = SyntaxNode::new_root(parsed.green_node());
             let errors = check_delimiters(&root);
-            assert!(errors.iter().any(|e| e.message.contains("Mismatched delimiter")), "Should detect mismatched delimiter in '{}'", input);
+            assert!(
+                errors
+                    .iter()
+                    .any(|e| e.message.contains("Mismatched delimiter")),
+                "Should detect mismatched delimiter in '{}'",
+                input
+            );
         }
     }
 
@@ -157,6 +171,10 @@ mod tests {
         let parsed = parse(input);
         let root = SyntaxNode::new_root(parsed.green_node());
         let errors = check_delimiters(&root);
-        assert!(errors.iter().any(|e| e.message.contains("Unclosed delimiter")));
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.message.contains("Unclosed delimiter"))
+        );
     }
 }

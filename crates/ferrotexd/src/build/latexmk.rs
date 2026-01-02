@@ -39,7 +39,7 @@ impl BuildEngine for LatexmkAdapter {
         // latexmk -pdf -interaction=nonstopmode -halt-on-error -file-line-error -outdir=<dist> <file>
         // PATH Augmentation for macOS (MacTeX)
         let mut cmd = Command::new("latexmk");
-        
+
         #[cfg(target_os = "macos")]
         {
             let current_path = std::env::var("PATH").unwrap_or_default();
@@ -90,7 +90,7 @@ impl BuildEngine for LatexmkAdapter {
 
             // Wait for process to finish
             let status = child.wait().await?;
-            
+
             // Wait for IO streams to finish
             let _ = tokio::join!(stdout_handle, stderr_handle);
 
@@ -100,15 +100,15 @@ impl BuildEngine for LatexmkAdapter {
                 artifact.set_extension("pdf");
                 Ok(BuildStatus::Success(artifact))
             } else {
-                 Ok(BuildStatus::Failure(BuildLog {
+                Ok(BuildStatus::Failure(BuildLog {
                     stdout: "See realtime logs".into(),
                     stderr: "See realtime logs".into(),
                 }))
             }
         } else {
-             // Buffered mode (same as before)
-             let output = child.wait_with_output().await?;
-             if output.status.success() {
+            // Buffered mode (same as before)
+            let output = child.wait_with_output().await?;
+            if output.status.success() {
                 let file_stem = file_path.file_stem().unwrap_or_default();
                 let mut artifact = out_dir.join(file_stem);
                 artifact.set_extension("pdf");

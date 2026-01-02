@@ -23,7 +23,7 @@ pub struct BuildLog {
 #[derive(Debug)]
 pub enum BuildStatus {
     /// Build succeeded, producing an artifact at the given path.
-    Success(std::path::PathBuf), 
+    Success(std::path::PathBuf),
     /// Build failed, with captured logs.
     Failure(BuildLog),
 }
@@ -46,4 +46,3 @@ pub trait BuildEngine: Send + Sync {
 pub mod latexmk;
 #[cfg(feature = "use-tectonic")]
 pub mod tectonic;
-

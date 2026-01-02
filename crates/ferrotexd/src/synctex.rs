@@ -1,6 +1,6 @@
+use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::process::Command;
-use serde::{Deserialize, Serialize};
 
 /// Result of a SyncTeX Forward Search (Source -> PDF).
 #[derive(Debug, Serialize, Deserialize)]
@@ -33,9 +33,9 @@ pub fn forward_search(
     // x:123.456
     // y:789.012
     // ...
-    
+
     let input_spec = format!("{}:{}:{}", line + 1, col + 1, tex_path.to_string_lossy());
-    
+
     let output = Command::new("synctex")
         .arg("view")
         .arg("-i")
@@ -50,12 +50,12 @@ pub fn forward_search(
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    
+
     // Parse output
     let mut page = 0;
     let mut x = 0.0;
     let mut y = 0.0;
-    
+
     for line in stdout.lines() {
         if let Some(p) = line.strip_prefix("Page:") {
             page = p.trim().parse().unwrap_or(0);
@@ -74,18 +74,13 @@ pub fn forward_search(
 }
 
 /// Runs `synctex edit` to find the source location corresponding to a PDF location.
-pub fn inverse_search(
-    pdf_path: &Path,
-    page: u32,
-    x: f64,
-    y: f64,
-) -> Option<InverseSearchResult> {
+pub fn inverse_search(pdf_path: &Path, page: u32, x: f64, y: f64) -> Option<InverseSearchResult> {
     // synctex edit -o "page:x:y:pdf_path"
     // format:
     // Line:10
     // Column:5
     // Input:/path/to/file.tex
-    
+
     let input_spec = format!("{}:{}:{}:{}", page, x, y, pdf_path.to_string_lossy());
 
     let output = Command::new("synctex")
@@ -94,16 +89,16 @@ pub fn inverse_search(
         .arg(&input_spec)
         .output()
         .ok()?;
-        
+
     if !output.status.success() {
         return None;
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    
+
     let mut file = String::new();
     let mut line_num = 0;
-    
+
     for line in stdout.lines() {
         if let Some(l) = line.strip_prefix("Line:") {
             line_num = l.trim().parse().unwrap_or(0);
@@ -113,7 +108,10 @@ pub fn inverse_search(
     }
 
     if !file.is_empty() && line_num > 0 {
-        Some(InverseSearchResult { file, line: line_num - 1 }) // Convert back to 0-indexed
+        Some(InverseSearchResult {
+            file,
+            line: line_num - 1,
+        }) // Convert back to 0-indexed
     } else {
         None
     }

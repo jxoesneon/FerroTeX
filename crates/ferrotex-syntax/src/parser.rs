@@ -88,7 +88,7 @@ impl<'a> Parser<'a> {
         lexer_clone.next();
         if let Some((SyntaxKind::LBrace, _)) = lexer_clone.next() {
             let mut text = String::new();
-            while let Some((kind, content)) = lexer_clone.next() {
+            for (kind, content) in lexer_clone {
                 match kind {
                     SyntaxKind::RBrace | SyntaxKind::Eof => break,
                     _ => text.push_str(content),
@@ -302,7 +302,10 @@ impl<'a> Parser<'a> {
                     if let Some((_, text)) = self.lexer.peek() {
                         if *text == "\\end" {
                             let end_name = self.get_group_text_peek();
-                            if !begin_name.is_empty() && !end_name.is_empty() && begin_name != end_name {
+                            if !begin_name.is_empty()
+                                && !end_name.is_empty()
+                                && begin_name != end_name
+                            {
                                 self.error(format!(
                                     "Mismatched environment: began with '{}', but ended with '{}'",
                                     begin_name, end_name
@@ -497,7 +500,7 @@ mod tests {
     fn test_parser_math_unclosed() {
         let input = r"$ x + y"; // Unclosed dollar
         let _res = parse(input);
-        // Our current parser might just treat it as a dollar token? 
+        // Our current parser might just treat it as a dollar token?
         // Need to check if it emits an error.
     }
 
@@ -527,7 +530,11 @@ mod tests {
     fn test_parser_complex_nesting() {
         let input = r"\begin{quote} { Text \begin{center} center \end{center} } \end{quote}";
         let result = parse(input);
-        assert!(result.errors.is_empty(), "Should parse nested structures without errors: {:?}", result.errors);
+        assert!(
+            result.errors.is_empty(),
+            "Should parse nested structures without errors: {:?}",
+            result.errors
+        );
     }
 
     #[test]

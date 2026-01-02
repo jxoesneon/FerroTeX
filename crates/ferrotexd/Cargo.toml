@@ -1,6 +1,6 @@
 [package]
 name = "ferrotexd"
-version = "0.20.0"
+version = "0.20.1"
 edition = "2021"
 
 [dependencies]
@@ -30,11 +30,11 @@ lazy_static = "1.4"
 rowan = "0.15"
 async-trait = "0.1"
 
-ferrotex-syntax = { path = "../ferrotex-syntax", version = "0.20.0" }
-ferrotex-log = { path = "../ferrotex-log", version = "0.20.0" }
-ferrotex-package = { path = "../ferrotex-package", version = "0.20.0" }
-ferrotex-math-semantics = { path = "../ferrotex-math-semantics", version = "0.20.0" }
-ferrotex-core = { path = "../ferrotex-core", version = "0.20.0" }
+ferrotex-syntax = { path = "../ferrotex-syntax", version = "0.20.1" }
+ferrotex-log = { path = "../ferrotex-log", version = "0.20.1" }
+ferrotex-package = { path = "../ferrotex-package", version = "0.20.1" }
+ferrotex-math-semantics = { path = "../ferrotex-math-semantics", version = "0.20.1" }
+ferrotex-core = { path = "../ferrotex-core", version = "0.20.1" }
 
 tectonic = { version = "0.15", default-features = false, optional = true }
 

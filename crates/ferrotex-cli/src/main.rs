@@ -115,10 +115,13 @@ fn build_tex(tex_path: &Path, output_dir: &Path) -> anyhow::Result<()> {
 
 fn verify_lock(lock_path: &Path) -> anyhow::Result<()> {
     use ferrotex_build::Lockfile;
-    use sha2::{Sha256, Digest};
+    use sha2::{Digest, Sha256};
 
     let lockfile = Lockfile::load(lock_path)?;
-    println!("🔍 Verifying build against lockfile: {}", lock_path.display());
+    println!(
+        "🔍 Verifying build against lockfile: {}",
+        lock_path.display()
+    );
 
     let mut all_match = true;
     for (path_str, expected_hash) in &lockfile.entries {

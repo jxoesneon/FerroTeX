@@ -6,6 +6,21 @@ The format is based on **Keep a Changelog**, and this project intends to follow 
 
 ## [Unreleased]
 
+## [0.20.1] - 2026-01-02
+
+### "Stellar Security" Patch
+
+This patch release focuses on critical security remediations and workspace stability, ensuring FerroTeX meets high-end production standards.
+
+### Fixed
+
+- **Security Remediation**:
+  - Remediated 5 critical vulnerabilities in `gix-features`, `gix-fs`, `gix-path`, and `gix-ref` via workspace-level `[patch.crates-io]` overrides.
+  - Upgraded `reqwest` to `v0.13.1` in `ferrotexd` to address unmaintained dependency warnings and modernize the networking stack.
+- **Build Stability**:
+  - Implemented a robust workaround for directory creation failures in `tectonic_bridge_harfbuzz v0.2.9` build scripts.
+  - Resolved `Cargo.toml` duplicate patch table errors.
+
 ## [0.20.0] - 2026-01-02
 
 ### "Engine Synchrony" Release
@@ -347,4 +362,6 @@ This milestone release transforms FerroTeX into a high-fidelity "Scientific Comp
 [0.14.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.13.0...v0.14.0
 [0.15.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.14.0...v0.15.0
 [0.16.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.15.0...v0.16.0
-[Unreleased]: https://github.com/jxoesneon/FerroTeX/compare/v0.16.0...HEAD
+[Unreleased]: https://github.com/jxoesneon/FerroTeX/compare/v0.20.1...HEAD
+[0.20.1]: https://github.com/jxoesneon/FerroTeX/compare/v0.20.0...v0.20.1
+[0.20.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.16.0...v0.20.0

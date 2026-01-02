@@ -1,8 +1,7 @@
-use serde::{Deserialize, Serialize};
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 
 pub mod shim;
-
 
 /// Represents a raw DAP message (Request, Response, or Event).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -44,13 +43,13 @@ pub trait DebugAdapter {
 
     /// Called when the client requests 'continue'.
     fn continue_execution(&mut self) -> Result<()>;
-    
+
     /// Called when the client requests 'next' (step over).
     fn next(&mut self) -> Result<()>;
 
     /// Called when the client requests 'stepIn'.
     fn step_in(&mut self) -> Result<()>;
-    
+
     /// Called when the client requests 'scopes'.
     fn scopes(&mut self, args: serde_json::Value) -> Result<serde_json::Value>;
 
@@ -82,9 +81,11 @@ impl<A: DebugAdapter> DebugSession<A> {
     }
 
     /// Internal logic for the DAP session, allowing mocking of I/O.
-    pub fn run_session(&mut self, reader: &mut impl std::io::BufRead, stdout: &mut impl std::io::Write) -> Result<()> {
-        use std::io::Read;
-        
+    pub fn run_session(
+        &mut self,
+        reader: &mut impl std::io::BufRead,
+        stdout: &mut impl std::io::Write,
+    ) -> Result<()> {
         loop {
             // 1. Read Headers (Content-Length)
             let mut content_length = 0;
@@ -93,55 +94,68 @@ impl<A: DebugAdapter> DebugSession<A> {
                 if reader.read_line(&mut line)? == 0 {
                     return Ok(()); // EOF
                 }
-                
+
                 // Trim
                 let line = line.trim();
-                
+
                 if line.is_empty() {
                     // Empty line marks end of headers
                     break;
                 }
-                
-                if line.to_lowercase().starts_with("content-length: ") {
-                    if let Ok(len) = line["content-length: ".len()..].parse::<usize>() {
-                        content_length = len;
-                    }
+
+                if line.to_lowercase().starts_with("content-length: ")
+                    && let Ok(len) = line["content-length: ".len()..].parse::<usize>()
+                {
+                    content_length = len;
                 }
             }
-            
+
             if content_length == 0 {
-                continue; 
+                continue;
             }
 
             // 2. Read Body
             let mut buffer = vec![0u8; content_length];
             reader.read_exact(&mut buffer)?;
-            
+
             let message_str = String::from_utf8_lossy(&buffer);
 
             // 3. Parse & Dispatch
-            if let Ok(msg) = serde_json::from_str::<ProtocolMessage>(&message_str) {
-                if let ProtocolMessage::Request { seq, command, arguments } = msg {
-                    self.handle_request(seq, &command, arguments, stdout)?;
-                }
+            if let Ok(msg) = serde_json::from_str::<ProtocolMessage>(&message_str)
+                && let ProtocolMessage::Request {
+                    seq,
+                    command,
+                    arguments,
+                } = msg
+            {
+                self.handle_request(seq, &command, arguments, stdout)?;
             }
         }
     }
-    
-    fn handle_request(&mut self, seq: i64, command: &str, args: Option<serde_json::Value>, stdout: &mut impl std::io::Write) -> Result<()> {
+
+    fn handle_request(
+        &mut self,
+        seq: i64,
+        command: &str,
+        args: Option<serde_json::Value>,
+        stdout: &mut impl std::io::Write,
+    ) -> Result<()> {
         let args = args.unwrap_or(serde_json::Value::Null);
         let result = match command {
             "initialize" => self.adapter.initialize(args),
             "launch" => self.adapter.launch(args).map(|_| serde_json::Value::Null),
             "disconnect" => self.adapter.disconnect().map(|_| serde_json::Value::Null),
-            "continue" => self.adapter.continue_execution().map(|_| serde_json::Value::Null),
+            "continue" => self
+                .adapter
+                .continue_execution()
+                .map(|_| serde_json::Value::Null),
             "next" => self.adapter.next().map(|_| serde_json::Value::Null),
             "stepIn" => self.adapter.step_in().map(|_| serde_json::Value::Null),
             "scopes" => self.adapter.scopes(args),
             "variables" => self.adapter.variables(args),
             _ => Ok(serde_json::json!({})),
         };
-        
+
         let (success, body, message) = match result {
             Ok(val) => (true, Some(val), None),
             Err(e) => (false, None, Some(e.to_string())),
@@ -155,160 +169,164 @@ impl<A: DebugAdapter> DebugSession<A> {
             message,
             body,
         };
-        
+
         let resp_json = serde_json::to_string(&response)?;
         let resp_body = format!("Content-Length: {}\r\n\r\n{}", resp_json.len(), resp_json);
         stdout.write_all(resp_body.as_bytes())?;
         stdout.flush()?;
-        
+
         Ok(())
     }
-    
+
     fn next_seq(&mut self) -> i64 {
         self.seq += 1;
         self.seq
     }
 }
 
-    #[cfg(feature = "tectonic-engine")]
-    use crate::shim::{EngineCommand, EngineEvent};
-    #[cfg(feature = "tectonic-engine")]
-    use std::sync::{Arc, Mutex};
-    #[cfg(feature = "tectonic-engine")]
-    use std::collections::HashMap;
-    #[cfg(feature = "tectonic-engine")]
-    use std::sync::mpsc::Sender;
+#[cfg(feature = "tectonic-engine")]
+use crate::shim::{EngineCommand, EngineEvent};
+#[cfg(feature = "tectonic-engine")]
+use std::collections::HashMap;
+#[cfg(feature = "tectonic-engine")]
+use std::sync::mpsc::Sender;
+#[cfg(feature = "tectonic-engine")]
+use std::sync::{Arc, Mutex};
 
-    #[cfg(feature = "tectonic-engine")]
-    pub struct TectonicAdapter {
-        shim_tx: Option<Sender<EngineCommand>>,
-        shadow_vars: Arc<Mutex<HashMap<String, String>>>,
-    }
+#[cfg(feature = "tectonic-engine")]
+pub struct TectonicAdapter {
+    shim_tx: Option<Sender<EngineCommand>>,
+    shadow_vars: Arc<Mutex<HashMap<String, String>>>,
+}
 
-    #[cfg(feature = "tectonic-engine")]
-    impl TectonicAdapter {
-        pub fn new() -> Self {
-            Self {
-                shim_tx: None,
-                shadow_vars: Arc::new(Mutex::new(HashMap::new())),
-            }
+#[cfg(feature = "tectonic-engine")]
+impl TectonicAdapter {
+    pub fn new() -> Self {
+        Self {
+            shim_tx: None,
+            shadow_vars: Arc::new(Mutex::new(HashMap::new())),
         }
     }
+}
 
-    #[cfg(feature = "tectonic-engine")]
-    impl DebugAdapter for TectonicAdapter {
-        fn initialize(&mut self, _args: serde_json::Value) -> Result<serde_json::Value> {
-            Ok(serde_json::json!({
-                "supportsConfigurationDoneRequest": true,
-                "supportsVariableType": true,
-                "supportsVariablePaging": false,
-            }))
-        }
+#[cfg(feature = "tectonic-engine")]
+impl DebugAdapter for TectonicAdapter {
+    fn initialize(&mut self, _args: serde_json::Value) -> Result<serde_json::Value> {
+        Ok(serde_json::json!({
+            "supportsConfigurationDoneRequest": true,
+            "supportsVariableType": true,
+            "supportsVariablePaging": false,
+        }))
+    }
 
-        fn launch(&mut self, args: serde_json::Value) -> Result<()> {
-            use crate::shim::TectonicShim;
-            let program = args["program"].as_str().ok_or_else(|| anyhow::anyhow!("Missing 'program' in launch args"))?;
-            let shim = TectonicShim::new(std::path::PathBuf::from(program));
-            let (tx, rx) = shim.spawn();
-            self.shim_tx = Some(tx);
-            
-            let vars = self.shadow_vars.clone();
-            // Thread to handle events from the engine
-            std::thread::spawn(move || {
-                let mut stdout = std::io::stdout();
-                while let Ok(event) = rx.recv() {
-                    match event {
-                        EngineEvent::Stopped { reason, location } => {
-                            let msg = serde_json::json!({
-                                "type": "event",
-                                "seq": 0, // Injected by session usually, but here we're async
-                                "event": "stopped",
-                                "body": {
-                                    "reason": reason,
-                                    "threadId": 1,
-                                    "allThreadsStopped": true,
-                                    "text": location
-                                }
-                            });
-                            send_raw_dap(&msg, &mut stdout).unwrap();
-                        }
-                        EngineEvent::Output(text) => {
-                            let msg = serde_json::json!({
-                                "type": "event",
-                                "event": "output",
-                                "body": { "output": text }
-                            });
-                            send_raw_dap(&msg, &mut stdout).unwrap();
-                        }
-                        EngineEvent::VariablesUpdated(new_vars) => {
-                            let mut v = vars.lock().unwrap();
-                            *v = new_vars;
-                        }
-                        EngineEvent::Terminated => {
-                            let msg = serde_json::json!({ "type": "event", "event": "terminated" });
-                            send_raw_dap(&msg, &mut stdout).unwrap();
-                            break;
-                        }
+    fn launch(&mut self, args: serde_json::Value) -> Result<()> {
+        use crate::shim::TectonicShim;
+        let program = args["program"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing 'program' in launch args"))?;
+        let shim = TectonicShim::new(std::path::PathBuf::from(program));
+        let (tx, rx) = shim.spawn();
+        self.shim_tx = Some(tx);
+
+        let vars = self.shadow_vars.clone();
+        // Thread to handle events from the engine
+        std::thread::spawn(move || {
+            let mut stdout = std::io::stdout();
+            while let Ok(event) = rx.recv() {
+                match event {
+                    EngineEvent::Stopped { reason, location } => {
+                        let msg = serde_json::json!({
+                            "type": "event",
+                            "seq": 0, // Injected by session usually, but here we're async
+                            "event": "stopped",
+                            "body": {
+                                "reason": reason,
+                                "threadId": 1,
+                                "allThreadsStopped": true,
+                                "text": location
+                            }
+                        });
+                        send_raw_dap(&msg, &mut stdout).unwrap();
+                    }
+                    EngineEvent::Output(text) => {
+                        let msg = serde_json::json!({
+                            "type": "event",
+                            "event": "output",
+                            "body": { "output": text }
+                        });
+                        send_raw_dap(&msg, &mut stdout).unwrap();
+                    }
+                    EngineEvent::VariablesUpdated(new_vars) => {
+                        let mut v = vars.lock().unwrap();
+                        *v = new_vars;
+                    }
+                    EngineEvent::Terminated => {
+                        let msg = serde_json::json!({ "type": "event", "event": "terminated" });
+                        send_raw_dap(&msg, &mut stdout).unwrap();
+                        break;
                     }
                 }
-            });
-
-            Ok(())
-        }
-
-        fn continue_execution(&mut self) -> Result<()> {
-            if let Some(tx) = &self.shim_tx {
-                tx.send(EngineCommand::Continue)?;
             }
-            Ok(())
-        }
+        });
 
-        fn next(&mut self) -> Result<()> {
-            if let Some(tx) = &self.shim_tx {
-                tx.send(EngineCommand::Step)?;
-            }
-            Ok(())
-        }
-
-        fn step_in(&mut self) -> Result<()> { Ok(()) }
-
-        fn scopes(&mut self, _args: serde_json::Value) -> Result<serde_json::Value> {
-            Ok(serde_json::json!({
-                "scopes": [
-                    { "name": "Registers", "variablesReference": 1, "expensive": false },
-                ]
-            }))
-        }
-
-        fn variables(&mut self, _args: serde_json::Value) -> Result<serde_json::Value> {
-            let vars = self.shadow_vars.lock().unwrap();
-            let mut dap_vars = Vec::new();
-            for (name, value) in vars.iter() {
-                dap_vars.push(serde_json::json!({
-                    "name": name,
-                    "value": value,
-                    "variablesReference": 0
-                }));
-            }
-            Ok(serde_json::json!({ "variables": dap_vars }))
-        }
-
-        fn disconnect(&mut self) -> Result<()> {
-            if let Some(tx) = &self.shim_tx {
-                let _ = tx.send(EngineCommand::Terminate);
-            }
-            Ok(())
-        }
-    }
-
-    #[cfg(feature = "tectonic-engine")]
-    fn send_raw_dap(msg: &serde_json::Value, stdout: &mut impl std::io::Write) -> Result<()> {
-        let resp_json = serde_json::to_string(msg)?;
-        let resp_body = format!("Content-Length: {}\r\n\r\n{}", resp_json.len(), resp_json);
-        stdout.write_all(resp_body.as_bytes())?;
-        stdout.flush()?;
         Ok(())
     }
+
+    fn continue_execution(&mut self) -> Result<()> {
+        if let Some(tx) = &self.shim_tx {
+            tx.send(EngineCommand::Continue)?;
+        }
+        Ok(())
+    }
+
+    fn next(&mut self) -> Result<()> {
+        if let Some(tx) = &self.shim_tx {
+            tx.send(EngineCommand::Step)?;
+        }
+        Ok(())
+    }
+
+    fn step_in(&mut self) -> Result<()> {
+        Ok(())
+    }
+
+    fn scopes(&mut self, _args: serde_json::Value) -> Result<serde_json::Value> {
+        Ok(serde_json::json!({
+            "scopes": [
+                { "name": "Registers", "variablesReference": 1, "expensive": false },
+            ]
+        }))
+    }
+
+    fn variables(&mut self, _args: serde_json::Value) -> Result<serde_json::Value> {
+        let vars = self.shadow_vars.lock().unwrap();
+        let mut dap_vars = Vec::new();
+        for (name, value) in vars.iter() {
+            dap_vars.push(serde_json::json!({
+                "name": name,
+                "value": value,
+                "variablesReference": 0
+            }));
+        }
+        Ok(serde_json::json!({ "variables": dap_vars }))
+    }
+
+    fn disconnect(&mut self) -> Result<()> {
+        if let Some(tx) = &self.shim_tx {
+            let _ = tx.send(EngineCommand::Terminate);
+        }
+        Ok(())
+    }
+}
+
+#[cfg(feature = "tectonic-engine")]
+fn send_raw_dap(msg: &serde_json::Value, stdout: &mut impl std::io::Write) -> Result<()> {
+    let resp_json = serde_json::to_string(msg)?;
+    let resp_body = format!("Content-Length: {}\r\n\r\n{}", resp_json.len(), resp_json);
+    stdout.write_all(resp_body.as_bytes())?;
+    stdout.flush()?;
+    Ok(())
+}
 
 pub fn run_mock_session() -> Result<()> {
     let stdin = std::io::stdin();
@@ -337,36 +355,45 @@ impl DebugAdapter for MockAdapter {
         Ok(())
     }
 
-    fn continue_execution(&mut self) -> Result<()> { 
+    fn continue_execution(&mut self) -> Result<()> {
         if let Some(tx) = &self.shim_tx {
             tx.send(crate::shim::EngineCommand::Continue)?;
         }
         Ok(())
     }
 
-    fn next(&mut self) -> Result<()> { 
+    fn next(&mut self) -> Result<()> {
         if let Some(tx) = &self.shim_tx {
             tx.send(crate::shim::EngineCommand::Step)?;
         }
         Ok(())
     }
-    
-    fn step_in(&mut self) -> Result<()> { Ok(()) }
+
+    fn step_in(&mut self) -> Result<()> {
+        Ok(())
+    }
     fn scopes(&mut self, _args: serde_json::Value) -> Result<serde_json::Value> {
-         Ok(serde_json::json!({ "scopes": [ { "name": "Global", "variablesReference": 1, "expensive": false } ] }))
+        Ok(
+            serde_json::json!({ "scopes": [ { "name": "Global", "variablesReference": 1, "expensive": false } ] }),
+        )
     }
     fn variables(&mut self, _args: serde_json::Value) -> Result<serde_json::Value> {
-         Ok(serde_json::json!({ "variables": [ { "name": "dummy", "value": "0", "variablesReference": 0 } ] }))
+        Ok(
+            serde_json::json!({ "variables": [ { "name": "dummy", "value": "0", "variablesReference": 0 } ] }),
+        )
     }
-    fn disconnect(&mut self) -> Result<()> { 
-         if let Some(tx) = &self.shim_tx {
+    fn disconnect(&mut self) -> Result<()> {
+        if let Some(tx) = &self.shim_tx {
             let _ = tx.send(crate::shim::EngineCommand::Terminate);
         }
-        Ok(()) 
+        Ok(())
     }
 }
 
-pub fn run_mock_session_with_io(reader: &mut impl std::io::BufRead, writer: &mut impl std::io::Write) -> Result<()> {
+pub fn run_mock_session_with_io(
+    reader: &mut impl std::io::BufRead,
+    writer: &mut impl std::io::Write,
+) -> Result<()> {
     let adapter = MockAdapter { shim_tx: None };
     let mut session = DebugSession::new(adapter);
     session.run_session(reader, writer)?;
@@ -395,7 +422,7 @@ mod tests {
         let js = serde_json::to_string(&msg).unwrap();
         assert!(js.contains("\"type\":\"request\""));
         assert!(js.contains("\"command\":\"initialize\""));
-        
+
         let back: ProtocolMessage = serde_json::from_str(&js).unwrap();
         match back {
             ProtocolMessage::Request { seq, .. } => assert_eq!(seq, 1),
@@ -405,23 +432,41 @@ mod tests {
 
     struct SimpleAdapter;
     impl DebugAdapter for SimpleAdapter {
-        fn initialize(&mut self, _args: serde_json::Value) -> Result<serde_json::Value> { Ok(json!({"ok": true})) }
-        fn launch(&mut self, _args: serde_json::Value) -> Result<()> { Ok(()) }
-        fn continue_execution(&mut self) -> Result<()> { Ok(()) }
-        fn next(&mut self) -> Result<()> { Ok(()) }
-        fn step_in(&mut self) -> Result<()> { Ok(()) }
-        fn scopes(&mut self, _args: serde_json::Value) -> Result<serde_json::Value> { Ok(json!({})) }
-        fn variables(&mut self, _args: serde_json::Value) -> Result<serde_json::Value> { Ok(json!({})) }
-        fn disconnect(&mut self) -> Result<()> { Ok(()) }
+        fn initialize(&mut self, _args: serde_json::Value) -> Result<serde_json::Value> {
+            Ok(json!({"ok": true}))
+        }
+        fn launch(&mut self, _args: serde_json::Value) -> Result<()> {
+            Ok(())
+        }
+        fn continue_execution(&mut self) -> Result<()> {
+            Ok(())
+        }
+        fn next(&mut self) -> Result<()> {
+            Ok(())
+        }
+        fn step_in(&mut self) -> Result<()> {
+            Ok(())
+        }
+        fn scopes(&mut self, _args: serde_json::Value) -> Result<serde_json::Value> {
+            Ok(json!({}))
+        }
+        fn variables(&mut self, _args: serde_json::Value) -> Result<serde_json::Value> {
+            Ok(json!({}))
+        }
+        fn disconnect(&mut self) -> Result<()> {
+            Ok(())
+        }
     }
 
     #[test]
     fn test_session_handle_request() {
         let mut session = DebugSession::new(SimpleAdapter);
         let mut stdout = Vec::new();
-        
-        session.handle_request(1, "initialize", None, &mut stdout).unwrap();
-        
+
+        session
+            .handle_request(1, "initialize", None, &mut stdout)
+            .unwrap();
+
         let out_str = String::from_utf8(stdout).unwrap();
         assert!(out_str.contains("Content-Length:"));
         assert!(out_str.contains("\"success\":true"));
@@ -435,9 +480,9 @@ mod tests {
         let input_data = format!("Content-Length: {}\r\n\r\n{}", body.len(), body);
         let mut reader = std::io::Cursor::new(input_data);
         let mut stdout = Vec::new();
-        
+
         session.run_session(&mut reader, &mut stdout).unwrap();
-        
+
         let out_str = String::from_utf8(stdout).unwrap();
         assert!(out_str.contains("\"command\":\"next\""));
         assert!(out_str.contains("\"success\":true"));
@@ -447,19 +492,37 @@ mod tests {
     fn test_adapter_error() {
         struct FailingAdapter;
         impl DebugAdapter for FailingAdapter {
-            fn initialize(&mut self, _args: serde_json::Value) -> Result<serde_json::Value> { Err(anyhow::anyhow!("fail")) }
-            fn launch(&mut self, _args: serde_json::Value) -> Result<()> { Ok(()) }
-            fn continue_execution(&mut self) -> Result<()> { Ok(()) }
-            fn next(&mut self) -> Result<()> { Ok(()) }
-            fn step_in(&mut self) -> Result<()> { Ok(()) }
-            fn scopes(&mut self, _args: serde_json::Value) -> Result<serde_json::Value> { Ok(json!({})) }
-            fn variables(&mut self, _args: serde_json::Value) -> Result<serde_json::Value> { Ok(json!({})) }
-            fn disconnect(&mut self) -> Result<()> { Ok(()) }
+            fn initialize(&mut self, _args: serde_json::Value) -> Result<serde_json::Value> {
+                Err(anyhow::anyhow!("fail"))
+            }
+            fn launch(&mut self, _args: serde_json::Value) -> Result<()> {
+                Ok(())
+            }
+            fn continue_execution(&mut self) -> Result<()> {
+                Ok(())
+            }
+            fn next(&mut self) -> Result<()> {
+                Ok(())
+            }
+            fn step_in(&mut self) -> Result<()> {
+                Ok(())
+            }
+            fn scopes(&mut self, _args: serde_json::Value) -> Result<serde_json::Value> {
+                Ok(json!({}))
+            }
+            fn variables(&mut self, _args: serde_json::Value) -> Result<serde_json::Value> {
+                Ok(json!({}))
+            }
+            fn disconnect(&mut self) -> Result<()> {
+                Ok(())
+            }
         }
 
         let mut session = DebugSession::new(FailingAdapter);
         let mut stdout = Vec::new();
-        session.handle_request(1, "initialize", None, &mut stdout).unwrap();
+        session
+            .handle_request(1, "initialize", None, &mut stdout)
+            .unwrap();
         let out_str = String::from_utf8(stdout).unwrap();
         assert!(out_str.contains("\"success\":false"));
         assert!(out_str.contains("\"message\":\"fail\""));
@@ -477,18 +540,18 @@ mod tests {
             json!({"type":"request","seq":7,"command":"variables","arguments":{"variablesReference":1}}),
             json!({"type":"request","seq":8,"command":"disconnect"}),
         ];
-        
+
         let mut input_data = String::new();
         for cmd in commands {
             let body = cmd.to_string();
             input_data.push_str(&format!("Content-Length: {}\r\n\r\n{}", body.len(), body));
         }
-        
+
         let mut reader = std::io::Cursor::new(input_data);
         let mut stdout = Vec::new();
-        
+
         run_mock_session_with_io(&mut reader, &mut stdout).unwrap();
-        
+
         let out_str = String::from_utf8(stdout).unwrap();
         assert!(out_str.contains("\"command\":\"initialize\""));
         assert!(out_str.contains("\"command\":\"launch\""));

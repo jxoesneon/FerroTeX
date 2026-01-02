@@ -1,25 +1,33 @@
-use ferrotex_syntax::{SyntaxNode, SyntaxKind};
 use ferrotex_math_semantics::analysis::infer_shape;
 use ferrotex_math_semantics::delimiters::check_delimiters;
 use ferrotex_math_semantics::Shape;
-use tower_lsp::lsp_types::{Diagnostic, DiagnosticSeverity, Range, Position};
+use ferrotex_syntax::{SyntaxKind, SyntaxNode};
 use line_index::LineIndex;
+use tower_lsp::lsp_types::{Diagnostic, DiagnosticSeverity, Position, Range};
 
 pub fn check_math(root: &SyntaxNode, line_index: &LineIndex) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
     // 1. Check delimiter balance
     for error in check_delimiters(root) {
-        let offset = rowan::TextSize::try_from(error.offset as u32).unwrap_or_default();
+        let offset = rowan::TextSize::from(error.offset as u32);
         let pos = line_index.line_col(offset);
         let lsp_range = Range {
-            start: Position { line: pos.line, character: pos.col },
-            end: Position { line: pos.line, character: pos.col + 1 },
+            start: Position {
+                line: pos.line,
+                character: pos.col,
+            },
+            end: Position {
+                line: pos.line,
+                character: pos.col + 1,
+            },
         };
         diagnostics.push(Diagnostic {
             range: lsp_range,
             severity: Some(DiagnosticSeverity::WARNING),
-            code: Some(tower_lsp::lsp_types::NumberOrString::String("delimiter-mismatch".to_string())),
+            code: Some(tower_lsp::lsp_types::NumberOrString::String(
+                "delimiter-mismatch".to_string(),
+            )),
             code_description: None,
             source: Some("ferrotex-math".to_string()),
             message: error.message,
@@ -48,31 +56,39 @@ pub fn check_math(root: &SyntaxNode, line_index: &LineIndex) -> Vec<Diagnostic> 
             if is_matrix {
                 let shape = infer_shape(&node);
                 if let Shape::Invalid(msg) = shape {
-                     let range = node.text_range();
-                     let start = line_index.line_col(range.start());
-                     let end = line_index.line_col(range.end());
-                     
-                     let lsp_range = Range {
-                         start: Position { line: start.line, character: start.col },
-                         end: Position { line: end.line, character: end.col },
-                     };
-                     
-                     diagnostics.push(Diagnostic {
-                         range: lsp_range,
-                         severity: Some(DiagnosticSeverity::ERROR),
-                         code: Some(tower_lsp::lsp_types::NumberOrString::String("math-semantics".to_string())),
-                         code_description: None,
-                         source: Some("ferrotex-math".to_string()),
-                         message: msg,
-                         related_information: None,
-                         tags: None,
-                         data: None,
-                     });
+                    let range = node.text_range();
+                    let start = line_index.line_col(range.start());
+                    let end = line_index.line_col(range.end());
+
+                    let lsp_range = Range {
+                        start: Position {
+                            line: start.line,
+                            character: start.col,
+                        },
+                        end: Position {
+                            line: end.line,
+                            character: end.col,
+                        },
+                    };
+
+                    diagnostics.push(Diagnostic {
+                        range: lsp_range,
+                        severity: Some(DiagnosticSeverity::ERROR),
+                        code: Some(tower_lsp::lsp_types::NumberOrString::String(
+                            "math-semantics".to_string(),
+                        )),
+                        code_description: None,
+                        source: Some("ferrotex-math".to_string()),
+                        message: msg,
+                        related_information: None,
+                        tags: None,
+                        data: None,
+                    });
                 }
             }
         }
     }
-    
+
     diagnostics
 }
 
@@ -88,7 +104,7 @@ mod tests {
         let parsed = parse(input);
         let root = SyntaxNode::new_root(parsed.green_node());
         let line_index = LineIndex::new(input);
-        
+
         let diags = check_math(&root, &line_index);
         assert!(diags.is_empty(), "No matrix = no diagnostics");
     }
@@ -100,7 +116,7 @@ mod tests {
         let parsed = parse(input);
         let root = SyntaxNode::new_root(parsed.green_node());
         let line_index = LineIndex::new(input);
-        
+
         let diags = check_math(&root, &line_index);
         assert!(diags.is_empty(), "Valid matrix should have no diagnostics");
     }
@@ -112,9 +128,12 @@ mod tests {
         let parsed = parse(input);
         let root = SyntaxNode::new_root(parsed.green_node());
         let line_index = LineIndex::new(input);
-        
+
         let diags = check_math(&root, &line_index);
-        assert!(!diags.is_empty(), "Invalid matrix shape should produce diagnostics");
+        assert!(
+            !diags.is_empty(),
+            "Invalid matrix shape should produce diagnostics"
+        );
         assert!(diags.iter().any(|d| d.message.contains("Jagged matrix")));
     }
 
@@ -124,7 +143,7 @@ mod tests {
         let parsed = parse(input);
         let root = SyntaxNode::new_root(parsed.green_node());
         let line_index = LineIndex::new(input);
-        
+
         let diags = check_math(&root, &line_index);
         // Empty matrix might be valid or not depending on parser, but shouldn't panic
         // It technically has 1 row, 0 columns? Or 0 rows?

@@ -75,13 +75,13 @@ impl Transform for ShellTransform {
     fn execute(&self) -> Result<(), String> {
         let mut cmd = Command::new(&self.command);
         cmd.args(&self.args);
-        
+
         if let Some(ref dir) = self.working_dir {
             cmd.current_dir(dir);
         }
 
         let output = cmd.output().map_err(|e| e.to_string())?;
-        
+
         if output.status.success() {
             Ok(())
         } else {
@@ -96,7 +96,12 @@ pub struct PdfLatexTransform {
 }
 
 impl PdfLatexTransform {
-    pub fn new(input_tex: ArtifactId, output_pdf: ArtifactId, tex_path: PathBuf, output_dir: PathBuf) -> Self {
+    pub fn new(
+        input_tex: ArtifactId,
+        output_pdf: ArtifactId,
+        tex_path: PathBuf,
+        output_dir: PathBuf,
+    ) -> Self {
         let mut inputs = HashSet::new();
         inputs.insert(input_tex);
         let mut outputs = HashSet::new();
@@ -108,13 +113,8 @@ impl PdfLatexTransform {
             tex_path.to_string_lossy().to_string(),
         ];
 
-        let inner = ShellTransform::new(
-            "pdflatex compilation",
-            inputs,
-            outputs,
-            "pdflatex",
-            args,
-        ).with_working_dir(tex_path.parent().unwrap_or(&output_dir).to_path_buf());
+        let inner = ShellTransform::new("pdflatex compilation", inputs, outputs, "pdflatex", args)
+            .with_working_dir(tex_path.parent().unwrap_or(&output_dir).to_path_buf());
 
         Self { inner }
     }
@@ -143,9 +143,9 @@ mod tests {
     #[test]
     fn test_compiler_config() {
         let out_dir = PathBuf::from("out");
-        let compiler = Compiler::new("pdflatex", out_dir.clone())
-            .with_args(vec!["-shell-escape".to_string()]);
-        
+        let compiler =
+            Compiler::new("pdflatex", out_dir.clone()).with_args(vec!["-shell-escape".to_string()]);
+
         assert_eq!(compiler.engine, "pdflatex");
         assert_eq!(compiler.output_dir, out_dir);
         assert_eq!(compiler.extra_args[0], "-shell-escape");
@@ -157,7 +157,7 @@ mod tests {
         inputs.insert(ArtifactId("in".to_string()));
         let mut outputs = HashSet::new();
         outputs.insert(ArtifactId("out".to_string()));
-        
+
         let transform = ShellTransform::new(
             "test echo",
             inputs,
@@ -165,32 +165,22 @@ mod tests {
             "echo",
             vec!["hello".to_string()],
         );
-        
+
         assert_eq!(transform.description(), "test echo");
         assert!(transform.execute().is_ok());
     }
 
     #[test]
     fn test_shell_transform_failure() {
-        let transform = ShellTransform::new(
-            "failure",
-            HashSet::new(),
-            HashSet::new(),
-            "false",
-            vec![],
-        );
+        let transform =
+            ShellTransform::new("failure", HashSet::new(), HashSet::new(), "false", vec![]);
         assert!(transform.execute().is_err());
     }
 
     #[test]
     fn test_shell_transform_working_dir() {
-        let transform = ShellTransform::new(
-            "pwd",
-            HashSet::new(),
-            HashSet::new(),
-            "pwd",
-            vec![],
-        ).with_working_dir(std::env::current_dir().unwrap());
+        let transform = ShellTransform::new("pwd", HashSet::new(), HashSet::new(), "pwd", vec![])
+            .with_working_dir(std::env::current_dir().unwrap());
         assert!(transform.execute().is_ok());
     }
 
@@ -200,7 +190,7 @@ mod tests {
         let output = ArtifactId("out.pdf".to_string());
         let tex_path = PathBuf::from("test.tex");
         let out_dir = PathBuf::from("out");
-        
+
         let transform = PdfLatexTransform::new(input, output, tex_path, out_dir);
         assert_eq!(transform.description(), "pdflatex compilation");
         assert_eq!(transform.outputs().len(), 1);
