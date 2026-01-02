@@ -1,6 +1,6 @@
 ﻿[package]
 name = "ferrotexd"
-version = "0.19.2"
+version = "0.20.0"
 edition = "2021"
 
 [dependencies]
@@ -30,13 +30,16 @@ lazy_static = "1.4"
 rowan = "0.15"
 async-trait = "0.1"
 
-ferrotex-syntax = { path = "../ferrotex-syntax" }
-ferrotex-log = { path = "../ferrotex-log" }
-ferrotex-core = { path = "../ferrotex-core" }
+ferrotex-syntax = { path = "../ferrotex-syntax", version = "0.20.0" }
+ferrotex-log = { path = "../ferrotex-log", version = "0.20.0" }
+ferrotex-package = { path = "../ferrotex-package", version = "0.20.0" }
+ferrotex-math-semantics = { path = "../ferrotex-math-semantics", version = "0.20.0" }
+ferrotex-core = { path = "../ferrotex-core", version = "0.20.0" }
 
-tectonic = { version = "0.15", default-features = false, features = ["external-harfbuzz"] }
+tectonic = { version = "0.15", default-features = false, optional = true }
+
+[features]
+default = []
+use-tectonic = ["tectonic"]
 
 [dev-dependencies]
-tempfile = "3.8"
-
-
