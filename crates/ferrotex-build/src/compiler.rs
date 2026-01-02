@@ -134,3 +134,101 @@ impl Transform for PdfLatexTransform {
         self.inner.execute()
     }
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ArtifactId;
+    use std::collections::HashSet;
+
+    #[test]
+    fn test_compiler_config() {
+        let out_dir = PathBuf::from("out");
+        let compiler = Compiler::new("pdflatex", out_dir.clone())
+            .with_args(vec!["-shell-escape".to_string()]);
+        
+        assert_eq!(compiler.engine, "pdflatex");
+        assert_eq!(compiler.output_dir, out_dir);
+        assert_eq!(compiler.extra_args[0], "-shell-escape");
+    }
+
+    #[test]
+    fn test_shell_transform_basic() {
+        let mut inputs = HashSet::new();
+        inputs.insert(ArtifactId("in".to_string()));
+        let mut outputs = HashSet::new();
+        outputs.insert(ArtifactId("out".to_string()));
+        
+        let transform = ShellTransform::new(
+            "test echo",
+            inputs,
+            outputs,
+            "echo",
+            vec!["hello".to_string()],
+        );
+        
+        assert_eq!(transform.description(), "test echo");
+        assert!(transform.execute().is_ok());
+    }
+
+    #[test]
+    fn test_shell_transform_failure() {
+        let transform = ShellTransform::new(
+            "failure",
+            HashSet::new(),
+            HashSet::new(),
+            "false",
+            vec![],
+        );
+        assert!(transform.execute().is_err());
+    }
+
+    #[test]
+    fn test_shell_transform_working_dir() {
+        let transform = ShellTransform::new(
+            "pwd",
+            HashSet::new(),
+            HashSet::new(),
+            "pwd",
+            vec![],
+        ).with_working_dir(std::env::current_dir().unwrap());
+        assert!(transform.execute().is_ok());
+    }
+
+    #[test]
+    fn test_pdflatex_transform_delegation() {
+        let input = ArtifactId("in.tex".to_string());
+        let output = ArtifactId("out.pdf".to_string());
+        let tex_path = PathBuf::from("test.tex");
+        let out_dir = PathBuf::from("out");
+        
+        let transform = PdfLatexTransform::new(input, output, tex_path, out_dir);
+        assert_eq!(transform.description(), "pdflatex compilation");
+        assert_eq!(transform.outputs().len(), 1);
+        // This exercises the trait delegation
+        let _ = transform.execute();
+    }
+
+    #[test]
+    fn test_shell_transform_map_err() {
+        let transform = ShellTransform::new(
+            "invalid",
+            HashSet::new(),
+            HashSet::new(),
+            "/non/existent/command/at/all",
+            vec![],
+        );
+        assert!(transform.execute().is_err());
+    }
+
+    #[test]
+    fn test_shell_transform_no_dir() {
+        let transform = ShellTransform::new(
+            "echo",
+            HashSet::new(),
+            HashSet::new(),
+            "echo",
+            vec!["ok".to_string()],
+        );
+        assert!(transform.execute().is_ok());
+    }
+}

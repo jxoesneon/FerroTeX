@@ -102,8 +102,33 @@ mod tests {
         let line_index = LineIndex::new(input);
         
         let diags = check_math(&root, &line_index);
-        // This depends on infer_shape logic; adjust assertion as needed
-        // For now, just ensure it doesn't panic
+        assert!(diags.is_empty(), "Valid matrix should have no diagnostics");
+    }
+
+    #[test]
+    fn test_check_math_invalid_matrix_shape() {
+        // Uneven rows: 2 columns in first row, 1 column in second
+        let input = r"\begin{pmatrix}1 & 2 \\ 3\end{pmatrix}";
+        let parsed = parse(input);
+        let root = SyntaxNode::new_root(parsed.green_node());
+        let line_index = LineIndex::new(input);
+        
+        let diags = check_math(&root, &line_index);
+        assert!(!diags.is_empty(), "Invalid matrix shape should produce diagnostics");
+        assert!(diags.iter().any(|d| d.message.contains("Jagged matrix")));
+    }
+
+    #[test]
+    fn test_check_math_empty_matrix() {
+        let input = r"\begin{pmatrix}\end{pmatrix}";
+        let parsed = parse(input);
+        let root = SyntaxNode::new_root(parsed.green_node());
+        let line_index = LineIndex::new(input);
+        
+        let diags = check_math(&root, &line_index);
+        // Empty matrix might be valid or not depending on parser, but shouldn't panic
+        // It technically has 1 row, 0 columns? Or 0 rows?
+        // Let's just ensure it scans.
         let _ = diags;
     }
 }

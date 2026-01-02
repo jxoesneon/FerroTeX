@@ -167,4 +167,34 @@ mod tests {
         let result = machine.step();
         assert!(matches!(result, Some(AbstractValue::AnalysisError(_))));
     }
+
+    #[test]
+    fn test_abstract_machine_default() {
+        let machine = AbstractMachine::default();
+        assert_eq!(machine.expansion_depth, 0);
+        assert_eq!(machine.max_depth, 1000);
+    }
+
+    #[test]
+    fn test_abstract_group() {
+        let mut machine = AbstractMachine::new();
+        machine.state.input_stack.push(AbstractValue::Group);
+        let result = machine.step();
+        assert_eq!(result, Some(AbstractValue::Group));
+    }
+
+    #[test]
+    fn test_abstract_tokens() {
+        let mut machine = AbstractMachine::new();
+        machine.state.input_stack.push(AbstractValue::Token("a".to_string()));
+        let result = machine.step();
+        assert_eq!(result, Some(AbstractValue::Token("a".to_string())));
+    }
+
+    #[test]
+    fn test_abstract_empty_stack() {
+        let mut machine = AbstractMachine::new();
+        let result = machine.step();
+        assert_eq!(result, None);
+    }
 }

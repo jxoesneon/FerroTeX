@@ -87,11 +87,29 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y pkg-config cmake nasm libicu-dev libharfbuzz-dev libfontconfig1-dev libssl-dev libgraphite2-dev libfreetype6-dev
 
+      - name: Install mold linker
+        uses: rui314/setup-mold@v1
+
+      - name: Install nextest
+        uses: taiki-e/install-action@nextest
+
       - name: Build
         run: cargo build --verbose
 
-      - name: Test
-        run: cargo test --verbose
+      - name: Test (Nextest)
+        run: cargo nextest run --verbose --workspace
+
+      - name: Test (Doctests)
+        run: cargo test --doc --verbose --workspace
+
+  audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: rustsec/audit-check@v2.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
   rust-windows:
     name: Rust Build & Test (Windows)

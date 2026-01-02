@@ -135,4 +135,28 @@ mod tests {
         let errors = check_delimiters(&root);
         assert!(!errors.is_empty(), "Unmatched \\right should produce error");
     }
+
+    #[test]
+    fn test_mismatched_delimiters() {
+        let inputs = vec![
+            "( ]",
+            "[ }",
+            "{ )",
+        ];
+        for input in inputs {
+            let parsed = parse(input);
+            let root = SyntaxNode::new_root(parsed.green_node());
+            let errors = check_delimiters(&root);
+            assert!(errors.iter().any(|e| e.message.contains("Mismatched delimiter")), "Should detect mismatched delimiter in '{}'", input);
+        }
+    }
+
+    #[test]
+    fn test_unclosed_paren() {
+        let input = "(";
+        let parsed = parse(input);
+        let root = SyntaxNode::new_root(parsed.green_node());
+        let errors = check_delimiters(&root);
+        assert!(errors.iter().any(|e| e.message.contains("Unclosed delimiter")));
+    }
 }

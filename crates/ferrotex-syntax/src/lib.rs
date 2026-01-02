@@ -221,3 +221,27 @@ pub type SyntaxNode = rowan::SyntaxNode<FerroTexLanguage>;
 pub type SyntaxToken = rowan::SyntaxToken<FerroTexLanguage>;
 /// A syntax element (node or token) in the FerroTeX language.
 pub type SyntaxElement = rowan::SyntaxElement<FerroTexLanguage>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_syntax_kind_conversion() {
+        let kind = SyntaxKind::Root;
+        let rowan_kind: rowan::SyntaxKind = kind.into();
+        assert_eq!(rowan_kind.0, kind as u16);
+
+        let back = FerroTexLanguage::kind_from_raw(rowan_kind);
+        assert_eq!(back, kind);
+
+        let raw = FerroTexLanguage::kind_to_raw(kind);
+        assert_eq!(raw.0, kind as u16);
+    }
+
+    #[test]
+    fn test_parse_entrypoint() {
+        let res = parse("Hello");
+        assert!(res.errors.is_empty());
+    }
+}

@@ -60,3 +60,39 @@ impl Shape {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_shape_compatibility_add() {
+        let scalar = Shape::Scalar;
+        let vec1 = Shape::Vector(Dimension::Finite(3));
+        let vec2 = Shape::Vector(Dimension::Finite(3));
+        let vec3 = Shape::Vector(Dimension::Finite(4));
+        let mat1 = Shape::Matrix { rows: Dimension::Symbolic("n".into()), cols: Dimension::Finite(3) };
+        let mat2 = Shape::Matrix { rows: Dimension::Symbolic("n".into()), cols: Dimension::Finite(3) };
+
+        assert!(scalar.is_compatible_add(&scalar));
+        assert!(vec1.is_compatible_add(&vec2));
+        assert!(!vec1.is_compatible_add(&vec3));
+        assert!(mat1.is_compatible_add(&mat2));
+        assert!(!mat1.is_compatible_add(&scalar));
+    }
+
+    #[test]
+    fn test_shape_compatibility_mul() {
+        let scalar = Shape::Scalar;
+        let vec = Shape::Vector(Dimension::Finite(3));
+        let mat = Shape::Matrix { rows: Dimension::Finite(5), cols: Dimension::Finite(3) };
+        let mat_bad = Shape::Matrix { rows: Dimension::Finite(4), cols: Dimension::Finite(5) };
+
+        assert!(scalar.is_compatible_mul(&mat));
+        assert!(mat.is_compatible_mul(&scalar));
+        assert!(mat.is_compatible_mul(&Shape::Matrix { rows: Dimension::Finite(3), cols: Dimension::Finite(2) }));
+        assert!(!mat.is_compatible_mul(&mat_bad));
+        assert!(mat.is_compatible_mul(&vec)); // Matrix(5 x 3) * Vector(3) -> compatible
+        assert!(!Shape::Vector(Dimension::Finite(5)).is_compatible_mul(&mat)); // Vector(5) * Matrix(5 x 3) -> incompatible (ignoring transposition for now)
+    }
+}
