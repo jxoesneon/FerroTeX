@@ -13,6 +13,7 @@ pub struct LogParser {
 }
 
 impl Default for LogParser {
+    /// Creates a default, empty parser.
     fn default() -> Self {
         Self::new()
     }
@@ -141,11 +142,6 @@ impl LogParser {
                 match c {
                     '(' => {
                         // Extract path, possibly spanning lines
-                        // Issue: extract_path_spanning might consume lines beyond our current `lines` slice if the path wraps?
-                        // But we only passed `chunk` which ends at a newline.
-                        // If a path wraps onto a line NOT in `chunk`, `extract_path_spanning` won't see it.
-                        // `extract_path_spanning` needs to handle "not enough lines".
-
                         let (path, consumed_lines, new_char_idx, incomplete) =
                             Self::extract_path_spanning(
                                 &lines,
@@ -156,19 +152,31 @@ impl LogParser {
 
                         if incomplete {
                             // We don't have enough data to finish this path.
-                            // Stop processing here.
-                            // We need to backup to before this `(` and leave the rest in buffer.
-                            // But `process_buffer` logic below assumes we drain `process_len`.
-                            // This means we can't drain `process_len` if we hit an incomplete token.
-                            // This is the complexity of streaming.
-
-                            // Implementation detail:
-                            // Return early, and ensure we only advance `self.global_offset` and remove from `self.buffer`
-                            // up to the *start* of this line (or previous successful parse).
-
-                            // For this pass, let's implement the structure.
-                            // If incomplete, we abort the loop.
                             break;
+                        }
+
+                        // VALIDATION: Heuristic to reject non-file text in parentheses
+                        // e.g. "Latexmk: (Info) ..." or "TeX Live (preloaded format=...)"
+                        // A valid TeX path usually:
+                        // - Starts with / or \ or .
+                        // - OR looks like a filename with extension (contains a dot)
+                        // - We accept likely identifiers if they are long enough and don't contain spaces (extract_path_spanning stops at space)
+                        let is_likely_path = path.starts_with('/') 
+                                          || path.starts_with('\\') 
+                                          || path.starts_with('.')
+                                          || (path.contains('.') && !path.ends_with('.'))
+                                          || path.contains('/'); // relative path like "subdir/file"
+                        
+                        // Reject specific false positives seen in logs
+                        let is_blacklisted = path == "Info" 
+                                           || path == "preloaded"
+                                           || path == "TeX"
+                                           || path == "con"; // Windows legacy (unlikely in log but good practice)
+
+                        if !is_likely_path || is_blacklisted {
+                            // Treat '(' as text
+                             char_idx += char_len;
+                             continue;
                         }
 
                         let span_end = if consumed_lines == 0 {
@@ -263,7 +271,18 @@ impl LogParser {
         self.events.split_off(start_event_count)
     }
 
-    // Legacy parse support for backward compatibility (and existing tests)
+    /// Legacy parse support for backward compatibility.
+    ///
+    /// This method parses the entire input at once, simulating a full stream update
+    /// followed by a finish.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - The full content of the log file.
+    ///
+    /// # Returns
+    ///
+    /// A vector of all parsed [`LogEvent`]s.
     pub fn parse(mut self, input: &str) -> Vec<LogEvent> {
         let mut events = self.update(input);
         events.extend(self.finish());
@@ -361,6 +380,9 @@ impl LogParser {
                         || next_line.starts_with(")")
                         || next_line.starts_with("Overfull")
                         || next_line.starts_with("Underfull")
+                        || next_line.starts_with("LaTeX") // e.g. "LaTeX2e <2020...>"
+                        || next_line.starts_with("Document Class:")
+                        || next_line.starts_with("L3 programming")
                     {
                         // Don't join. Assume path ended at newline.
                         path.push_str(remainder);
@@ -376,7 +398,10 @@ impl LogParser {
                             || next_line.starts_with("(")
                             || next_line.starts_with(")")
                             || next_line.starts_with("Overfull")
-                            || next_line.starts_with("Underfull"))
+                            || next_line.starts_with("Underfull")
+                            || next_line.starts_with("LaTeX")
+                            || next_line.starts_with("Document Class:")
+                            || next_line.starts_with("L3 programming"))
                     {
                         // Don't join.
                         path.push_str(remainder);
@@ -391,6 +416,46 @@ impl LogParser {
                 current_line_idx += 1;
                 current_char_idx = 0;
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_streaming_chunks() {
+        let input = "
+(main.tex
+(package.sty)
+LaTeX Warning: Reference `missing' on page 1 undefined on input line 6.
+)
+";
+        // Baseline
+        let full_parser = LogParser::new();
+        let expected_events = full_parser.parse(input);
+
+        // Streaming with tiny chunks
+        let mut stream_parser = LogParser::new();
+        let mut amassed_events = Vec::new();
+        
+        // Chunk size 2 to force many boundaries
+        for chunk in input.as_bytes().chunks(2) {
+             let s = std::str::from_utf8(chunk).unwrap();
+             amassed_events.extend(stream_parser.update(s));
+        }
+        amassed_events.extend(stream_parser.finish());
+
+        // Compare structure (ignoring spans maybe? No, spans should match if implementation is correct)
+        // Spans in streaming might differ if global offset tracking is buggy.
+        // Let's compare payload and ordering first.
+        
+        assert_eq!(expected_events.len(), amassed_events.len());
+        for (e1, e2) in expected_events.iter().zip(amassed_events.iter()) {
+            assert_eq!(e1.payload, e2.payload);
+            // Verify spans if robust
+            assert_eq!(e1.span, e2.span, "Span mismatch for payload {:?}", e1.payload);
         }
     }
 }

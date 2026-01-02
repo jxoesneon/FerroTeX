@@ -4,7 +4,10 @@ members = [
     "crates/ferrotex-log",
     "crates/ferrotex-syntax",
     "crates/ferrotexd",
-    "fuzz",
+    "crates/ferrotex-package",
+    "crates/ferrotex-math-semantics",
+    "crates/ferrotex-analysis",
+    "fuzz", "crates/ferrotex-build", "crates/ferrotex-dap",
 ]
 resolver = "2"
 

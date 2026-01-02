@@ -12,6 +12,7 @@ use dashmap::DashMap;
 
 use ferrotex_core::package_manager;
 
+use ferrotex_package::{PackageIndex, scanner::PackageScanner};
 use ferrotex_log::parser::LogParser;
 use ferrotex_syntax::{SyntaxKind, SyntaxNode};
 use line_index::LineIndex;
@@ -90,6 +91,7 @@ struct Backend {
     root_uri: Arc<Mutex<Option<Url>>>,
     syntax_diagnostics: Arc<DashMap<Url, Vec<Diagnostic>>>,
     package_manager: Arc<Mutex<package_manager::PackageManager>>,
+    package_index: Arc<Mutex<Option<PackageIndex>>>, // Add index field
 }
 
 #[tower_lsp::async_trait]
@@ -106,6 +108,76 @@ impl LanguageServer for Backend {
             let mut pm = self.package_manager.lock().unwrap();
             *pm = detected_pm;
         }
+
+        // Start background package scan (with caching and progress)
+        let package_index_clone = self.package_index.clone();
+        let client_clone = self.client.clone();
+        tokio::spawn(async move {
+            // Try loading from cache first
+            if let Some(cached) = PackageIndex::load_from_cache() {
+                let count = cached.packages.len();
+                {
+                    let mut guard = package_index_clone.lock().unwrap();
+                    *guard = Some(cached);
+                }
+                log::info!("Using cached package index ({} packages).", count);
+                return;
+            }
+
+            // Cache miss: perform full scan with progress
+            let token = tower_lsp::lsp_types::NumberOrString::String("ferrotex-package-scan".to_string());
+            
+            // Begin progress
+            client_clone.send_notification::<tower_lsp::lsp_types::notification::Progress>(
+                tower_lsp::lsp_types::ProgressParams {
+                    token: token.clone(),
+                    value: tower_lsp::lsp_types::ProgressParamsValue::WorkDone(
+                        tower_lsp::lsp_types::WorkDoneProgress::Begin(
+                            tower_lsp::lsp_types::WorkDoneProgressBegin {
+                                title: "Indexing LaTeX Packages".to_string(),
+                                cancellable: Some(false),
+                                message: Some("Scanning TeX distribution...".to_string()),
+                                percentage: Some(0),
+                            }
+                        )
+                    ),
+                }
+            ).await;
+
+            log::info!("Cache miss. Starting background package scan...");
+            let index = tokio::task::spawn_blocking(|| {
+                let scanner = PackageScanner::new();
+                scanner.scan()
+            }).await.unwrap_or_default();
+            
+            let count = index.packages.len();
+            
+            // Save to cache for next time
+            if let Err(e) = index.save_to_cache() {
+                log::warn!("Failed to save package cache: {}", e);
+            }
+            
+            {
+                let mut guard = package_index_clone.lock().unwrap();
+                *guard = Some(index);
+            }
+            
+            // End progress
+            client_clone.send_notification::<tower_lsp::lsp_types::notification::Progress>(
+                tower_lsp::lsp_types::ProgressParams {
+                    token,
+                    value: tower_lsp::lsp_types::ProgressParamsValue::WorkDone(
+                        tower_lsp::lsp_types::WorkDoneProgress::End(
+                            tower_lsp::lsp_types::WorkDoneProgressEnd {
+                                message: Some(format!("Indexed {} packages", count)),
+                            }
+                        )
+                    ),
+                }
+            ).await;
+            
+            log::info!("Package scan complete. Indexed {} packages.", count);
+        });
 
         Ok(InitializeResult {
             capabilities: ServerCapabilities {
@@ -499,7 +571,8 @@ impl LanguageServer for Backend {
 
                 // Dynamic Package Completions (CS-3)
                 let packages = self.workspace.get_packages(&uri);
-                let (_, dyn_envs) = completer::get_package_completions(&packages);
+                let package_index = self.package_index.lock().unwrap();
+                let (_, dyn_envs) = completer::get_package_completions(&packages, package_index.as_ref());
                 items.extend(dyn_envs);
 
                 Ok(Some(CompletionResponse::Array(items)))
@@ -517,7 +590,8 @@ impl LanguageServer for Backend {
 
                 // Dynamic Package Completions (CS-3)
                 let packages = self.workspace.get_packages(&uri);
-                let (dyn_cmds, _) = completer::get_package_completions(&packages);
+                let package_index = self.package_index.lock().unwrap();
+                let (dyn_cmds, _) = completer::get_package_completions(&packages, package_index.as_ref());
                 items.extend(dyn_cmds);
 
                 Ok(Some(CompletionResponse::Array(items)))
@@ -1070,6 +1144,7 @@ impl LanguageServer for Backend {
             // Create an enum-based engine to work around async trait object limitations
             enum BuildEngineImpl {
                 Latexmk(LatexmkAdapter),
+                #[cfg(feature = "use-tectonic")]
                 Tectonic(build::tectonic::TectonicAdapter),
             }
             
@@ -1077,6 +1152,7 @@ impl LanguageServer for Backend {
                 fn name(&self) -> &str {
                     match self {
                         Self::Latexmk(e) => e.name(),
+                        #[cfg(feature = "use-tectonic")]
                         Self::Tectonic(e) => e.name(),
                     }
                 }
@@ -1088,6 +1164,7 @@ impl LanguageServer for Backend {
                 ) -> anyhow::Result<BuildStatus> {
                     match self {
                         Self::Latexmk(e) => e.build(request, log_callback).await,
+                        #[cfg(feature = "use-tectonic")]
                         Self::Tectonic(e) => e.build(request, log_callback).await,
                     }
                 }
@@ -1096,7 +1173,15 @@ impl LanguageServer for Backend {
             let engine = if std::process::Command::new("latexmk").arg("-v").stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()).status().map(|s| s.success()).unwrap_or(false) {
                 BuildEngineImpl::Latexmk(LatexmkAdapter)
             } else {
-                BuildEngineImpl::Tectonic(build::tectonic::TectonicAdapter)
+                #[cfg(feature = "use-tectonic")]
+                {
+                    BuildEngineImpl::Tectonic(build::tectonic::TectonicAdapter)
+                }
+                #[cfg(not(feature = "use-tectonic"))]
+                {
+                    // Fallback to latexmk if tectonic is disabled, effective "default"
+                    BuildEngineImpl::Latexmk(LatexmkAdapter)
+                }
             };
             
             self.client
@@ -1585,6 +1670,12 @@ async fn publish_diagnostics_logic(
             .map(|v| v.clone())
             .unwrap_or_default();
 
+        // 1.5. Run Math Semantics Analysis (PhD Implementation)
+        let parse = ferrotex_syntax::parse(text);
+        let root = SyntaxNode::new_root(parse.green_node());
+        let math_diags = crate::diagnostics::math::check_math(&root, &line_index);
+        diags.extend(math_diags);
+
         // Append project diagnostics
         if let Some(proj_list) = project_diags.get(uri) {
             for (range, msg, source) in proj_list {
@@ -2010,10 +2101,10 @@ async fn watch_workspace(
                                      }
                                  }
 
-                                 if let Ok(_) = file.seek(std::io::SeekFrom::Start(file_offset)).await {
+                                 if file.seek(std::io::SeekFrom::Start(file_offset)).await.is_ok() {
                                      let mut buffer = String::new();
-                                     if let Ok(_) = file.read_to_string(&mut buffer).await {
-                                         if !buffer.is_empty() {
+                                     if file.read_to_string(&mut buffer).await.is_ok()
+                                         && !buffer.is_empty() {
                                              file_offset += buffer.len() as u64;
                                              let events = parser.update(&buffer);
 
@@ -2076,7 +2167,6 @@ async fn watch_workspace(
                                                 client.publish_diagnostics(uri, diags, None).await;
                                              }
                                          }
-                                     }
                                  }
                              }
                         }
@@ -2091,7 +2181,7 @@ async fn watch_workspace(
 
 /// Detects if an error message indicates a missing package file.
 /// Returns the filename (e.g., "tikz.sty") if found.
-fn detect_missing_package_file(message: &str) -> Option<String> {
+fn _detect_missing_package_file(message: &str) -> Option<String> {
     // Pattern: "File 'xxx.sty' not found"
     if let Some(start_idx) = message.find("File '") {
         let rest = &message[start_idx + 6..];
@@ -2256,6 +2346,7 @@ async fn main() {
         root_uri: Arc::new(Mutex::new(None)),
         syntax_diagnostics: Arc::new(DashMap::new()),
         package_manager: Arc::new(Mutex::new(package_manager::PackageManager::new())),
+        package_index: Arc::new(Mutex::new(None)), // Initialize as None
     });
     Server::new(stdin, stdout, socket).serve(service).await;
 }
@@ -2264,3 +2355,4 @@ async fn main() {
 mod tests {
     // use super::*; // Unused
 }
+
