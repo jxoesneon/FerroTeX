@@ -15,9 +15,4 @@ resolver = "2"
 tectonic_xetex_layout = { path = "patches/tectonic_xetex_layout" }
 tectonic_engine_xetex = { path = "patches/tectonic_engine_xetex" }
 
-# [SECURITY] Fix SHA-1 collision, path traversal, and Windows device name issues in gix (gitoxide)
-# These are major version jumps but necessary for security.
-gix-features = { git = "https://github.com/Byron/gitoxide", rev = "gix-features-v0.45.1" }
-gix-fs = { git = "https://github.com/Byron/gitoxide", rev = "gix-fs-v0.9.1" }
-gix-path = { git = "https://github.com/Byron/gitoxide", rev = "gix-path-v0.9.0" }
-gix-ref = { git = "https://github.com/Byron/gitoxide", rev = "gix-ref-v0.57.0" }
+
