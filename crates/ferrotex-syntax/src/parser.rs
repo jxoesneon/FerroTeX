@@ -326,6 +326,9 @@ impl<'a> Parser<'a> {
                         self.bump();
                     }
                 }
+                SyntaxKind::LBrace => {
+                    self.parse_group();
+                }
                 SyntaxKind::RBrace => {
                     self.error("Unmatched '}' inside environment".into());
                     self.builder.start_node(SyntaxKind::Error.into());
