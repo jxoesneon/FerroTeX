@@ -14,6 +14,18 @@ FerroTeX targets two pillars:
 - **Engine/toolchain adapters at the edge**: keep parsing/reconstruction core independent from latexmk/tectonic specifics.
 - **Measure everything**: performance and correctness claims require benchmarks and labeled datasets.
 
+## Market-Driven Priorities (Q1 2025)
+
+> [!IMPORTANT]
+> Based on competitive analysis (Dec 2025), the following features are **critical for adoption** and should be prioritized:
+>
+> 1. **PDF Preview + SyncTeX** (Currently v0.13.0) → **Consider early pull-in to v0.10.0-v0.11.0**
+>    - LaTeX Workshop and Overleaf both offer this as a core feature
+>    - Single biggest barrier to switching from established tools
+> 2. **Advanced Refactoring** (Not yet scoped) → **Target for v0.14.0+**
+>    - Semantic-aware refactoring (Rename Environment, Extract to Preamble)
+>    - Differentiator vs regex-based competitors (LaTeX Workshop, TexLab)
+
 ## Release Plan (Semantic Versioning)
 
 Until `1.0.0`, breaking changes are allowed but MUST be documented in `CHANGELOG.md`.

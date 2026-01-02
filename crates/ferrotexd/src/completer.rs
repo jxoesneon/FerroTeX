@@ -90,3 +90,45 @@ pub fn get_package_completions(packages: &[String]) -> (Vec<CompletionItem>, Vec
 
     (cmd_items, env_items)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_package_completions_amsmath() {
+        let packages = vec!["amsmath".to_string()];
+        let (cmds, envs) = get_package_completions(&packages);
+        
+        assert!(cmds.iter().any(|c| c.label == "\\text"));
+        assert!(envs.iter().any(|e| e.label == "align"));
+    }
+
+    #[test]
+    fn test_get_package_completions_tikz() {
+        let packages = vec!["tikz".to_string()];
+        let (cmds, envs) = get_package_completions(&packages);
+        
+        assert!(cmds.iter().any(|c| c.label == "\\draw"));
+        assert!(envs.iter().any(|e| e.label == "tikzpicture"));
+    }
+
+    #[test]
+    fn test_get_package_completions_unknown() {
+        let packages = vec!["unknown_pkg".to_string()];
+        let (cmds, envs) = get_package_completions(&packages);
+        
+        assert!(cmds.is_empty());
+        assert!(envs.is_empty());
+    }
+
+    #[test]
+    fn test_get_package_completions_multiple() {
+        let packages = vec!["amsmath".to_string(), "graphicx".to_string()];
+        let (cmds, envs) = get_package_completions(&packages);
+        
+        assert!(cmds.iter().any(|c| c.label == "\\text"));
+        assert!(cmds.iter().any(|c| c.label == "\\includegraphics"));
+        assert!(envs.iter().any(|e| e.label == "align"));
+    }
+}

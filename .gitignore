@@ -38,6 +38,21 @@ editors/vscode/*.vsix
 .agent/*
 .gemini/*
 
+# Coverage
+coverage_html/
+*.profraw
+*coverage*.txt
+coverage.json
+
+# Temporary testing artifacts (in root)
+/*.tex
+/*.bib
+workspace_fail*
+test_failures.txt
+build_errors*.txt
+e2e_failures.txt
+*.bak
+
 # Documentation drafts
 design/*
 *plan*.md

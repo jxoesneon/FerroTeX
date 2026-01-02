@@ -33,8 +33,12 @@ pub struct FileIndex {
     pub bibliographies: Vec<BibRef>,
     /// List of sections (e.g., `\section{...}`).
     pub sections: Vec<SectionDef>,
-    /// List of used packages (e.g., `\usepackage{...}`).
-    pub packages: Vec<String>,
+    /// List of used packages with their ranges (e.g., `\usepackage{...}`).
+    pub packages: Vec<(String, TextRange)>,
+    /// Set of all command names used in the file.
+    pub used_commands: HashSet<String>,
+    /// Set of all environment names used in the file.
+    pub used_environments: HashSet<String>,
     /// List of deprecated command usages.
     pub deprecated_usages: Vec<(TextRange, String)>,
 }
@@ -104,7 +108,7 @@ impl Workspace {
     ///
     /// Parses the file content and extracts includes, labels, citations, etc.
     pub fn update(&self, uri: &Url, text: &str) {
-        let (includes, definitions, references, citations, bibliographies, sections, packages, magic_root, deprecated_usages) =
+        let (includes, definitions, references, citations, bibliographies, sections, packages, used_commands, used_environments, magic_root, deprecated_usages) =
             scan_file(text);
 
         if let Some(root_path) = magic_root {
@@ -123,6 +127,8 @@ impl Workspace {
                 bibliographies,
                 sections,
                 packages,
+                used_commands,
+                used_environments,
                 deprecated_usages,
             },
         );
@@ -155,15 +161,12 @@ impl Workspace {
         self.explicit_roots.get(uri).map(|v| v.value().clone())
     }
 
-    /// Retrieves the list of used packages for a given document URI.
-    ///
-    /// If an explicit root is set, it also includes packages from the root.
     pub fn get_packages(&self, uri: &Url) -> Vec<String> {
         let mut packages = HashSet::new();
 
         // 1. Get packages from current file
         if let Some(idx) = self.indices.get(uri) {
-            packages.extend(idx.packages.clone());
+            packages.extend(idx.packages.iter().map(|(p, _): &(String, TextRange)| p.clone()));
         }
 
         // 2. Get packages from explicit root (if any)
@@ -175,7 +178,7 @@ impl Workspace {
                     if let Ok(root_uri) = Url::from_file_path(root_buf) {
                         #[allow(clippy::collapsible_if)]
                         if let Some(idx) = self.indices.get(&root_uri) {
-                            packages.extend(idx.packages.clone());
+                            packages.extend(idx.packages.iter().map(|(p, _): &(String, TextRange)| p.clone()));
                         }
                     }
                 }
@@ -496,7 +499,6 @@ impl Workspace {
         diagnostics
     }
 
-    /// Validates usage of deprecated commands.
     pub fn validate_deprecated(&self) -> Vec<(Url, TextRange, String)> {
         let mut diagnostics = Vec::new();
 
@@ -507,6 +509,62 @@ impl Workspace {
                     *range,
                     format!("Command '{}' is deprecated. Use standard LaTeX2e replacements.", cmd),
                 ));
+            }
+        }
+        diagnostics
+    }
+
+    /// Validates unused packages across the workspace.
+    pub fn validate_unused_packages(&self) -> Vec<(Url, TextRange, String)> {
+        let mut diagnostics = Vec::new();
+
+        for entry in self.indices.iter() {
+            let uri = entry.key();
+            let index = entry.value();
+            
+            for (pkg, range) in &index.packages {
+                let is_used = match pkg.as_str() {
+                    "graphicx" => {
+                        index.used_commands.contains("\\includegraphics") ||
+                        index.used_commands.contains("\\includegraphics*")
+                    }
+                    "amsmath" => {
+                        index.used_environments.contains("align") || 
+                        index.used_environments.contains("align*") ||
+                        index.used_environments.contains("gather") ||
+                        index.used_environments.contains("gather*") ||
+                        index.used_environments.contains("equation") ||
+                        index.used_environments.contains("equation*") ||
+                        index.used_environments.contains("multline") ||
+                        index.used_environments.contains("multline*") ||
+                        index.used_environments.contains("cases") ||
+                        index.used_environments.contains("cases*")
+                    }
+                    "listings" => {
+                        index.used_environments.contains("lstlisting") ||
+                        index.used_commands.contains("\\lstinline") ||
+                        index.used_commands.contains("\\lstinputlisting")
+                    }
+                    "xcolor" | "color" => {
+                        index.used_commands.contains("\\color") ||
+                        index.used_commands.contains("\\textcolor") ||
+                        index.used_commands.contains("\\definecolor") ||
+                        index.used_commands.contains("\\pagecolor")
+                    }
+                    "hyperref" => {
+                        // hyperref is usually "used" just by being there (it makes links)
+                        true
+                    }
+                    _ => true, // Assume used for unknown packages
+                };
+
+                if !is_used {
+                    diagnostics.push((
+                        uri.clone(),
+                        *range,
+                        format!("Package '{}' appears to be unused.", pkg),
+                    ));
+                }
             }
         }
         diagnostics
@@ -596,7 +654,9 @@ type ScanResult = (
     Vec<CitationRef>,
     Vec<BibRef>,
     Vec<SectionDef>,
-    Vec<String>, // packages
+    Vec<(String, TextRange)>, // packages
+    HashSet<String>, // used_commands
+    HashSet<String>, // used_environments
     Option<String>, // magic_root
     Vec<(TextRange, String)>, // deprecated_usages
 );
@@ -628,9 +688,54 @@ fn scan_file(text: &str) -> ScanResult {
     let mut last_dollar_range: Option<TextRange> = None;
     let mut opening_display_math: Option<TextRange> = None; // Track opening $$
 
+    let mut used_commands = HashSet::new();
+    let mut used_environments = HashSet::new();
+
     for element in root.descendants_with_tokens() {
         match element.kind() {
+            SyntaxKind::Environment => {
+                if let Some(node) = element.as_node() {
+                   if let Some(g) = node.children().find(|c| c.kind() == SyntaxKind::Group) {
+                       let name = g.text().to_string();
+                       if name.len() >= 2 {
+                           used_environments.insert(name[1..name.len()-1].to_string());
+                       }
+                   }
+                }
+            }
+            SyntaxKind::Command => {
+                let name = element.to_string();
+                used_commands.insert(name.clone());
+                
+                let deprecated = ["\\bf", "\\it", "\\sc", "\\rm", "\\sf", "\\tt", "\\sl"];
+                if deprecated.contains(&name.as_str()) {
+                    // ... (existing deprecated logic)
+                    let mut in_group = false;
+                    let mut group_range = element.text_range();
+                    
+                    if let Some(token) = element.as_token() {
+                        if let Some(parent) = token.parent() {
+                            if parent.kind() == SyntaxKind::Group {
+                                in_group = true;
+                                group_range = parent.text_range();
+                            }
+                        }
+                    }
+                    
+                    let context_marker = if in_group {
+                        format!("{}:group", name)
+                    } else {
+                        name.clone()
+                    };
+                    
+                    deprecated_usages.push((
+                        if in_group { group_range } else { element.text_range() },
+                        context_marker
+                    ));
+                }
+            }
             SyntaxKind::Dollar => {
+                // ... (existing displaymath logic)
                 if last_was_dollar {
                     if let Some(prev_range) = last_dollar_range {
                         if prev_range.end() == element.text_range().start() {
@@ -660,39 +765,7 @@ fn scan_file(text: &str) -> ScanResult {
                 last_was_dollar = false;
                 last_dollar_range = None;
                 
-                if element.kind() == SyntaxKind::Command {
-                    let text = element.to_string();
-                    let deprecated = ["\\bf", "\\it", "\\sc", "\\rm", "\\sf", "\\tt", "\\sl"];
-                    if deprecated.contains(&text.as_str()) {
-                        // Check if this command is inside a group (e.g., {\bf ...})
-                        // by looking at parent context
-                        let mut in_group = false;
-                        let mut group_range = element.text_range();
-                        
-                        if let Some(token) = element.as_token() {
-                            if let Some(parent) = token.parent() {
-                                // Check if parent is a Group node
-                                if parent.kind() == SyntaxKind::Group {
-                                    in_group = true;
-                                    group_range = parent.text_range();
-                                }
-                            }
-                        }
-                        
-                        // Store command with context info
-                        // Format: "cmd:in_group" or just "cmd" for standalone
-                        let context_marker = if in_group {
-                            format!("{}:group", text)
-                        } else {
-                            text.clone()
-                        };
-                        
-                        deprecated_usages.push((
-                            if in_group { group_range } else { element.text_range() },
-                            context_marker
-                        ));
-                    }
-                } else if let Some(node) = element.as_node() {
+                if let Some(node) = element.as_node() {
                     match node.kind() {
                         SyntaxKind::Include => {
                             if let Some((name, range)) = extract_label_data(node) {
@@ -756,40 +829,42 @@ fn scan_file(text: &str) -> ScanResult {
         }
     }
     // Scan for packages
-    // Pattern: \usepackage[opt]{pkg} or \RequirePackage[opt]{pkg}
-    // We ignore options for now.
-    // Scan for packages
-    let text_str = root.text().to_string();
+    // (existing package regex scan)
     let re = Regex::new(r"\\usepackage(?:\[[^\]]*\])?\{([^}]+)\}").unwrap();
     let mut packages = Vec::new();
     
-    for cap in re.captures_iter(&text_str) {
+    for cap in re.captures_iter(text) {
         if let Some(pkg_group_match) = cap.get(1) {
-            for pkg in pkg_group_match.as_str().split(',') {
+            for (pkg_idx, pkg) in pkg_group_match.as_str().split(',').enumerate() {
                 let trimmed = pkg.trim();
                 if !trimmed.is_empty() {
-                    packages.push(trimmed.to_string());
+                    use ferrotex_syntax::TextSize;
+                    
+                    let mut current_offset = 0;
+                    for (i, p) in pkg_group_match.as_str().split(',').enumerate() {
+                        if i == pkg_idx {
+                            let start = pkg_group_match.start() + current_offset + p.find(trimmed).unwrap_or(0);
+                            let range = TextRange::new(
+                                TextSize::from(start as u32),
+                                TextSize::from((start + trimmed.len()) as u32)
+                            );
+                            packages.push((trimmed.to_string(), range));
+                            break;
+                        }
+                        current_offset += p.len() + 1;
+                    }
                     
                     let forbidden = ["a4wide", "times", "epsfig", "psfig"];
                     if forbidden.contains(&trimmed) {
-                        // Calculate exact range of the package name
-                        use ferrotex_syntax::TextSize;
-                        let relative_start_in_group = pkg_group_match.as_str().find(trimmed).unwrap_or(0);
-                        let absolute_start = pkg_group_match.start() + relative_start_in_group;
-                        let absolute_end = absolute_start + trimmed.len();
-
-                        let range = TextRange::new(
-                            TextSize::from(absolute_start as u32), 
-                            TextSize::from(absolute_end as u32)
-                        );
-                        deprecated_usages.push((range, format!("package:{}", trimmed)));
+                        let (_, range) = packages.last().unwrap();
+                        deprecated_usages.push((*range, format!("package:{}", trimmed)));
                     }
                 }
             }
         }
     }
 
-    (includes, defs, refs, citations, bibs, sections, packages, magic_root, deprecated_usages)
+    (includes, defs, refs, citations, bibs, sections, packages, used_commands, used_environments, magic_root, deprecated_usages)
 }
 
 pub fn extract_group_text(node: &ferrotex_syntax::SyntaxNode) -> Option<String> {
@@ -876,5 +951,96 @@ mod tests {
         let (.., deprecated) = scan_file(text);
         assert!(deprecated.iter().any(|d| d.1 == "package:times"), "Should detect 'times' package");
         assert!(!deprecated.iter().any(|d| d.1 == "package:geometry"), "Should NOT detect 'geometry' package");
+    }
+
+    #[test]
+    fn test_detect_unused_packages() {
+        let mut workspace = Workspace::new();
+        let uri = Url::parse("file:///main.tex").unwrap();
+        
+        // Case 1: Unused graphicx
+        workspace.update(&uri, r#"\usepackage{graphicx}"#);
+        let diags = workspace.validate_unused_packages();
+        assert!(diags.iter().any(|(_, _, msg)| msg.contains("graphicx")), "Should detect unused graphicx");
+
+        // Case 2: Used graphicx
+        workspace.update(&uri, r#"\usepackage{graphicx} \includegraphics{file}"#);
+        let diags = workspace.validate_unused_packages();
+        assert!(diags.is_empty(), "Should NOT detect used graphicx");
+        
+        // Case 3: amsmath environment usage
+        workspace.update(&uri, r#"\usepackage{amsmath} \begin{align} a=b \end{align}"#);
+        let diags = workspace.validate_unused_packages();
+        assert!(diags.is_empty(), "Unused check failed for amsmath environment");
+    }
+
+    #[test]
+    fn test_detect_cycles() {
+        let mut workspace = Workspace::new();
+        let uri_a = Url::parse("file:///a.tex").unwrap();
+        let uri_b = Url::parse("file:///b.tex").unwrap();
+        
+        // A includes B
+        workspace.update(&uri_a, r#"\input{b.tex}"#);
+        // B includes A -> Cycle
+        workspace.update(&uri_b, r#"\input{a.tex}"#);
+        
+        let cycles = workspace.detect_cycles();
+        assert!(!cycles.is_empty(), "Should detect include cycle");
+        assert!(cycles[0].2.contains("Cycle detected"));
+    }
+
+    #[test]
+    fn test_validate_citations_missing() {
+        let mut workspace = Workspace::new();
+        let uri = Url::parse("file:///main.tex").unwrap();
+        workspace.update(&uri, r#"\cite{missing_key}"#);
+        
+        let diags = workspace.validate_citations();
+        assert!(!diags.is_empty());
+        assert!(diags[0].2.contains("Undefined citation"));
+    }
+    
+    #[test]
+    fn test_validate_citations_present() {
+        let mut workspace = Workspace::new();
+        let uri = Url::parse("file:///main.tex").unwrap();
+        // Assume implicit bib reference via bibliography command isn't strictly enforced for simple validation 
+        // if no bibliography command is present, it might check all known bibs or fail.
+        // Let's rely on loose check if no bibs referenced.
+        workspace.update(&uri, r#"\cite{known_key}"#);
+        
+        let bib_uri = Url::parse("file:///ref.bib").unwrap();
+        workspace.update_bib(&bib_uri, r#"@article{known_key, title={Test}}"#);
+        
+        let diags = workspace.validate_citations();
+        assert!(diags.is_empty(), "Should confirm citation exists");
+    }
+
+    #[test]
+    fn test_validate_labels() {
+         let mut workspace = Workspace::new();
+         let uri = Url::parse("file:///main.tex").unwrap();
+         
+         // Duplicate definition
+         workspace.update(&uri, r#"\label{dup} \label{dup}"#);
+         let diags = workspace.validate_labels();
+         assert!(diags.iter().any(|d| d.2.contains("Duplicate label")));
+
+         // Undefined reference
+         workspace.update(&uri, r#"\ref{missing}"#);
+         let diags = workspace.validate_labels();
+         assert!(diags.iter().any(|d| d.2.contains("Undefined reference")));
+    }
+
+    #[test]
+    fn test_delete_file() {
+        let ws = Workspace::new();
+        let uri = Url::parse("file:///C:/test.tex").unwrap();
+        ws.update(&uri, "content");
+        assert!(ws.indices.contains_key(&uri));
+        
+        ws.remove(&uri);
+        assert!(!ws.indices.contains_key(&uri));
     }
 }

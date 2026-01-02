@@ -38,6 +38,7 @@ impl BuildEngine for TectonicAdapter {
         let mut child = Command::new("tectonic")
             .arg("-o")
             .arg(&out_dir)
+            .arg("--synctex")
             .arg(&file_path)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())

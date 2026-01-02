@@ -83,4 +83,26 @@ use crate::parser::Parser;
         let result = parse(input);
         assert!(true);
     }
+
+    #[test]
+    fn test_syntax_kind_conversion() {
+        use crate::{SyntaxKind, FerroTexLanguage};
+        use rowan::Language;
+        
+        // Test kind_to_raw and kind_from_raw for all variants
+        let kinds = [
+            SyntaxKind::LBrace, SyntaxKind::RBrace, SyntaxKind::LBracket, SyntaxKind::RBracket,
+            SyntaxKind::Command, SyntaxKind::Dollar, SyntaxKind::Whitespace, SyntaxKind::Comment,
+            SyntaxKind::Text, SyntaxKind::Error, SyntaxKind::Root, SyntaxKind::Group,
+            SyntaxKind::Environment, SyntaxKind::Section, SyntaxKind::Include,
+            SyntaxKind::LabelDefinition, SyntaxKind::LabelReference, SyntaxKind::Citation,
+            SyntaxKind::Bibliography, SyntaxKind::Eof,
+        ];
+        
+        for kind in kinds {
+            let raw = FerroTexLanguage::kind_to_raw(kind);
+            let back = FerroTexLanguage::kind_from_raw(raw);
+            assert_eq!(back, kind);
+        }
+    }
 }

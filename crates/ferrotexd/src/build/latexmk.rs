@@ -53,6 +53,7 @@ impl BuildEngine for LatexmkAdapter {
 
         let mut child = cmd
             .arg("-pdf")
+            .arg("-synctex=1")
             .arg("-interaction=nonstopmode")
             .arg("-halt-on-error")
             .arg("-file-line-error")

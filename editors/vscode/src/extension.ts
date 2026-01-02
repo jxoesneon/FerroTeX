@@ -301,8 +301,6 @@ export function activate(context: vscode.ExtensionContext) {
     }),
   );
 
-  client = new LanguageClient("ferrotex", "FerroTeX Language Server", serverOptions, clientOptions);
-
   // BO-2: Real-time Log Streaming
   const outputChannel = vscode.window.createOutputChannel("FerroTeX Build");
   context.subscriptions.push(outputChannel);
