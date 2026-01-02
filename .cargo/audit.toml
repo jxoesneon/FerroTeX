@@ -1,0 +1,18 @@
+[advisories]
+ignore = [
+    # Transitive dependencies of tectonic 0.15.0
+    # These are currently unfixable without breaking tectonic or waiting for an upstream update.
+    "RUSTSEC-2021-0139", # ansi_term is unmaintained
+    "RUSTSEC-2024-0375", # atty is unmaintained
+    "RUSTSEC-2021-0145", # atty unsoundness
+    "RUSTSEC-2024-0370", # proc-macro-error is unmaintained
+    "RUSTSEC-2025-0134", # rustls-pemfile is unmaintained (in tectonic's reqwest 0.11)
+    
+    # gix vulnerabilities (transitive via tectonic -> watchexec -> ignore-files)
+    # These require gix >= 0.41, but tectonic is currently locked to 0.29.
+    "RUSTSEC-2025-0021", # gix-features SHA-1 collision
+    "RUSTSEC-2024-0350", # gix-fs traversal
+    "RUSTSEC-2024-0367", # gix-path config resolution
+    "RUSTSEC-2024-0371", # gix-path config resolution
+    "RUSTSEC-2024-0351", # gix-ref windows device names
+]
