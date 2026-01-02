@@ -329,6 +329,8 @@ impl<'a> Parser<'a> {
                 SyntaxKind::RBrace => {
                     self.error("Unmatched '}' inside environment".into());
                     self.builder.start_node(SyntaxKind::Error.into());
+                    self.bump();
+                    self.builder.finish_node();
                 }
                 _ => self.bump(), // Consume other tokens
             }
