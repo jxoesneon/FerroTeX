@@ -44,5 +44,6 @@ pub trait BuildEngine: Send + Sync {
 }
 
 pub mod latexmk;
+#[cfg(feature = "use-tectonic")]
 pub mod tectonic;
 

@@ -1,10 +1,62 @@
 use crate::SyntaxKind;
 
-/// A simple lexer for LaTeX source code.
+/// A lexer for LaTeX source code.
 ///
-/// It breaks the input string into a stream of `SyntaxKind` tokens.
+/// ## Overview
+///
+/// The lexer performs **character-level scanning** of LaTeX source, producing
+/// a stream of ([`SyntaxKind`], `&str`) tuples. It handles:
+///
+/// - **Commands**: `\section`, `\item`, `\%` (escape sequences)
+/// - **Delimiters**: `{`, `}`, `[`, `]`
+/// - **Math mode**: `$` (inline math delimiter)
+/// - **Comments**: `%` through end of line
+/// - **Whitespace**: Consecutive whitespace collapsed into single tokens
+/// - **Text**: Everything else, consumed greedily until a special character
+///
+/// ## UTF-8 Handling
+///
+/// The lexer is **fully UTF-8 aware**, correctly handling multi-byte characters
+/// in commands, text, and comments. Position tracking uses byte offsets internally
+/// but respects character boundaries.
+///
+/// ## Performance Characteristics
+///
+/// - **Single-pass**: O(n) time complexity where n is source length
+/// - **Zero-copy**: Returns `&str` slices into the original source
+/// - **Lazy**: Implemented as an iterator, tokens generated on demand
+///
+/// ## Examples
+///
+/// ### Basic Tokenization
+///
+/// ```
+/// use ferrotex_syntax::lexer::Lexer;
+/// use ferrotex_syntax::SyntaxKind;
+///
+/// let source = r"\section{Hello} % comment";
+/// let tokens: Vec<_> = Lexer::new(source).collect();
+///
+/// assert_eq!(tokens[0].0, SyntaxKind::Command); // \section
+/// assert_eq!(tokens[1].0, SyntaxKind::LBrace);  // {
+/// assert_eq!(tokens[2].0, SyntaxKind::Text);    // Hello
+/// ```
+///
+/// ### Handling Multi-byte UTF-8
+///
+/// ```
+/// use ferrotex_syntax::lexer::Lexer;
+///
+/// let source = r"Émilie Noether's theorem";
+/// let mut lexer = Lexer::new(source);
+///
+/// let (kind, text) = lexer.next().unwrap();
+/// assert_eq!(text, "Émilie"); // Correctly handles é
+/// ```
 pub struct Lexer<'a> {
+    /// The input source text being lexed.
     input: &'a str,
+    /// Current byte position in the input.
     position: usize,
 }
 
@@ -160,5 +212,72 @@ mod tests {
                 (SyntaxKind::Command, "\\%"),
             ]
         );
+    }
+
+    #[test]
+    fn test_lexer_empty_input() {
+        let input = "";
+        let tokens = tokenize(input);
+        assert!(tokens.is_empty());
+    }
+
+    #[test]
+    fn test_lexer_only_whitespace() {
+        let input = "   \n\t ";
+        let tokens = tokenize(input);
+        assert_eq!(tokens, vec![(SyntaxKind::Whitespace, "   \n\t ")]);
+    }
+
+    #[test]
+    fn test_lexer_unexpected_chars() {
+        // Technically nothing is unexpected in our lexer yet (it falls back to text),
+        // but this verifies that behavior.
+        let input = "@#*&^";
+        let tokens = tokenize(input);
+        assert_eq!(tokens, vec![(SyntaxKind::Text, "@#*&^")]);
+    }
+
+    #[test]
+    fn test_lexer_mixed_math_and_text() {
+        let input = "a$b$c";
+        let tokens = tokenize(input);
+        assert_eq!(
+            tokens,
+            vec![
+                (SyntaxKind::Text, "a"),
+                (SyntaxKind::Dollar, "$"),
+                (SyntaxKind::Text, "b"),
+                (SyntaxKind::Dollar, "$"),
+                (SyntaxKind::Text, "c"),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_lexer_brackets() {
+        let input = r"[arg]";
+        let tokens = tokenize(input);
+        assert_eq!(
+            tokens,
+            vec![
+                (SyntaxKind::LBracket, "["),
+                (SyntaxKind::Text, "arg"),
+                (SyntaxKind::RBracket, "]"),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_lexer_multi_byte_text() {
+        let input = "Étude";
+        let tokens = tokenize(input);
+        assert_eq!(tokens, vec![(SyntaxKind::Text, "Étude")]);
+    }
+
+    #[test]
+    fn test_lexer_comment_with_carriage_return() {
+        let input = "% comment\rnext";
+        let tokens = tokenize(input);
+        assert_eq!(tokens[0], (SyntaxKind::Comment, "% comment"));
     }
 }

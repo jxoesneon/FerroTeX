@@ -6,6 +6,42 @@ The format is based on **Keep a Changelog**, and this project intends to follow 
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-01-02
+
+### "Engine Synchrony" Release
+
+This milestone release transforms FerroTeX into a high-fidelity "Scientific Compiler" platform, introducing cryptographic reproducibility, live state inspection, and preventative macro analysis.
+
+### Added
+
+- **Content-Addressable Reproducibility**:
+  - Automatic `ferrotex.lock` generation for hermetic builds.
+  - `ferrotex verify` command for cryptographic baseline checks.
+- **DAP State Inspection**:
+  - Live shadowing of TeX internal registers (`\count`, `\dimen`) and macros.
+  - Real-time engine state visualization in the VS Code variables pane.
+- **Safety-Critical Analysis**:
+  - Preventative detection of infinite recursion and stack overflows in macros.
+  - Cycle detection for circular control sequences.
+- **"Premium" Tectonic Debugger**:
+  - **File-Level Stepping**: Intercept `.tex`, `.sty`, and `.cls` access to provide source-level granularity.
+  - **Pass-Level Control**: Integrated DAP synchronization with the real Tectonic engine.
+- **Universal Build System**:
+  - DAG-based build engine with topological sorting and cycle detection.
+- **Semantic Math Verification**:
+  - Real-time jagged matrix detection and mathematical delimiter balancing.
+
+### Fixed
+
+- Cleaned up all compiler warnings across the entire workspace (10 crates).
+- Resolved unused imports and variables in `ferrotex-dap` and `ferrotex-syntax`.
+- Synchronized all workspace crate versions to `0.20.0`.
+
+### Changed
+
+- Refactored `TectonicShim` to use trace-based variable extraction instead of unstable FFI.
+- Enhanced LSP progress reporting for package indexing.
+
 ## [0.19.2] - 2025-12-29
 
 ### Documentation

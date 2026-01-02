@@ -1,6 +1,6 @@
 
 use crate::LogParser;
-use crate::ir::{LogEvent, EventPayload};
+use crate::ir::EventPayload;
 
 #[test]
 fn test_parse_empty_log() {

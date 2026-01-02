@@ -1,6 +1,6 @@
-﻿[package]
+[package]
 name = "ferrotex-log"
-version = "0.19.2"
+version = "0.20.0"
 edition = "2024"
 description = "FerroTeX build log parser and event model"
 license = "Apache-2.0 OR MIT"

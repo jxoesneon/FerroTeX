@@ -172,7 +172,7 @@ fn handle_command_hover(text: &str) -> Option<Hover> {
     // Commands like \section* need to keep the *
     // Commands like \section{...} need to stop at {
     
-    let cmd = if let Some(idx) = text.find(|c| c == '{' || c == '[' || c == ' ') {
+    let cmd = if let Some(idx) = text.find(['{', '[', ' ']) {
         &text[..idx]
     } else {
         text.trim()

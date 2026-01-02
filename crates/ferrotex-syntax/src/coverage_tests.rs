@@ -1,8 +1,7 @@
 use crate::lexer::Lexer;
 use crate::parser::parse;
-use crate::parser::Parser; // If needed, but parse() helper is usually enough
 use crate::SyntaxKind;
-use rowan::TextRange;
+// use rowan::TextRange; // unused
 
 #[cfg(test)]
 mod coverage_tests {
@@ -171,7 +170,7 @@ mod coverage_tests {
         // Our parser is naive and parses content of verbatim like normal content
         // unless we add specific support. This test just ensures it doesn't crash.
         let input = r"\begin{verbatim} \end{verbatim} $ % & { } ";
-        let res = parse(input);
+        let _res = parse(input);
         // It should try to parse $ % etc as tokens or comments.
         // It might error on unmatched braces if verbatim contains them?
         // Actually our environment parser loops until \end
@@ -201,7 +200,7 @@ mod coverage_tests {
         // Lexer impl: while next != \n && != \r
         // So \n is NOT consumed in the comment token.
         
-        let (k2, t2) = lexer.next_token();
+        let (k2, _t2) = lexer.next_token();
         assert_eq!(k2, SyntaxKind::Whitespace); // The newline
     }
 
@@ -231,13 +230,13 @@ mod coverage_tests {
         
         lexer.next_token(); // whitespace
         
-        let (k2, t2) = lexer.next_token();
+        let (k2, _t2) = lexer.next_token();
         assert_eq!(k2, SyntaxKind::Text); // # is Text
         
         lexer.next_token(); // whitespace
         
         // $ is Dollar
-        let (k3, t3) = lexer.next_token();
+        let (k3, _t3) = lexer.next_token();
         assert_eq!(k3, SyntaxKind::Dollar);
     }
     

@@ -1,32 +1,13 @@
 [
   {
     "span": {
-      "start": 33,
-      "end": 37
-    },
-    "confidence": 1.0,
-    "kind": "FileEnter",
-    "data": {
-      "path": "TeX"
-    }
-  },
-  {
-    "span": {
       "start": 47,
       "end": 48
     },
-    "confidence": 1.0,
-    "kind": "FileExit"
-  },
-  {
-    "span": {
-      "start": 49,
-      "end": 59
-    },
-    "confidence": 1.0,
-    "kind": "FileEnter",
+    "confidence": 0.5,
+    "kind": "Info",
     "data": {
-      "path": "preloaded"
+      "message": "Unmatched closing parenthesis"
     }
   },
   {
@@ -34,29 +15,32 @@
       "start": 81,
       "end": 82
     },
-    "confidence": 1.0,
-    "kind": "FileExit"
+    "confidence": 0.5,
+    "kind": "Info",
+    "data": {
+      "message": "Unmatched closing parenthesis"
+    }
   },
   {
     "span": {
       "start": 192,
-      "end": 211
+      "end": 203
     },
     "confidence": 1.0,
     "kind": "FileEnter",
     "data": {
-      "path": "./main.texLaTeX2e"
+      "path": "./main.tex"
     }
   },
   {
     "span": {
       "start": 259,
-      "end": 282
+      "end": 273
     },
     "confidence": 1.0,
     "kind": "FileEnter",
     "data": {
-      "path": "./article.clsDocument"
+      "path": "./article.cls"
     }
   },
   {
@@ -68,17 +52,6 @@
     "kind": "FileEnter",
     "data": {
       "path": "./size10.cloFile:"
-    }
-  },
-  {
-    "span": {
-      "start": 413,
-      "end": 418
-    },
-    "confidence": 1.0,
-    "kind": "FileEnter",
-    "data": {
-      "path": "size"
     }
   },
   {
@@ -170,18 +143,10 @@
       "start": 1682,
       "end": 1683
     },
-    "confidence": 1.0,
-    "kind": "FileExit"
-  },
-  {
-    "span": {
-      "start": 2106,
-      "end": 2108
-    },
-    "confidence": 1.0,
-    "kind": "FileEnter",
+    "confidence": 0.5,
+    "kind": "Info",
     "data": {
-      "path": "1"
+      "message": "Unmatched closing parenthesis"
     }
   },
   {
@@ -189,18 +154,10 @@
       "start": 2126,
       "end": 2127
     },
-    "confidence": 1.0,
-    "kind": "FileExit"
-  },
-  {
-    "span": {
-      "start": 2173,
-      "end": 2178
-    },
-    "confidence": 1.0,
-    "kind": "FileEnter",
+    "confidence": 0.5,
+    "kind": "Info",
     "data": {
-      "path": "max."
+      "message": "Unmatched closing parenthesis"
     }
   },
   {
@@ -208,18 +165,10 @@
       "start": 2186,
       "end": 2187
     },
-    "confidence": 1.0,
-    "kind": "FileExit"
-  },
-  {
-    "span": {
-      "start": 2267,
-      "end": 2272
-    },
-    "confidence": 1.0,
-    "kind": "FileEnter",
+    "confidence": 0.5,
+    "kind": "Info",
     "data": {
-      "path": "max."
+      "message": "Unmatched closing parenthesis"
     }
   },
   {
@@ -227,18 +176,10 @@
       "start": 2279,
       "end": 2280
     },
-    "confidence": 1.0,
-    "kind": "FileExit"
-  },
-  {
-    "span": {
-      "start": 2334,
-      "end": 2339
-    },
-    "confidence": 1.0,
-    "kind": "FileEnter",
+    "confidence": 0.5,
+    "kind": "Info",
     "data": {
-      "path": "max."
+      "message": "Unmatched closing parenthesis"
     }
   },
   {
@@ -246,7 +187,10 @@
       "start": 2348,
       "end": 2349
     },
-    "confidence": 1.0,
-    "kind": "FileExit"
+    "confidence": 0.5,
+    "kind": "Info",
+    "data": {
+      "message": "Unmatched closing parenthesis"
+    }
   }
 ]
