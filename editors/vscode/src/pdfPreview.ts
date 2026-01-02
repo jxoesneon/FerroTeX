@@ -97,58 +97,117 @@ export class PdfPreviewProvider implements vscode.CustomReadonlyEditorProvider {
             <title>PDF Preview</title>
             <style>
                 body { margin: 0; padding: 0; background-color: #525659; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+                :root {
+                    --bg-color: #1e1e1e;
+                    --toolbar-bg: rgba(30, 30, 30, 0.8);
+                    --accent: #3b82f6;
+                    --text-color: #e5e7eb;
+                }
+                body { 
+                    margin: 0; 
+                    padding: 0; 
+                    background-color: var(--bg-color); 
+                    display: flex; 
+                    flex-direction: column; 
+                    height: 100vh; 
+                    overflow: hidden; 
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                }
                 #toolbar {
-                    background-color: #323639;
-                    color: white;
+                    position: absolute;
+                    bottom: 20px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    background-color: var(--toolbar-bg);
+                    backdrop-filter: blur(10px);
+                    color: var(--text-color);
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    height: 40px;
-                    width: 100%;
-                    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+                    height: 44px;
+                    padding: 0 16px;
+                    border-radius: 22px;
+                    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
                     z-index: 1000;
-                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                    border: 1px solid rgba(255,255,255,0.1);
+                    transition: opacity 0.3s;
                 }
+                #toolbar:hover { opacity: 1; }
                 #toolbar button {
                     background: none;
                     border: none;
-                    color: white;
+                    color: var(--text-color);
                     cursor: pointer;
-                    padding: 5px 10px;
-                    font-size: 14px;
+                    width: 32px;
+                    height: 32px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 18px;
+                    transition: background-color 0.2s;
                 }
-                #toolbar button:hover { background-color: rgba(255,255,255,0.1); border-radius: 4px; }
+                #toolbar button:hover { background-color: rgba(255,255,255,0.1); }
+                #scale-display { 
+                    margin: 0 12px; 
+                    width: 40px; 
+                    text-align: center; 
+                    font-size: 13px;
+                    font-weight: 500;
+                    font-variant-numeric: tabular-nums;
+                }
                 #page-container { 
                     flex: 1; 
                     overflow: auto; 
-                    padding: 20px; 
+                    padding: 40px 20px; 
                     text-align: center; 
                     box-sizing: border-box;
+                    scroll-behavior: smooth;
                 }
-                canvas { box-shadow: 0 0 10px rgba(0,0,0,0.5); margin-bottom: 20px; display: inline-block; vertical-align: top; }
-                .page-wrapper { margin-bottom: 20px; position: relative; display: inline-block; }
+                canvas { 
+                    box-shadow: 0 4px 20px rgba(0,0,0,0.3); 
+                    margin-bottom: 24px; 
+                    display: inline-block; 
+                    vertical-align: top;
+                    border-radius: 4px;
+                }
+                .page-wrapper { position: relative; display: inline-block; margin-bottom: 24px; }
                 /* SyncTeX Highlight Overlay */
                 .marker {
                     position: absolute;
-                    width: 20px;
-                    height: 20px;
-                    background-color: rgba(255, 0, 0, 0.4);
-                    border: 2px solid red;
-                    border-radius: 50%;
-                    transform: translate(-50%, -50%);
+                    width: 100%;
+                    height: 0;
+                    border-top: 2px solid rgba(59, 130, 246, 0.8);
+                    box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
                     pointer-events: none;
-                    transition: opacity 0.5s;
+                    animation: fadeOut 2s forwards;
                     z-index: 100;
+                    transform: translateY(-50%);
                 }
+                @keyframes fadeOut {
+                    0% { opacity: 1; }
+                    80% { opacity: 1; }
+                    100% { opacity: 0; }
+                }
+                /* Custom Scrollbar */
+                ::-webkit-scrollbar { width: 10px; height: 10px; }
+                ::-webkit-scrollbar-track { background: transparent; }
+                ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 5px; }
+                ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
             </style>
         </head>
         <body>
-            <div id="toolbar">
-                <button id="zoom-out">-</button>
-                <span id="scale-display" style="margin: 0 10px; width: 50px; text-align: center;">100%</span>
-                <button id="zoom-in">+</button>
-            </div>
             <div id="page-container"></div>
+            <!-- Floating Toolbar -->
+            <div id="toolbar">
+                <button id="zoom-out" title="Zoom Out">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M14 8a.75.75 0 0 1-.75.75H2.75a.75.75 0 0 1 0-1.5h10.5A.75.75 0 0 1 14 8Z"/></svg>
+                </button>
+                <span id="scale-display">100%</span>
+                <button id="zoom-in" title="Zoom In">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8.75 2.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>
+                </button>
+            </div>
             <script type="module">
                 import * as pdfjsLib from '${pdfJsUri}';
 
@@ -245,7 +304,7 @@ export class PdfPreviewProvider implements vscode.CustomReadonlyEditorProvider {
                         if (pageData) {
                             pageData.canvas.scrollIntoView({ behavior: 'smooth', block: 'center' });
                             
-                            // Visual Indicator
+                            // Visual Indicator - Line Highlight
                             const viewPoint = pageData.viewport.convertToViewportPoint(x, y);
                             
                             // Remove existing markers
@@ -253,16 +312,15 @@ export class PdfPreviewProvider implements vscode.CustomReadonlyEditorProvider {
 
                             const marker = document.createElement('div');
                             marker.className = 'marker';
-                            marker.style.left = viewPoint[0] + 'px';
+                            // SyncTeX gives us a point, usually baseline. We want a horizontal line there.
+                            // viewPoint[1] is Y.
                             marker.style.top = viewPoint[1] + 'px';
+                            // We make it span the width of the page wrapper
                             
                             pageData.wrapper.appendChild(marker);
 
-                            // Auto-fade
-                            setTimeout(() => {
-                                marker.style.opacity = '0';
-                                setTimeout(() => marker.remove(), 500);
-                            }, 3000);
+                            // Auto-removed by animation in CSS
+                            setTimeout(() => marker.remove(), 2000);
                         }
                     }
                 });

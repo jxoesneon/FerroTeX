@@ -172,7 +172,7 @@ fn handle_command_hover(text: &str) -> Option<Hover> {
     // Commands like \section* need to keep the *
     // Commands like \section{...} need to stop at {
     
-    let cmd = if let Some(idx) = text.find(|c| c == '{' || c == '[' || c == ' ') {
+    let cmd = if let Some(idx) = text.find(['{', '[', ' ']) {
         &text[..idx]
     } else {
         text.trim()
@@ -340,6 +340,27 @@ mod tests {
         match hover.unwrap().contents {
             HoverContents::Markup(m) => {
                 assert!(m.value.contains("Bold"));
+            },
+            _ => panic!("Wrong hover content type"),
+        }
+    }
+
+    #[test]
+    fn test_hover_citation() {
+        use tower_lsp::lsp_types::Url;
+        let workspace = crate::workspace::Workspace::default();
+        let bib_uri = Url::parse("file:///refs.bib").unwrap();
+        workspace.update_bib(&bib_uri, "@article{knuth77, author={Knuth}, title={The Art}, year={1977}}");
+        
+        let input = r#"\cite{knuth77}"#;
+        let p = parse(input);
+        let offset = TextSize::from(input.find("knuth77").unwrap() as u32);
+        
+        let hover = find_hover(&p.syntax(), offset, &workspace).expect("No citation hover");
+        match hover.contents {
+            HoverContents::Markup(m) => {
+                assert!(m.value.contains("Knuth"));
+                assert!(m.value.contains("Art"));
             },
             _ => panic!("Wrong hover content type"),
         }

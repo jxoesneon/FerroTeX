@@ -227,3 +227,58 @@ fn test_miktex_backend_execution_failure() {
     
     assert_eq!(status.state, InstallState::Failed);
 }
+
+#[test]
+fn test_miktex_search() {
+    let mock = Box::new(super::MockCommandExecutor {
+        stdout: "".to_string(),
+        stderr: "".to_string(),
+        status_code: 0,
+    });
+    let backend = MiktexBackend::with_executor(PathBuf::from("/bin/mpm"), mock);
+    let results = backend.search("query").unwrap();
+    assert!(results.is_empty());
+}
+
+#[test]
+fn test_noop_backend_search() {
+    let backend = NoOpBackend;
+    let results = backend.search("any").unwrap();
+    assert!(results.is_empty());
+}
+
+#[test]
+fn test_package_manager_search_delegation() {
+    let mock = MockBackend {
+        install_result: Ok(InstallStatus{name: "".into(), state: InstallState::Unknown, message: None}),
+        search_result: Ok(vec!["found".into()]),
+    };
+    let pm = PackageManager::with_backend(std::sync::Arc::new(mock));
+    let results = pm.search("query").unwrap();
+    assert_eq!(results[0], "found");
+}
+
+#[test]
+fn test_package_manager_default() {
+    let _ = PackageManager::default();
+}
+
+#[test]
+fn test_real_command_executor_failure() {
+    let executor = RealCommandExecutor;
+    let result = executor.execute(Path::new("/non/existent/path/for/sure"), &[]);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_tlmgr_search_malformed() {
+    let mock = Box::new(super::MockCommandExecutor {
+        stdout: "  \ntlmgr: some message\nvalidpkg".to_string(),
+        stderr: "".to_string(),
+        status_code: 0,
+    });
+    let backend = TlmgrBackend::with_executor(PathBuf::from("/bin/tlmgr"), mock);
+    let results = backend.search("query").unwrap();
+    // Should filter out empty lines and possibly tlmgr specific warnings if we handle them
+    assert!(results.iter().any(|s| s == "validpkg"));
+}

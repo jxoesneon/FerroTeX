@@ -1,7 +1,130 @@
 //! # FerroTeX Syntax
 //!
-//! This crate provides the syntax tree definition, lexer, and parser for the FerroTeX project.
-//! It is based on `rowan` for lossless syntax trees.
+//! Lexer, parser, and lossless syntax tree implementation for LaTeX source code.
+//!
+//! ## Overview
+//!
+//! This crate provides a **fault-tolerant** parser for LaTeX documents that produces
+//! a **lossless Concrete Syntax Tree (CST)** using the [`rowan`](https://github.com/rust-analyzer/rowan)
+//! library. The parser is designed to handle incomplete, malformed, or evolving documents
+//! gracefully, making it suitable for IDE use cases where the source is being actively edited.
+//!
+//! ## Architecture
+//!
+//! The parsing pipeline consists of three main components:
+//!
+//! ```text
+//! ┌──────────┐      ┌────────┐      ┌─────────────┐
+//! │  Source  │ ───► │ Lexer  │ ───► │   Parser    │
+//! │  (str)   │      │        │      │             │
+//! └──────────┘      └────────┘      └─────────────┘
+//!                       │                   │
+//!                       ▼                   ▼
+//!                 SyntaxKind           GreenNode
+//!                   tokens              (CST)
+//! ```
+//!
+//! ### Component Responsibilities
+//!
+//! - **[`lexer`]** - Tokenizes LaTeX source into [`SyntaxKind`] tokens
+//! - **[`parser`]** - Builds a CST using recursive descent parsing
+//! - **[`bibtex`]** - Specialized parsing for BibTeX bibliography files
+//!
+//! ## Design Principles
+//!
+//! ### 1. Lossless Representation
+//!
+//! The syntax tree preserves **all** source information including:
+//! - Whitespace
+//! - Comments
+//! - Malformed or unrecognized tokens
+//!
+//! This enables precise source mapping, formatting preservation, and reliable
+//! round-tripping (`parse(source).to_string() == source`).
+//!
+//! ### 2. Error Tolerance
+//!
+//! The parser continues after encountering errors, producing a best-effort tree plus
+//! a list of [`parser::SyntaxError`]s. This ensures IDE features work even in incomplete
+//! documents.
+//!
+//! ### 3. Incremental Updates
+//!
+//! The `rowan` CST is designed for incremental re-parsing (not yet fully implemented),
+//! allowing efficient updates when small portions of the document change.
+//!
+//! ## Key Types
+//!
+//! - [`SyntaxKind`] - Enumeration of all token and node types
+//! - [`SyntaxNode`] - A node in the concrete syntax tree
+//! - [`SyntaxToken`] - A terminal token (leaf) in the CST
+//! - [`parser::Parser`] - The main parsing entry point
+//! - [`parser::ParseResult`] - Contains the CST and any errors
+//!
+//! ## Examples
+//!
+//! ### Basic Parsing
+//!
+//! ```
+//! use ferrotex_syntax::parse;
+//!
+//! let source = r"\section{Introduction}
+//! This is a \textbf{LaTeX} document.
+//! ";
+//!
+//! let result = parse(source);
+//! let root = result.syntax();
+//!
+//! // Check for parse errors
+//! if result.errors.is_empty() {
+//!     println!("Parse successful!");
+//! } else {
+//!     for error in &result.errors {
+//!         eprintln!("Error: {} at {:?}", error.message, error.range);
+//!     }
+//! }
+//! ```
+//!
+//! ### Traversing the Syntax Tree
+//!
+//! ```
+//! use ferrotex_syntax::{parse, SyntaxKind};
+//!
+//! let result = parse(r"\section{Intro} \label{sec:intro}");
+//! let root = result.syntax();
+//!
+//! // Find all section nodes
+//! for child in root.children() {
+//!     if child.kind() == SyntaxKind::Section {
+//!         println!("Found section at: {:?}", child.text_range());
+//!     }
+//! }
+//! ```
+//!
+//! ### Using the Lexer Directly
+//!
+//! ```
+//! use ferrotex_syntax::lexer::Lexer;
+//!
+//! let source = r"\section{Hello}";
+//! let tokens: Vec<_> = Lexer::new(source).collect();
+//!
+//! for (kind, text) in tokens {
+//!     println!("{:?}: {:?}", kind, text);
+//! }
+//! ```
+//!
+//! ## Rowan Integration
+//!
+//! This crate uses the [`rowan`](https://github.com/rust-analyzer/rowan) library,
+//! originally developed for rust-analyzer. Rowan provides:
+//!
+//! - **Immutable, persistent trees** with structural sharing
+//! - **Red-green tree architecture** separating syntax (green) from parent pointers (red)
+//! - **Zero-copy text representation** via interned strings
+//!
+//! See [`FerroTexLanguage`] for the language implementation that connects [`SyntaxKind`]
+//! to rowan's generic tree types.
 
 pub mod bibtex;
 pub mod lexer;
@@ -98,3 +221,27 @@ pub type SyntaxNode = rowan::SyntaxNode<FerroTexLanguage>;
 pub type SyntaxToken = rowan::SyntaxToken<FerroTexLanguage>;
 /// A syntax element (node or token) in the FerroTeX language.
 pub type SyntaxElement = rowan::SyntaxElement<FerroTexLanguage>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_syntax_kind_conversion() {
+        let kind = SyntaxKind::Root;
+        let rowan_kind: rowan::SyntaxKind = kind.into();
+        assert_eq!(rowan_kind.0, kind as u16);
+
+        let back = FerroTexLanguage::kind_from_raw(rowan_kind);
+        assert_eq!(back, kind);
+
+        let raw = FerroTexLanguage::kind_to_raw(kind);
+        assert_eq!(raw.0, kind as u16);
+    }
+
+    #[test]
+    fn test_parse_entrypoint() {
+        let res = parse("Hello");
+        assert!(res.errors.is_empty());
+    }
+}

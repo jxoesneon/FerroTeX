@@ -336,6 +336,46 @@ Hello World
     \end{itemize}
 \end{document}"#;
 
+
+        check_format(input, expected);
+    }
+
+    #[test]
+    fn test_format_idempotency() {
+        let input = r#"\documentclass{article}
+\begin{document}
+    \begin{itemize}
+        \item One
+    \end{itemize}
+\end{document}"#;
+        // First format
+        let parse = parse(input);
+        let root = parse.syntax();
+        let line_index = LineIndex::new(input);
+        let edits = format_document(&root, &line_index);
+        
+        // Apply edits (which should be none if already formatted, or minimal)
+        // If the input is already well-formatted, formatting it again should yield zero edits?
+        // Our formatter always returns edits if indentation mismatches.
+        // If it returns edits, applying them should result in the same string.
+        assert!(edits.is_empty(), "Well-formatted document should produce no edits");
+    }
+
+    #[test]
+    fn test_format_preserves_blank_lines() {
+        let input = r#"\begin{document}
+    Hello
+
+    World
+\end{document}"#;
+        let expected = r#"\begin{document}
+    Hello
+
+    World
+\end{document}"#;
+        // Blank lines inside should be preserved (though potentially indented if not empty)
+        // Our logic: trimmed.is_empty() -> continue. So blank lines are untouched.
+        
         check_format(input, expected);
     }
 }
