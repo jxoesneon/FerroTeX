@@ -185,8 +185,8 @@ pub fn format_document(root: &SyntaxNode, line_index: &line_index::LineIndex) ->
     // 2. Determine net effect on indent.
 
     let mut line_effects = vec![(0isize, 0isize); lines.len()]; // (pre_adjustment, post_adjustment)
-    // pre_adjustment: applied to THIS line (e.g. \end)
-    // post_adjustment: applied to NEXT line (e.g. \begin)
+                                                                // pre_adjustment: applied to THIS line (e.g. \end)
+                                                                // post_adjustment: applied to NEXT line (e.g. \begin)
 
     for token in root
         .descendants_with_tokens()
@@ -203,8 +203,8 @@ pub fn format_document(root: &SyntaxNode, line_index: &line_index::LineIndex) ->
                 line_effects[line].1 += 1; // Increment for next line
             } else if txt == "\\end" {
                 line_effects[line].0 -= 1; // Decrement for this line
-                // If we decrement for this line, we IMPLICITLY decrement for next line too purely by state carry-over?
-                // No, we need to model the state machine.
+                                           // If we decrement for this line, we IMPLICITLY decrement for next line too purely by state carry-over?
+                                           // No, we need to model the state machine.
             }
         }
     }
@@ -336,7 +336,6 @@ Hello World
     \end{itemize}
 \end{document}"#;
 
-
         check_format(input, expected);
     }
 
@@ -353,12 +352,15 @@ Hello World
         let root = parse.syntax();
         let line_index = LineIndex::new(input);
         let edits = format_document(&root, &line_index);
-        
+
         // Apply edits (which should be none if already formatted, or minimal)
         // If the input is already well-formatted, formatting it again should yield zero edits?
         // Our formatter always returns edits if indentation mismatches.
         // If it returns edits, applying them should result in the same string.
-        assert!(edits.is_empty(), "Well-formatted document should produce no edits");
+        assert!(
+            edits.is_empty(),
+            "Well-formatted document should produce no edits"
+        );
     }
 
     #[test]
@@ -375,7 +377,7 @@ Hello World
 \end{document}"#;
         // Blank lines inside should be preserved (though potentially indented if not empty)
         // Our logic: trimmed.is_empty() -> continue. So blank lines are untouched.
-        
+
         check_format(input, expected);
     }
 }

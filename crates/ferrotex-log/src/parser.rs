@@ -161,22 +161,20 @@ impl LogParser {
                         // - Starts with / or \ or .
                         // - OR looks like a filename with extension (contains a dot)
                         // - We accept likely identifiers if they are long enough and don't contain spaces (extract_path_spanning stops at space)
-                        let is_likely_path = path.starts_with('/') 
-                                          || path.starts_with('\\') 
-                                          || path.starts_with('.')
-                                          || (path.contains('.') && !path.ends_with('.'))
-                                          || path.contains('/'); // relative path like "subdir/file"
-                        
+                        let is_likely_path = path.starts_with('/')
+                            || path.starts_with('\\')
+                            || path.starts_with('.')
+                            || (path.contains('.') && !path.ends_with('.'))
+                            || path.contains('/'); // relative path like "subdir/file"
+
                         // Reject specific false positives seen in logs
-                        let is_blacklisted = path == "Info" 
-                                           || path == "preloaded"
-                                           || path == "TeX"
-                                           || path == "con"; // Windows legacy (unlikely in log but good practice)
+                        let is_blacklisted =
+                            path == "Info" || path == "preloaded" || path == "TeX" || path == "con"; // Windows legacy (unlikely in log but good practice)
 
                         if !is_likely_path || is_blacklisted {
                             // Treat '(' as text
-                             char_idx += char_len;
-                             continue;
+                            char_idx += char_len;
+                            continue;
                         }
 
                         let span_end = if consumed_lines == 0 {
@@ -355,7 +353,6 @@ impl LogParser {
         let mut current_char_idx = start_char_idx;
 
         loop {
-
             let line = lines[current_line_idx];
             let remainder = &line[current_char_idx..];
 
@@ -439,23 +436,27 @@ LaTeX Warning: Reference `missing' on page 1 undefined on input line 6.
         // Streaming with tiny chunks
         let mut stream_parser = LogParser::new();
         let mut amassed_events = Vec::new();
-        
+
         // Chunk size 2 to force many boundaries
         for chunk in input.as_bytes().chunks(2) {
-             let s = std::str::from_utf8(chunk).unwrap();
-             amassed_events.extend(stream_parser.update(s));
+            let s = std::str::from_utf8(chunk).unwrap();
+            amassed_events.extend(stream_parser.update(s));
         }
         amassed_events.extend(stream_parser.finish());
 
         // Compare structure (ignoring spans maybe? No, spans should match if implementation is correct)
         // Spans in streaming might differ if global offset tracking is buggy.
         // Let's compare payload and ordering first.
-        
+
         assert_eq!(expected_events.len(), amassed_events.len());
         for (e1, e2) in expected_events.iter().zip(amassed_events.iter()) {
             assert_eq!(e1.payload, e2.payload);
             // Verify spans if robust
-            assert_eq!(e1.span, e2.span, "Span mismatch for payload {:?}", e1.payload);
+            assert_eq!(
+                e1.span, e2.span,
+                "Span mismatch for payload {:?}",
+                e1.payload
+            );
         }
     }
 }

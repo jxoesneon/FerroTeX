@@ -1,7 +1,7 @@
-use std::path::PathBuf;
-use std::fs;
-use sha2::{Sha256, Digest};
 use crate::{Artifact, ArtifactId};
+use sha2::{Digest, Sha256};
+use std::fs;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
 pub struct FileArtifact {
@@ -44,16 +44,19 @@ mod tests {
 
     #[test]
     fn test_file_artifact_fingerprint() {
-        let temp_dir = std::env::current_dir().unwrap().join("target").join("test_artifacts");
+        let temp_dir = std::env::current_dir()
+            .unwrap()
+            .join("target")
+            .join("test_artifacts");
         fs::create_dir_all(&temp_dir).unwrap();
         let file_path = temp_dir.join("test.txt");
         fs::write(&file_path, "hello world").unwrap();
-        
+
         let artifact = FileArtifact::new(file_path.clone());
         let fp1 = artifact.fingerprint();
-        
+
         assert_ne!(fp1, "MISSING");
-        
+
         fs::write(&file_path, "modified").unwrap();
         let fp2 = artifact.fingerprint();
         assert_ne!(fp1, fp2);
@@ -61,7 +64,7 @@ mod tests {
         // Test missing file
         let _ = fs::remove_file(&file_path);
         assert_eq!(artifact.fingerprint(), "MISSING");
-        
+
         let _ = fs::remove_dir_all(temp_dir);
     }
 

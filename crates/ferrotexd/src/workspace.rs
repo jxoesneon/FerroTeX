@@ -1,5 +1,5 @@
 use dashmap::DashMap;
-use ferrotex_syntax::{SyntaxKind, TextRange, parse};
+use ferrotex_syntax::{parse, SyntaxKind, TextRange};
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
 use tower_lsp::lsp_types::{SymbolKind, Url};
@@ -115,8 +115,18 @@ impl Workspace {
     ///
     /// Parses the file content and extracts includes, labels, citations, etc.
     pub fn update(&self, uri: &Url, text: &str) {
-        let (includes, definitions, references, citations, bibliographies, sections, packages, magic_root, deprecated_usages, environments) =
-            scan_file(text);
+        let (
+            includes,
+            definitions,
+            references,
+            citations,
+            bibliographies,
+            sections,
+            packages,
+            magic_root,
+            deprecated_usages,
+            environments,
+        ) = scan_file(text);
 
         if let Some(root_path) = magic_root {
             self.explicit_roots.insert(uri.clone(), root_path);
@@ -288,14 +298,26 @@ impl Workspace {
         let referenced_bibs = self.get_referenced_bib_uris();
 
         let find_in_bibs = |uris: &Vec<Url>| -> Option<String> {
-             for uri in uris {
+            for uri in uris {
                 if let Some(bib_file) = self.bib_indices.get(uri) {
                     if let Some(entry) = bib_file.entries.iter().find(|e| e.key == key) {
                         // Found logic
-                        let title = entry.fields.get("title").map(|s| s.as_str()).unwrap_or("Unknown Title");
-                        let author = entry.fields.get("author").map(|s| s.as_str()).unwrap_or("Unknown Author");
-                        let year = entry.fields.get("year").map(|s| s.as_str()).unwrap_or("????");
-                        
+                        let title = entry
+                            .fields
+                            .get("title")
+                            .map(|s| s.as_str())
+                            .unwrap_or("Unknown Title");
+                        let author = entry
+                            .fields
+                            .get("author")
+                            .map(|s| s.as_str())
+                            .unwrap_or("Unknown Author");
+                        let year = entry
+                            .fields
+                            .get("year")
+                            .map(|s| s.as_str())
+                            .unwrap_or("????");
+
                         return Some(format!("**{}**\n{} ({})", title, author, year));
                     }
                 }
@@ -308,7 +330,7 @@ impl Workspace {
                 return Some(res);
             }
         }
-        
+
         // Fallback: search all known bibs if not found in referenced ones (loose mode)
         let all_uris: Vec<Url> = self.bib_indices.iter().map(|e| e.key().clone()).collect();
         find_in_bibs(&all_uris)
@@ -385,7 +407,7 @@ impl Workspace {
                 if env.name.to_lowercase().contains(&query) {
                     results.push((
                         env.name.clone(),
-                        SymbolKind::NAMESPACE, 
+                        SymbolKind::NAMESPACE,
                         uri.clone(),
                         env.range,
                     ));
@@ -529,7 +551,10 @@ impl Workspace {
                 diagnostics.push((
                     entry.key().clone(),
                     *range,
-                    format!("Command '{}' is deprecated. Use standard LaTeX2e replacements.", cmd),
+                    format!(
+                        "Command '{}' is deprecated. Use standard LaTeX2e replacements.",
+                        cmd
+                    ),
                 ));
             }
         }
@@ -620,10 +645,10 @@ type ScanResult = (
     Vec<CitationRef>,
     Vec<BibRef>,
     Vec<SectionDef>,
-    Vec<String>, // packages
-    Option<String>, // magic_root
+    Vec<String>,              // packages
+    Option<String>,           // magic_root
     Vec<(TextRange, String)>, // deprecated_usages
-    Vec<EnvDef>, // environments
+    Vec<EnvDef>,              // environments
 );
 
 fn scan_file(text: &str) -> ScanResult {
@@ -633,7 +658,7 @@ fn scan_file(text: &str) -> ScanResult {
     } else {
         text
     };
-    
+
     // Pattern: %!TEX root = <path>
     // Handles optional spaces around = and leading whitespace
     let re = Regex::new(r"(?mi)^%\s*!TEX\s+root\s*=\s*(.+)$").unwrap();
@@ -661,18 +686,21 @@ fn scan_file(text: &str) -> ScanResult {
                     if let Some(prev_range) = last_dollar_range {
                         if prev_range.end() == element.text_range().start() {
                             // Found consecutive $$
-                            let combined_range = TextRange::new(prev_range.start(), element.text_range().end());
-                            
+                            let combined_range =
+                                TextRange::new(prev_range.start(), element.text_range().end());
+
                             if let Some(opening_range) = opening_display_math {
                                 // This is the closing $$, mark the entire block
-                                let full_block_range = TextRange::new(opening_range.start(), combined_range.end());
-                                deprecated_usages.push((full_block_range, "displaymath".to_string()));
+                                let full_block_range =
+                                    TextRange::new(opening_range.start(), combined_range.end());
+                                deprecated_usages
+                                    .push((full_block_range, "displaymath".to_string()));
                                 opening_display_math = None;
                             } else {
                                 // This is an opening $$, remember it
                                 opening_display_math = Some(combined_range);
                             }
-                            
+
                             last_was_dollar = false;
                             last_dollar_range = None;
                             continue;
@@ -685,7 +713,7 @@ fn scan_file(text: &str) -> ScanResult {
             _ => {
                 last_was_dollar = false;
                 last_dollar_range = None;
-                
+
                 if element.kind() == SyntaxKind::Command {
                     let text = element.to_string();
                     let deprecated = ["\\bf", "\\it", "\\sc", "\\rm", "\\sf", "\\tt", "\\sl"];
@@ -694,7 +722,7 @@ fn scan_file(text: &str) -> ScanResult {
                         // by looking at parent context
                         let mut in_group = false;
                         let mut group_range = element.text_range();
-                        
+
                         if let Some(token) = element.as_token() {
                             if let Some(parent) = token.parent() {
                                 // Check if parent is a Group node
@@ -704,7 +732,7 @@ fn scan_file(text: &str) -> ScanResult {
                                 }
                             }
                         }
-                        
+
                         // Store command with context info
                         // Format: "cmd:in_group" or just "cmd" for standalone
                         let context_marker = if in_group {
@@ -712,36 +740,31 @@ fn scan_file(text: &str) -> ScanResult {
                         } else {
                             text.clone()
                         };
-                        
+
                         deprecated_usages.push((
-                            if in_group { group_range } else { element.text_range() },
-                            context_marker
+                            if in_group {
+                                group_range
+                            } else {
+                                element.text_range()
+                            },
+                            context_marker,
                         ));
                     }
                 } else if let Some(node) = element.as_node() {
                     match node.kind() {
                         SyntaxKind::Include => {
                             if let Some((name, range)) = extract_label_data(node) {
-                                includes.push(IncludeRef {
-                                    path: name,
-                                    range, 
-                                });
+                                includes.push(IncludeRef { path: name, range });
                             }
                         }
                         SyntaxKind::LabelDefinition => {
                             if let Some((name, range)) = extract_label_data(node) {
-                                defs.push(LabelDef {
-                                    name,
-                                    range,
-                                });
+                                defs.push(LabelDef { name, range });
                             }
                         }
                         SyntaxKind::LabelReference => {
                             if let Some((name, range)) = extract_label_data(node) {
-                                refs.push(LabelRef {
-                                    name,
-                                    range,
-                                });
+                                refs.push(LabelRef { name, range });
                             }
                         }
                         SyntaxKind::Citation => {
@@ -777,7 +800,10 @@ fn scan_file(text: &str) -> ScanResult {
                         }
                         SyntaxKind::Environment => {
                             if let Some((name, _range)) = extract_label_data(node) {
-                                environments.push(EnvDef { name, range: node.text_range() });
+                                environments.push(EnvDef {
+                                    name,
+                                    range: node.text_range(),
+                                });
                             }
                         }
                         _ => {}
@@ -793,25 +819,26 @@ fn scan_file(text: &str) -> ScanResult {
     let text_str = root.text().to_string();
     let re = Regex::new(r"\\usepackage(?:\[[^\]]*\])?\{([^}]+)\}").unwrap();
     let mut packages = Vec::new();
-    
+
     for cap in re.captures_iter(&text_str) {
         if let Some(pkg_group_match) = cap.get(1) {
             for pkg in pkg_group_match.as_str().split(',') {
                 let trimmed = pkg.trim();
                 if !trimmed.is_empty() {
                     packages.push(trimmed.to_string());
-                    
+
                     let forbidden = ["a4wide", "times", "epsfig", "psfig"];
                     if forbidden.contains(&trimmed) {
                         // Calculate exact range of the package name
                         use ferrotex_syntax::TextSize;
-                        let relative_start_in_group = pkg_group_match.as_str().find(trimmed).unwrap_or(0);
+                        let relative_start_in_group =
+                            pkg_group_match.as_str().find(trimmed).unwrap_or(0);
                         let absolute_start = pkg_group_match.start() + relative_start_in_group;
                         let absolute_end = absolute_start + trimmed.len();
 
                         let range = TextRange::new(
-                            TextSize::from(absolute_start as u32), 
-                            TextSize::from(absolute_end as u32)
+                            TextSize::from(absolute_start as u32),
+                            TextSize::from(absolute_end as u32),
                         );
                         deprecated_usages.push((range, format!("package:{}", trimmed)));
                     }
@@ -820,7 +847,18 @@ fn scan_file(text: &str) -> ScanResult {
         }
     }
 
-    (includes, defs, refs, citations, bibs, sections, packages, magic_root, deprecated_usages, environments)
+    (
+        includes,
+        defs,
+        refs,
+        citations,
+        bibs,
+        sections,
+        packages,
+        magic_root,
+        deprecated_usages,
+        environments,
+    )
 }
 
 pub fn extract_group_text(node: &ferrotex_syntax::SyntaxNode) -> Option<String> {
@@ -900,7 +938,10 @@ mod tests {
         "#;
         let result = scan_file(text);
         let deprecated = result.8;
-        assert!(deprecated.iter().any(|d| d.1 == "displaymath"), "Should detect display math block");
+        assert!(
+            deprecated.iter().any(|d| d.1 == "displaymath"),
+            "Should detect display math block"
+        );
     }
 
     #[test]
@@ -908,8 +949,14 @@ mod tests {
         let text = r#"\usepackage{times, geometry}"#;
         let result = scan_file(text);
         let deprecated = result.8;
-        assert!(deprecated.iter().any(|d| d.1 == "package:times"), "Should detect 'times' package");
-        assert!(!deprecated.iter().any(|d| d.1 == "package:geometry"), "Should NOT detect 'geometry' package");
+        assert!(
+            deprecated.iter().any(|d| d.1 == "package:times"),
+            "Should detect 'times' package"
+        );
+        assert!(
+            !deprecated.iter().any(|d| d.1 == "package:geometry"),
+            "Should NOT detect 'geometry' package"
+        );
     }
 
     #[test]
@@ -917,10 +964,10 @@ mod tests {
         let workspace = Workspace::new();
         let uri1 = Url::parse("file:///main.tex").unwrap();
         let uri2 = Url::parse("file:///sub.tex").unwrap();
-        
+
         workspace.update(&uri1, r"\label{lbl1}");
         workspace.update(&uri2, r"\label{lbl2}");
-        
+
         let labels = workspace.get_all_labels();
         assert_eq!(labels.len(), 2);
         assert!(labels.contains(&"lbl1".to_string()));
@@ -932,11 +979,11 @@ mod tests {
         let workspace = Workspace::new();
         let uri1 = Url::parse("file:///a.tex").unwrap();
         let uri2 = Url::parse("file:///b.tex").unwrap();
-        
+
         // A includes B, B includes A
         workspace.update(&uri1, r"\include{b.tex}");
         workspace.update(&uri2, r"\include{a.tex}");
-        
+
         let cycles = workspace.detect_cycles();
         assert!(!cycles.is_empty(), "Cycle should be detected");
     }
@@ -946,7 +993,7 @@ mod tests {
         let workspace = Workspace::new();
         let uri = Url::parse("file:///refs.bib").unwrap();
         let text = "@article{key1, title={Title}}";
-        
+
         workspace.update_bib(&uri, text);
         assert!(workspace.has_citation_key("key1"));
         assert!(!workspace.has_citation_key("key2"));
@@ -957,9 +1004,12 @@ mod tests {
         let workspace = Workspace::new();
         let uri = Url::parse("file:///chapter.tex").unwrap();
         let text = "% !TeX root = main.tex\nContent";
-        
+
         workspace.update(&uri, text);
-        assert_eq!(workspace.get_explicit_root(&uri), Some("main.tex".to_string()));
+        assert_eq!(
+            workspace.get_explicit_root(&uri),
+            Some("main.tex".to_string())
+        );
     }
 
     #[test]
@@ -968,7 +1018,7 @@ mod tests {
         let uri = Url::parse("file:///main.tex").unwrap();
         // \section should be parsed and added to sections list
         workspace.update(&uri, r"\section{Introduction}");
-        
+
         let index = workspace.indices.get(&uri).unwrap();
         assert_eq!(index.sections.len(), 1);
         assert_eq!(index.sections[0].name, "Introduction");

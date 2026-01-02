@@ -1,5 +1,5 @@
 use dashmap::DashMap;
-use ferrotexd::{Backend, workspace::Workspace};
+use ferrotexd::{workspace::Workspace, Backend};
 use std::sync::{Arc, Mutex};
 use tower_lsp::{LspService, Server};
 
@@ -16,7 +16,9 @@ async fn main() {
         workspace: Arc::new(Workspace::new()),
         root_uri: Arc::new(Mutex::new(None)),
         syntax_diagnostics: Arc::new(DashMap::new()),
-        package_manager: Arc::new(Mutex::new(ferrotex_core::package_manager::PackageManager::new())),
+        package_manager: Arc::new(Mutex::new(
+            ferrotex_core::package_manager::PackageManager::new(),
+        )),
         package_index: Arc::new(Mutex::new(None)),
     });
 
