@@ -1,3 +1,37 @@
+//! BibTeX file parsing utilities.
+//!
+//! ## Overview
+//!
+//! This module provides a separate, lightweight parser for BibTeX bibliography files (`.bib`).
+//! Unlike the main LaTeX parser, this implementation focuses on extracting structured data
+//! (entries, keys, fields) rather than producing a full syntax tree.
+//!
+//! ## Parsing Strategy
+//!
+//! The parser uses a **best-effort approach**:
+//!
+//! - It scans for `@type{key, ...}` patterns
+//! - It is resilient to unstructured comments and garbage text outside entries
+//! - It handles standard brace `{...}` and quote `"..."` delimiters for values
+//!
+//! ## Examples
+//!
+//! ```
+//! use ferrotex_syntax::bibtex::parse_bibtex;
+//!
+//! let input = r#"
+//!     @article{knuth84,
+//!         author = {Donald Knuth},
+//!         title = {Literate Programming},
+//!         year = 1984
+//!     }
+//! "#;
+//!
+//! let file = parse_bibtex(input);
+//! assert_eq!(file.entries.len(), 1);
+//! assert_eq!(file.entries[0].key, "knuth84");
+//! ```
+
 use rowan::{TextRange, TextSize};
 use std::collections::HashMap;
 use std::iter::Peekable;
@@ -23,7 +57,19 @@ pub struct BibFile {
     pub entries: Vec<BibEntry>,
 }
 
-/// A very simple, best-effort BibTeX parser.
+/// Parses a BibTeX input string into a structured [`BibFile`].
+///
+/// This function is tolerant of common errors and non-standard formatting.
+/// It extracts all recognizable entries and ignores malformed ones or
+/// text outside of entries.
+///
+/// # Arguments
+///
+/// * `input` - The content of the `.bib` file
+///
+/// # Returns
+///
+/// A [`BibFile`] containing all successfully parsed entries.
 pub fn parse_bibtex(input: &str) -> BibFile {
     let mut entries = Vec::new();
     let mut chars = input.char_indices().peekable();
@@ -32,9 +78,7 @@ pub fn parse_bibtex(input: &str) -> BibFile {
         let Some((start_idx, c)) = chars.next() else {
             break;
         };
-        if c == '@'
-            && let Some(entry) = parse_entry(&mut chars, start_idx, input.len())
-        {
+        if c == '@' && let Some(entry) = parse_entry(&mut chars, start_idx, input.len()) {
             entries.push(entry);
         }
     }
@@ -151,12 +195,20 @@ fn read_value(chars: &mut Peekable<CharIndices>) -> Option<String> {
     if c == '"' {
         chars.next(); // consume "
         // Read until "
-        // Handle escaped quotes? Simplified: no escapes for now or simplistic.
         let mut val = String::new();
         while let Some(&(_, ch)) = chars.peek() {
             if ch == '"' {
                 chars.next();
                 break;
+            }
+            if ch == '\\' {
+                chars.next(); // consume backslash
+                val.push('\\');
+                if let Some(&(_, escaped)) = chars.peek() {
+                     val.push(escaped);
+                     chars.next(); 
+                }
+                continue;
             }
             val.push(ch);
             chars.next();
@@ -313,5 +365,58 @@ mod tests {
         let entries = parse_bibtex(input);
         assert_eq!(entries.entries.len(), 1);
         assert_eq!(entries.entries[0].fields.get("year"), Some(&"1999".to_string()));
+    }
+
+    #[test]
+    fn test_bib_malformed_entries() {
+        // Entry without key, should ideally be skipped or partial
+        let input = r#"
+            @article{
+                author = "Anon"
+            }
+            @book{key4, title="Valid"}
+        "#;
+        let entries = parse_bibtex(input);
+        // The first might be parsed with empty key or skipped depending on logic
+        // "read_key" reads until comma or whitespace. If followed by author it might get "author" as key?
+        // Let's see behavior. The parser is robust/permissive.
+        // It's acceptable if it parses it.
+        // We mainly want to ensure it doesn't panic and finds the second entry.
+        let found_book = entries.entries.iter().any(|e| e.key == "key4");
+        assert!(found_book, "Should recover and parse valid second entry");
+    }
+
+    #[test]
+    fn test_bib_nested_braces() {
+        let input = r#"@misc{k, title = {{Double {Nested}}}}"#;
+        let entries = parse_bibtex(input);
+        assert_eq!(entries.entries[0].fields.get("title"), Some(&"{Double {Nested}}".to_string()));
+    }
+
+    #[test]
+    fn test_bib_multiline_field() {
+        let input = r#"@misc{k, 
+        title = {Line1
+        Line2}
+        }"#;
+        let entries = parse_bibtex(input);
+        // Our parser likely preserves newlines in brace-delimited strings
+        let val = entries.entries[0].fields.get("title").unwrap();
+        assert!(val.contains("Line1"));
+        assert!(val.contains("Line2"));
+    }
+
+    #[test]
+    fn test_bib_escaped_chars() {
+        let input = r#"@misc{k, title = "O\"Hare"}"#;
+        // The parser might treat \" as two chars \ and " or as an escaped quote.
+        // Standard BibTeX often just treats it as text inside curlies, but quotes need care.
+        // Let's see what happens.
+        let entries = parse_bibtex(input);
+        // If it parses correctly, we get the entry.
+        assert_eq!(entries.entries.len(), 1);
+        let val = entries.entries[0].fields.get("title").unwrap();
+        // If our parser handles escaped quotes in quoted strings:
+        assert!(val.contains("O\\\"Hare") || val.contains("O\"Hare"), "Value was: {}", val);
     }
 }

@@ -8,11 +8,30 @@ on:
 
 jobs:
   coverage:
-    name: Code Coverage
+    name: ${{ matrix.name }} Coverage
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Syntax
+            args: "--packages ferrotex-syntax"
+            flags: "syntax"
+          - name: Server
+            args: "--packages ferrotexd"
+            flags: "server"
+          - name: Core
+            args: "--workspace --exclude ferrotex-syntax --exclude ferrotexd"
+            flags: "core"
+
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Set Swap Space
+        uses: pierotofy/set-swap-space@master
+        with:
+          swap-size-gb: 10
 
       - name: Install System Dependencies
         run: |
@@ -27,20 +46,12 @@ jobs:
 
       - name: Run coverage
         run: |
-          cargo tarpaulin --lib --out Xml --output-dir coverage --skip-clean \
-            --packages ferrotex-core ferrotex-syntax ferrotex-log \
-            --exclude-files "crates/ferrotexd/*"
+          cargo tarpaulin --lib --out Xml --output-dir coverage --skip-clean ${{ matrix.args }}
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
           files: coverage/cobertura.xml
-          fail_ci_if_error: false
+          flags: ${{ matrix.flags }}
+          fail_ci_if_error: true
           verbose: true
-
-      - name: Upload coverage report artifact
-        uses: actions/upload-artifact@v6
-        with:
-          name: coverage-report
-          path: coverage/
-          retention-days: 30

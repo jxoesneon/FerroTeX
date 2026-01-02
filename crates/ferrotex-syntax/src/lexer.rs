@@ -1,10 +1,63 @@
 use crate::SyntaxKind;
 
-/// A simple lexer for LaTeX source code.
+/// A lexer for LaTeX source code.
 ///
-/// It breaks the input string into a stream of `SyntaxKind` tokens.
+/// ## Overview
+///
+/// The lexer performs **character-level scanning** of LaTeX source, producing
+/// a stream of ([`SyntaxKind`], `&str`) tuples. It handles:
+///
+/// - **Commands**: `\section`, `\item`, `\%` (escape sequences)
+/// - **Delimiters**: `{`, `}`, `[`, `]`
+/// - **Math mode**: `$` (inline math delimiter)
+/// - **Comments**: `%` through end of line
+/// - **Whitespace**: Consecutive whitespace collapsed into single tokens
+/// - **Text**: Everything else, consumed greedily until a special character
+///
+/// ## UTF-8 Handling
+///
+/// The lexer is **fully UTF-8 aware**, correctly handling multi-byte characters
+/// in commands, text, and comments. Position tracking uses byte offsets internally
+/// but respects character boundaries.
+///
+/// ## Performance Characteristics
+///
+/// - **Single-pass**: O(n) time complexity where n is source length
+/// - **Zero-copy**: Returns `&str` slices into the original source
+/// - **Lazy**: Implemented as an iterator, tokens generated on demand
+///
+/// ## Examples
+///
+/// ### Basic Tokenization
+///
+/// ```
+/// use ferrotex_syntax::lexer::Lexer;
+/// use ferrotex_syntax::SyntaxKind;
+///
+/// let source = r"\section{Hello} % comment";
+/// let tokens: Vec<_> = Lexer::new(source).collect();
+///
+/// assert_eq!(tokens[0].0, SyntaxKind::Command); // \section
+/// assert_eq!(tokens[1].0, SyntaxKind::LBrace);  // {
+/// assert_eq!(tokens[2].0, SyntaxKind::Text);    // Hello
+/// ```
+///
+/// ### Handling Multi-byte UTF-8
+///
+/// ```
+/// use ferrotex_syntax::lexer::Lexer;
+///
+/// let source = r"Émilie Noether's theorem";
+/// let mut lexer = Lexer::new(source);
+///
+/// let (kind, text) = lexer.next().unwrap();
+/// assert_eq!(text, "Émilie"); // Correctly handles é
+/// ```
+#[derive(Clone)]
 pub struct Lexer<'a> {
+    /// The input source text being lexed.
     input: &'a str,
+    /// Current byte position in the input.
     position: usize,
 }
 
@@ -160,5 +213,131 @@ mod tests {
                 (SyntaxKind::Command, "\\%"),
             ]
         );
+    }
+
+    #[test]
+    fn test_lexer_empty_input() {
+        let input = "";
+        let tokens = tokenize(input);
+        assert!(tokens.is_empty());
+    }
+
+    #[test]
+    fn test_lexer_only_whitespace() {
+        let input = "   \n\t ";
+        let tokens = tokenize(input);
+        assert_eq!(tokens, vec![(SyntaxKind::Whitespace, "   \n\t ")]);
+    }
+
+    #[test]
+    fn test_lexer_unexpected_chars() {
+        // Technically nothing is unexpected in our lexer yet (it falls back to text),
+        // but this verifies that behavior.
+        let input = "@#*&^";
+        let tokens = tokenize(input);
+        assert_eq!(tokens, vec![(SyntaxKind::Text, "@#*&^")]);
+    }
+
+    #[test]
+    fn test_lexer_mixed_math_and_text() {
+        let input = "a$b$c";
+        let tokens = tokenize(input);
+        assert_eq!(
+            tokens,
+            vec![
+                (SyntaxKind::Text, "a"),
+                (SyntaxKind::Dollar, "$"),
+                (SyntaxKind::Text, "b"),
+                (SyntaxKind::Dollar, "$"),
+                (SyntaxKind::Text, "c"),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_lexer_brackets() {
+        let input = r"[arg]";
+        let tokens = tokenize(input);
+        assert_eq!(
+            tokens,
+            vec![
+                (SyntaxKind::LBracket, "["),
+                (SyntaxKind::Text, "arg"),
+                (SyntaxKind::RBracket, "]"),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_lexer_multi_byte_text() {
+        let input = "Étude";
+        let tokens = tokenize(input);
+        assert_eq!(tokens, vec![(SyntaxKind::Text, "Étude")]);
+    }
+
+    #[test]
+    fn test_lexer_comment_with_carriage_return() {
+        let input = "% comment\rnext";
+        let tokens = tokenize(input);
+        assert_eq!(tokens[0], (SyntaxKind::Comment, "% comment"));
+    }
+
+    #[test]
+    fn test_lexer_all_special_chars() {
+        let input = r"\{ \} \[ \] \$ \%";
+        let tokens = tokenize(input);
+        // These are all commands because they start with \
+        for (kind, text) in tokens {
+            if kind != SyntaxKind::Whitespace {
+                assert_eq!(kind, SyntaxKind::Command);
+                assert!(text.starts_with('\\'));
+            }
+        }
+        
+        // Literal ones
+        let input2 = "{ } [ ] $ %";
+        let tokens2 = tokenize(input2);
+        let kinds: Vec<_> = tokens2.into_iter().map(|(k, _)| k).filter(|k| *k != SyntaxKind::Whitespace).collect();
+        assert_eq!(kinds, vec![
+            SyntaxKind::LBrace, SyntaxKind::RBrace,
+            SyntaxKind::LBracket, SyntaxKind::RBracket,
+            SyntaxKind::Dollar, SyntaxKind::Comment
+        ]);
+    }
+
+    #[test]
+    fn test_single_symbol_commands() {
+        let input = r"\_ \# \@";
+        let tokens = tokenize(input);
+        assert_eq!(tokens[0].0, SyntaxKind::Command);
+        assert_eq!(tokens[0].1, r"\_");
+    }
+
+    #[test]
+    fn test_lexer_complex_commands() {
+        let input = r"\newcommand{\foo}[2]{#1 #2}";
+        let tokens = tokenize(input);
+        assert!(tokens.iter().any(|(k, v)| *k == SyntaxKind::Command && *v == "\\newcommand"));
+        assert!(tokens.iter().any(|(k, v)| *k == SyntaxKind::Command && *v == "\\foo"));
+    }
+
+    #[test]
+    fn test_lexer_bibtex_patterns() {
+        let input = r#"author = {López and Müller}, key = "v""#;
+        let tokens = tokenize(input);
+        // Lexer just tokens, parser will handle the rest
+        assert!(tokens.iter().any(|(_, v)| *v == "López"));
+        assert!(tokens.iter().any(|(_, v)| *v == "Müller"));
+    }
+
+    #[test]
+    fn test_lexer_unusual_whitespace() {
+        let input = "a\u{00A0}b"; // non-breaking space
+        let tokens = tokenize(input);
+        // NBSP is considered whitespace in Rust's char::is_whitespace
+        assert_eq!(tokens.len(), 3);
+        assert_eq!(tokens[0], (SyntaxKind::Text, "a"));
+        assert_eq!(tokens[1], (SyntaxKind::Whitespace, "\u{00A0}"));
+        assert_eq!(tokens[2], (SyntaxKind::Text, "b"));
     }
 }

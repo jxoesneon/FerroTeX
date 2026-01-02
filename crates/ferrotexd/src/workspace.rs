@@ -35,8 +35,19 @@ pub struct FileIndex {
     pub sections: Vec<SectionDef>,
     /// List of used packages (e.g., `\usepackage{...}`).
     pub packages: Vec<String>,
+    /// List of environments (e.g., `\begin{...}`).
+    pub environments: Vec<EnvDef>,
     /// List of deprecated command usages.
     pub deprecated_usages: Vec<(TextRange, String)>,
+}
+
+/// Represents an environment definition.
+#[derive(Debug, Clone)]
+pub struct EnvDef {
+    /// The environment name.
+    pub name: String,
+    /// The range of the entire environment block.
+    pub range: TextRange,
 }
 
 /// Represents an included file reference.
@@ -104,7 +115,7 @@ impl Workspace {
     ///
     /// Parses the file content and extracts includes, labels, citations, etc.
     pub fn update(&self, uri: &Url, text: &str) {
-        let (includes, definitions, references, citations, bibliographies, sections, packages, magic_root, deprecated_usages) =
+        let (includes, definitions, references, citations, bibliographies, sections, packages, magic_root, deprecated_usages, environments) =
             scan_file(text);
 
         if let Some(root_path) = magic_root {
@@ -123,6 +134,7 @@ impl Workspace {
                 bibliographies,
                 sections,
                 packages,
+                environments,
                 deprecated_usages,
             },
         );
@@ -367,6 +379,18 @@ impl Workspace {
                     ));
                 }
             }
+
+            // Environments
+            for env in &index.environments {
+                if env.name.to_lowercase().contains(&query) {
+                    results.push((
+                        env.name.clone(),
+                        SymbolKind::NAMESPACE, 
+                        uri.clone(),
+                        env.range,
+                    ));
+                }
+            }
         }
 
         // 2. Search BibTeX files (Entries)
@@ -599,6 +623,7 @@ type ScanResult = (
     Vec<String>, // packages
     Option<String>, // magic_root
     Vec<(TextRange, String)>, // deprecated_usages
+    Vec<EnvDef>, // environments
 );
 
 fn scan_file(text: &str) -> ScanResult {
@@ -611,7 +636,7 @@ fn scan_file(text: &str) -> ScanResult {
     
     // Pattern: %!TEX root = <path>
     // Handles optional spaces around = and leading whitespace
-    let re = Regex::new(r"(?m)^%\s*!TEX\s+root\s*=\s*(.+)$").unwrap();
+    let re = Regex::new(r"(?mi)^%\s*!TEX\s+root\s*=\s*(.+)$").unwrap();
     let magic_root = re.captures(head).map(|cap| cap[1].trim().to_string());
 
     let parse = parse(text);
@@ -623,6 +648,7 @@ fn scan_file(text: &str) -> ScanResult {
     let mut bibs = Vec::new();
     let mut sections = Vec::new();
     let mut deprecated_usages = Vec::new();
+    let mut environments = Vec::new();
 
     let mut last_was_dollar = false;
     let mut last_dollar_range: Option<TextRange> = None;
@@ -749,6 +775,11 @@ fn scan_file(text: &str) -> ScanResult {
                                 sections.push(SectionDef { name, range });
                             }
                         }
+                        SyntaxKind::Environment => {
+                            if let Some((name, _range)) = extract_label_data(node) {
+                                environments.push(EnvDef { name, range: node.text_range() });
+                            }
+                        }
                         _ => {}
                     }
                 }
@@ -789,7 +820,7 @@ fn scan_file(text: &str) -> ScanResult {
         }
     }
 
-    (includes, defs, refs, citations, bibs, sections, packages, magic_root, deprecated_usages)
+    (includes, defs, refs, citations, bibs, sections, packages, magic_root, deprecated_usages, environments)
 }
 
 pub fn extract_group_text(node: &ferrotex_syntax::SyntaxNode) -> Option<String> {
@@ -852,7 +883,8 @@ mod tests {
     #[test]
     fn test_deprecated_command() {
         let text = r#"\section{Test} {\bf bold} text"#;
-        let (.., deprecated) = scan_file(text);
+        let result = scan_file(text);
+        let deprecated = result.8; // deprecated_usages
         assert!(!deprecated.is_empty(), "Should detect deprecated command");
         assert_eq!(deprecated[0].1, "\\bf:group");
     }
@@ -866,15 +898,79 @@ mod tests {
         $$
         End
         "#;
-        let (.., deprecated) = scan_file(text);
+        let result = scan_file(text);
+        let deprecated = result.8;
         assert!(deprecated.iter().any(|d| d.1 == "displaymath"), "Should detect display math block");
     }
 
     #[test]
     fn test_obsolete_package_detection() {
         let text = r#"\usepackage{times, geometry}"#;
-        let (.., deprecated) = scan_file(text);
+        let result = scan_file(text);
+        let deprecated = result.8;
         assert!(deprecated.iter().any(|d| d.1 == "package:times"), "Should detect 'times' package");
         assert!(!deprecated.iter().any(|d| d.1 == "package:geometry"), "Should NOT detect 'geometry' package");
+    }
+
+    #[test]
+    fn test_workspace_cross_file_labels() {
+        let workspace = Workspace::new();
+        let uri1 = Url::parse("file:///main.tex").unwrap();
+        let uri2 = Url::parse("file:///sub.tex").unwrap();
+        
+        workspace.update(&uri1, r"\label{lbl1}");
+        workspace.update(&uri2, r"\label{lbl2}");
+        
+        let labels = workspace.get_all_labels();
+        assert_eq!(labels.len(), 2);
+        assert!(labels.contains(&"lbl1".to_string()));
+        assert!(labels.contains(&"lbl2".to_string()));
+    }
+
+    #[test]
+    fn test_workspace_cycle_detection() {
+        let workspace = Workspace::new();
+        let uri1 = Url::parse("file:///a.tex").unwrap();
+        let uri2 = Url::parse("file:///b.tex").unwrap();
+        
+        // A includes B, B includes A
+        workspace.update(&uri1, r"\include{b.tex}");
+        workspace.update(&uri2, r"\include{a.tex}");
+        
+        let cycles = workspace.detect_cycles();
+        assert!(!cycles.is_empty(), "Cycle should be detected");
+    }
+
+    #[test]
+    fn test_workspace_bib_indexing() {
+        let workspace = Workspace::new();
+        let uri = Url::parse("file:///refs.bib").unwrap();
+        let text = "@article{key1, title={Title}}";
+        
+        workspace.update_bib(&uri, text);
+        assert!(workspace.has_citation_key("key1"));
+        assert!(!workspace.has_citation_key("key2"));
+    }
+
+    #[test]
+    fn test_magic_root_detection() {
+        let workspace = Workspace::new();
+        let uri = Url::parse("file:///chapter.tex").unwrap();
+        let text = "% !TeX root = main.tex\nContent";
+        
+        workspace.update(&uri, text);
+        assert_eq!(workspace.get_explicit_root(&uri), Some("main.tex".to_string()));
+    }
+
+    #[test]
+    fn test_workspace_sections() {
+        let workspace = Workspace::new();
+        let uri = Url::parse("file:///main.tex").unwrap();
+        // \section should be parsed and added to sections list
+        workspace.update(&uri, r"\section{Introduction}");
+        
+        let index = workspace.indices.get(&uri).unwrap();
+        assert_eq!(index.sections.len(), 1);
+        assert_eq!(index.sections[0].name, "Introduction");
     }
 }
