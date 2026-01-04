@@ -13,6 +13,19 @@ pub mod delimiters;
 ///
 /// Shape inference allows FerroTeX to detect "jagged matrices" or incompatible
 /// operations (e.g., adding a vector to a matrix of mismatched size).
+///
+/// # Examples
+///
+/// ```
+/// use ferrotex_math_semantics::{Shape, Dimension};
+///
+/// let mat = Shape::Matrix {
+///     rows: Dimension::Finite(2),
+///     cols: Dimension::Finite(3),
+/// };
+///
+/// assert!(mat.is_compatible_add(&mat));
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Shape {
     /// A scalar value (0-dimensional).
@@ -36,6 +49,15 @@ pub enum Shape {
 }
 
 /// Represents a single dimension size, which can be concrete or symbolic.
+///
+/// # Examples
+///
+/// ```
+/// use ferrotex_math_semantics::Dimension;
+///
+/// let dim = Dimension::Finite(3);
+/// let sym = Dimension::Symbolic("n".to_string());
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Dimension {
     /// A known integer size (e.g., 3).

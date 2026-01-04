@@ -22,9 +22,14 @@
     "latex",
     "tex",
     "lsp",
-    "language server",
+    "scientific",
+    "reproducible",
+    "tectonic",
+    "bibtex",
     "pdf",
     "synctex",
+    "rust",
+    "equation",
     "typesetting"
   ],
   "badges": [
@@ -56,7 +61,10 @@
   "categories": [
     "Programming Languages",
     "Linters",
-    "Formatters"
+    "Formatters",
+    "Debuggers",
+    "Snippets",
+    "Other"
   ],
   "activationEvents": [
     "onLanguage:latex",

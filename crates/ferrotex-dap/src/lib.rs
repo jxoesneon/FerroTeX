@@ -4,6 +4,21 @@ use serde::{Deserialize, Serialize};
 pub mod shim;
 
 /// Represents a raw DAP message (Request, Response, or Event).
+///
+/// Follows the JSON-RPC inspired Debug Adapter Protocol specification.
+///
+/// # Examples
+///
+/// ```
+/// use ferrotex_dap::ProtocolMessage;
+/// use serde_json::json;
+///
+/// let msg = ProtocolMessage::Request {
+///     seq: 1,
+///     command: "initialize".to_string(),
+///     arguments: Some(json!({"adapterID": "ferrotex"})),
+/// };
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum ProtocolMessage {
@@ -32,6 +47,10 @@ pub enum ProtocolMessage {
 
 /// The core trait for a Debug Adapter implementation.
 /// Handles the lifecycle of a debug session.
+///
+/// # Required Implementation
+/// Implementors must handle the standard DAP requests (initialize, launch, continue, etc.)
+/// and manage the state of the underlying TeX engine.
 pub trait DebugAdapter {
     /// Called when the client sends the 'initialize' request.
     /// Should return the capabilities of this debug adapter.
@@ -62,6 +81,15 @@ pub trait DebugAdapter {
 
 /// A generic session handler that wraps a specific Adapter implementation
 /// and handles the raw protocol loop (reading stdin, writing stdout).
+///
+/// # Examples
+///
+/// ```no_run
+/// use ferrotex_dap::{DebugSession, run_mock_session};
+///
+/// // Starts a standard DAP loop on stdin/stdout
+/// run_mock_session().unwrap();
+/// ```
 pub struct DebugSession<A: DebugAdapter> {
     adapter: A,
     seq: i64,

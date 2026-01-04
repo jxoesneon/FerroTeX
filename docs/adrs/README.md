@@ -20,3 +20,6 @@ Write an ADR when a decision:
 - `0002-uncertainty-as-first-class.md`
 - `0003-thin-extension-thick-server.md`
 - `0004-streaming-incremental-parsing.md`
+- `0005-universal-build-dag.md`
+- `0006-tectonic-stepping-io.md`
+- `0007-multi-platform-vsix.md`
