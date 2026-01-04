@@ -1,9 +1,18 @@
+//! # FerroTeX Math Semantics
+//!
+//! Provides data structures and algorithms for analyzing the mathematical
+//! semantics of LaTeX expressions, specifically focusing on dimensionality
+//! and structural consistency of AMS math environments.
+
 use serde::{Deserialize, Serialize};
 
 pub mod analysis;
 pub mod delimiters;
 
 /// Represents the dimensionality and size of a mathematical object.
+///
+/// Shape inference allows FerroTeX to detect "jagged matrices" or incompatible
+/// operations (e.g., adding a vector to a matrix of mismatched size).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Shape {
     /// A scalar value (0-dimensional).
@@ -11,12 +20,18 @@ pub enum Shape {
     /// A column vector of size `n`.
     Vector(Dimension),
     /// A matrix of size `rows x cols`.
-    Matrix { rows: Dimension, cols: Dimension },
+    Matrix {
+        /// Number of rows.
+        rows: Dimension,
+        /// Number of columns.
+        cols: Dimension,
+    },
     /// A higher-order tensor with specified dimensions.
     Tensor(Vec<Dimension>),
     /// The shape is unknown or could not be inferred.
     Unknown,
     /// The object has an inconsistent shape (e.g., a matrix with rows of defined but differing lengths).
+    /// The string contains a human-readable reason for the invalidity.
     Invalid(String),
 }
 
@@ -25,7 +40,7 @@ pub enum Shape {
 pub enum Dimension {
     /// A known integer size (e.g., 3).
     Finite(usize),
-    /// A symbolic size (e.g., "n").
+    /// A symbolic size (e.g., "n" or "m").
     Symbolic(String),
     /// An unknown size.
     Unknown,
@@ -71,8 +86,14 @@ mod tests {
         let vec1 = Shape::Vector(Dimension::Finite(3));
         let vec2 = Shape::Vector(Dimension::Finite(3));
         let vec3 = Shape::Vector(Dimension::Finite(4));
-        let mat1 = Shape::Matrix { rows: Dimension::Symbolic("n".into()), cols: Dimension::Finite(3) };
-        let mat2 = Shape::Matrix { rows: Dimension::Symbolic("n".into()), cols: Dimension::Finite(3) };
+        let mat1 = Shape::Matrix {
+            rows: Dimension::Symbolic("n".into()),
+            cols: Dimension::Finite(3),
+        };
+        let mat2 = Shape::Matrix {
+            rows: Dimension::Symbolic("n".into()),
+            cols: Dimension::Finite(3),
+        };
 
         assert!(scalar.is_compatible_add(&scalar));
         assert!(vec1.is_compatible_add(&vec2));
@@ -85,12 +106,21 @@ mod tests {
     fn test_shape_compatibility_mul() {
         let scalar = Shape::Scalar;
         let vec = Shape::Vector(Dimension::Finite(3));
-        let mat = Shape::Matrix { rows: Dimension::Finite(5), cols: Dimension::Finite(3) };
-        let mat_bad = Shape::Matrix { rows: Dimension::Finite(4), cols: Dimension::Finite(5) };
+        let mat = Shape::Matrix {
+            rows: Dimension::Finite(5),
+            cols: Dimension::Finite(3),
+        };
+        let mat_bad = Shape::Matrix {
+            rows: Dimension::Finite(4),
+            cols: Dimension::Finite(5),
+        };
 
         assert!(scalar.is_compatible_mul(&mat));
         assert!(mat.is_compatible_mul(&scalar));
-        assert!(mat.is_compatible_mul(&Shape::Matrix { rows: Dimension::Finite(3), cols: Dimension::Finite(2) }));
+        assert!(mat.is_compatible_mul(&Shape::Matrix {
+            rows: Dimension::Finite(3),
+            cols: Dimension::Finite(2)
+        }));
         assert!(!mat.is_compatible_mul(&mat_bad));
         assert!(mat.is_compatible_mul(&vec)); // Matrix(5 x 3) * Vector(3) -> compatible
         assert!(!Shape::Vector(Dimension::Finite(5)).is_compatible_mul(&mat)); // Vector(5) * Matrix(5 x 3) -> incompatible (ignoring transposition for now)

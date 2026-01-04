@@ -27,11 +27,11 @@ impl BuildEngine for TectonicAdapter {
         let parent_dir = file_path
             .parent()
             .unwrap_or_else(|| std::path::Path::new("."));
-        
+
         // Tectonic auto-downloads packages, so we just run it on the file.
         // tectonic -outdir <build> <file>
         // Note: Tectonic default interface is chatty, we want to capture stdout/stderr.
-        
+
         let out_dir = parent_dir.join("build");
         tokio::fs::create_dir_all(&out_dir).await?;
 
@@ -49,60 +49,56 @@ impl BuildEngine for TectonicAdapter {
         let stderr = child.stderr.take().context("Failed to open stderr")?;
 
         if let Some(callback) = log_callback {
-             let cb_stdout = std::sync::Arc::new(callback);
-             let cb_stderr = cb_stdout.clone();
+            let cb_stdout = std::sync::Arc::new(callback);
+            let cb_stderr = cb_stdout.clone();
 
-             let mut stdout_reader = tokio::io::BufReader::new(stdout).lines();
-             let mut stderr_reader = tokio::io::BufReader::new(stderr).lines();
+            let mut stdout_reader = tokio::io::BufReader::new(stdout).lines();
+            let mut stderr_reader = tokio::io::BufReader::new(stderr).lines();
 
-             let stdout_handle = tokio::spawn(async move {
-                 let mut acc = String::new();
-                 while let Ok(Some(line)) = stdout_reader.next_line().await {
-                     cb_stdout(format!("[stdout] {}\n", line));
-                     acc.push_str(&line);
-                     acc.push('\n');
-                 }
-                 acc
-             });
+            let stdout_handle = tokio::spawn(async move {
+                let mut acc = String::new();
+                while let Ok(Some(line)) = stdout_reader.next_line().await {
+                    cb_stdout(format!("[stdout] {}\n", line));
+                    acc.push_str(&line);
+                    acc.push('\n');
+                }
+                acc
+            });
 
-             let stderr_handle = tokio::spawn(async move {
-                 let mut acc = String::new();
-                 while let Ok(Some(line)) = stderr_reader.next_line().await {
-                     cb_stderr(format!("[stderr] {}\n", line));
-                     acc.push_str(&line);
-                     acc.push('\n');
-                 }
-                 acc
-             });
+            let stderr_handle = tokio::spawn(async move {
+                let mut acc = String::new();
+                while let Ok(Some(line)) = stderr_reader.next_line().await {
+                    cb_stderr(format!("[stderr] {}\n", line));
+                    acc.push_str(&line);
+                    acc.push('\n');
+                }
+                acc
+            });
 
-             let status = child.wait().await?;
-             let (stdout_res, stderr_res) = tokio::join!(stdout_handle, stderr_handle);
-             let stdout = stdout_res.unwrap_or_default();
-             let stderr = stderr_res.unwrap_or_default();
+            let status = child.wait().await?;
+            let (stdout_res, stderr_res) = tokio::join!(stdout_handle, stderr_handle);
+            let stdout = stdout_res.unwrap_or_default();
+            let stderr = stderr_res.unwrap_or_default();
 
-             if status.success() {
-                 let file_stem = file_path.file_stem().unwrap_or_default();
-                 let mut artifact = out_dir.join(file_stem);
-                 artifact.set_extension("pdf");
-                 Ok(BuildStatus::Success(artifact))
-             } else {
-                 Ok(BuildStatus::Failure(BuildLog {
-                     stdout,
-                     stderr,
-                 }))
-             }
-
+            if status.success() {
+                let file_stem = file_path.file_stem().unwrap_or_default();
+                let mut artifact = out_dir.join(file_stem);
+                artifact.set_extension("pdf");
+                Ok(BuildStatus::Success(artifact))
+            } else {
+                Ok(BuildStatus::Failure(BuildLog { stdout, stderr }))
+            }
         } else {
             let output = child.wait_with_output().await?;
             if output.status.success() {
-                 let file_stem = file_path.file_stem().unwrap_or_default();
-                 let mut artifact = out_dir.join(file_stem);
-                 artifact.set_extension("pdf");
-                 Ok(BuildStatus::Success(artifact))
+                let file_stem = file_path.file_stem().unwrap_or_default();
+                let mut artifact = out_dir.join(file_stem);
+                artifact.set_extension("pdf");
+                Ok(BuildStatus::Success(artifact))
             } else {
-                 let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-                 let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-                 Ok(BuildStatus::Failure(BuildLog { stdout, stderr }))
+                let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+                let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+                Ok(BuildStatus::Failure(BuildLog { stdout, stderr }))
             }
         }
     }

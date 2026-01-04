@@ -162,7 +162,7 @@ pub struct Delimiter {
 /// this function returns only the *required* argument count.
 pub fn get_expected_args(command: &str) -> Option<usize> {
     let mut map = HashMap::new();
-    
+
     // Fractions and binomials
     map.insert("frac", 2);
     map.insert("dfrac", 2);
@@ -171,10 +171,10 @@ pub fn get_expected_args(command: &str) -> Option<usize> {
     map.insert("binom", 2);
     map.insert("dbinom", 2);
     map.insert("tbinom", 2);
-    
+
     // Roots
-    map.insert("sqrt", 1);  // Note: \sqrt can have optional argument
-    
+    map.insert("sqrt", 1); // Note: \sqrt can have optional argument
+
     // Text in math
     map.insert("text", 1);
     map.insert("mathrm", 1);
@@ -185,7 +185,7 @@ pub fn get_expected_args(command: &str) -> Option<usize> {
     map.insert("mathcal", 1);
     map.insert("mathbb", 1);
     map.insert("mathfrak", 1);
-    
+
     // Operators
     map.insert("overline", 1);
     map.insert("underline", 1);
@@ -195,7 +195,7 @@ pub fn get_expected_args(command: &str) -> Option<usize> {
     map.insert("vec", 1);
     map.insert("dot", 1);
     map.insert("ddot", 1);
-    
+
     map.get(command).copied()
 }
 
@@ -257,8 +257,15 @@ impl MathError {
     /// Converts the error into a human-readable diagnostic message.
     pub fn to_diagnostic_message(&self) -> String {
         match self {
-            MathError::MismatchedDelimiter { left_kind, right_kind, .. } => {
-                format!("Mismatched delimiters: {:?} paired with {:?}", left_kind, right_kind)
+            MathError::MismatchedDelimiter {
+                left_kind,
+                right_kind,
+                ..
+            } => {
+                format!(
+                    "Mismatched delimiters: {:?} paired with {:?}",
+                    left_kind, right_kind
+                )
             }
             MathError::UnmatchedOpening { kind, .. } => {
                 format!("Unmatched opening delimiter: {:?}", kind)
@@ -266,7 +273,12 @@ impl MathError {
             MathError::UnmatchedClosing { kind, .. } => {
                 format!("Unmatched closing delimiter: {:?}", kind)
             }
-            MathError::IncorrectArgumentCount { command, expected, actual, .. } => {
+            MathError::IncorrectArgumentCount {
+                command,
+                expected,
+                actual,
+                ..
+            } => {
                 format!(
                     "Command '\\{}' expects {} argument(s) but got {}",
                     command, expected, actual
@@ -275,7 +287,6 @@ impl MathError {
         }
     }
 }
-
 
 /// Delimiter validation logic.
 pub mod delimiter_validator;

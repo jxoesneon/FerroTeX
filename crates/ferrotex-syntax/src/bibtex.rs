@@ -78,7 +78,9 @@ pub fn parse_bibtex(input: &str) -> BibFile {
         let Some((start_idx, c)) = chars.next() else {
             break;
         };
-        if c == '@' && let Some(entry) = parse_entry(&mut chars, start_idx, input.len()) {
+        if c == '@'
+            && let Some(entry) = parse_entry(&mut chars, start_idx, input.len())
+        {
             entries.push(entry);
         }
     }
@@ -128,30 +130,32 @@ fn parse_entry(
 
         // Read field name
         let field_name = read_until(chars, |c| c == '=' || c.is_whitespace() || c == '}');
-        if let Some(name) = field_name { 
+        if let Some(name) = field_name {
             let name = name.trim().to_lowercase();
-             if name.is_empty() {
-                // Could be trailing comma or malformed 
+            if name.is_empty() {
+                // Could be trailing comma or malformed
                 if let Some(&(_, '}')) = chars.peek() {
                     continue; // Loop will catch it next iteration
                 }
                 // Determine if we should break or skip char?
                 // Let's consume one char to avoid infinite loop if stuck
-                if chars.next().is_none() { break; }
+                if chars.next().is_none() {
+                    break;
+                }
                 continue;
             }
-            
+
             skip_whitespace(chars);
             // Expect =
             if let Some(&(_, '=')) = chars.peek() {
                 chars.next(); // consume =
                 skip_whitespace(chars);
-                
+
                 // Read value
                 if let Some(val) = read_value(chars) {
                     fields.insert(name, val);
                 }
-                
+
                 skip_whitespace(chars);
                 // Consume optional comma
                 if let Some(&(_, ',')) = chars.peek() {
@@ -159,16 +163,20 @@ fn parse_entry(
                 }
             } else {
                 // Missing equals, maybe malformed, skip to next comma or end
-                 // Consuming until comma or brace
-                 read_until(chars, |c| c == ',' || c == '}');
-                 if let Some(&(_, ',')) = chars.peek() { chars.next(); }
+                // Consuming until comma or brace
+                read_until(chars, |c| c == ',' || c == '}');
+                if let Some(&(_, ',')) = chars.peek() {
+                    chars.next();
+                }
             }
         } else {
-             // No field name found, check closure
-             if let Some(&(_, '}')) = chars.peek() {
-                 continue;
-             }
-             if chars.next().is_none() { break; }
+            // No field name found, check closure
+            if let Some(&(_, '}')) = chars.peek() {
+                continue;
+            }
+            if chars.next().is_none() {
+                break;
+            }
         }
     }
 
@@ -189,9 +197,9 @@ fn read_value(chars: &mut Peekable<CharIndices>) -> Option<String> {
     // { ... }
     // digits (simple)
     // identifier (macro - treated as string for now)
-    
+
     let &(_, c) = chars.peek()?;
-    
+
     if c == '"' {
         chars.next(); // consume "
         // Read until "
@@ -205,8 +213,8 @@ fn read_value(chars: &mut Peekable<CharIndices>) -> Option<String> {
                 chars.next(); // consume backslash
                 val.push('\\');
                 if let Some(&(_, escaped)) = chars.peek() {
-                     val.push(escaped);
-                     chars.next(); 
+                    val.push(escaped);
+                    chars.next();
                 }
                 continue;
             }
@@ -235,7 +243,9 @@ fn read_value(chars: &mut Peekable<CharIndices>) -> Option<String> {
     } else {
         // Read until comma or closing brace
         // This covers numbers and unquoted strings/macros
-        read_until(chars, |char_code| char_code == ',' || char_code == '}' || char_code.is_whitespace())
+        read_until(chars, |char_code| {
+            char_code == ',' || char_code == '}' || char_code.is_whitespace()
+        })
     }
 }
 
@@ -324,7 +334,7 @@ mod tests {
         // Let's assert based on behavior.
         assert!(entries.entries.len() <= 1);
     }
-    
+
     #[test]
     fn test_bib_comments_everywhere() {
         let input = r#"
@@ -339,7 +349,7 @@ mod tests {
         let entries = parse_bibtex(input);
         assert_eq!(entries.entries.len(), 1);
         if let Some(t) = entries.entries[0].fields.get("title") {
-             assert_eq!(t, "Library");
+            assert_eq!(t, "Library");
         }
     }
 
@@ -347,24 +357,39 @@ mod tests {
     fn test_bib_quoted_values() {
         let input = r#"@Misc{x, note = "quoted string"}"#;
         let entries = parse_bibtex(input);
-        assert_eq!(entries.entries[0].fields.get("note"), Some(&"quoted string".to_string()));
+        assert_eq!(
+            entries.entries[0].fields.get("note"),
+            Some(&"quoted string".to_string())
+        );
     }
-    
+
     #[test]
     fn test_bib_mixed_delimiters() {
         let input = r#"@Misc{x, year = 1999, month = "Jan", note = {Braced}}"#;
         let entries = parse_bibtex(input);
-        assert_eq!(entries.entries[0].fields.get("year"), Some(&"1999".to_string()));
-        assert_eq!(entries.entries[0].fields.get("month"), Some(&"Jan".to_string()));
-        assert_eq!(entries.entries[0].fields.get("note"), Some(&"Braced".to_string()));
+        assert_eq!(
+            entries.entries[0].fields.get("year"),
+            Some(&"1999".to_string())
+        );
+        assert_eq!(
+            entries.entries[0].fields.get("month"),
+            Some(&"Jan".to_string())
+        );
+        assert_eq!(
+            entries.entries[0].fields.get("note"),
+            Some(&"Braced".to_string())
+        );
     }
-    
+
     #[test]
     fn test_bib_trailing_comma() {
         let input = r#"@Misc{x, year=1999,}"#;
         let entries = parse_bibtex(input);
         assert_eq!(entries.entries.len(), 1);
-        assert_eq!(entries.entries[0].fields.get("year"), Some(&"1999".to_string()));
+        assert_eq!(
+            entries.entries[0].fields.get("year"),
+            Some(&"1999".to_string())
+        );
     }
 
     #[test]
@@ -390,7 +415,10 @@ mod tests {
     fn test_bib_nested_braces() {
         let input = r#"@misc{k, title = {{Double {Nested}}}}"#;
         let entries = parse_bibtex(input);
-        assert_eq!(entries.entries[0].fields.get("title"), Some(&"{Double {Nested}}".to_string()));
+        assert_eq!(
+            entries.entries[0].fields.get("title"),
+            Some(&"{Double {Nested}}".to_string())
+        );
     }
 
     #[test]
@@ -417,6 +445,10 @@ mod tests {
         assert_eq!(entries.entries.len(), 1);
         let val = entries.entries[0].fields.get("title").unwrap();
         // If our parser handles escaped quotes in quoted strings:
-        assert!(val.contains("O\\\"Hare") || val.contains("O\"Hare"), "Value was: {}", val);
+        assert!(
+            val.contains("O\\\"Hare") || val.contains("O\"Hare"),
+            "Value was: {}",
+            val
+        );
     }
 }

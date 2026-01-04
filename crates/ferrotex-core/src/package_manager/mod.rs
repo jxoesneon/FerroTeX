@@ -95,10 +95,10 @@
 //! }
 //! ```
 
+use anyhow::{anyhow, Result};
+use log::{info, warn};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use anyhow::{Result, anyhow};
-use log::{info, warn};
 
 /// Database of CTAN packages and file mappings.
 pub mod ctan_db;
@@ -125,7 +125,7 @@ pub struct InstallStatus {
     /// The name of the package that was installed (or attempted).
     pub name: String,
     /// The outcome of the installation operation.
-    pub state: InstallState, 
+    pub state: InstallState,
     /// Optional error message or diagnostic information.
     /// Typically populated when `state` is [`InstallState::Failed`].
     pub message: Option<String>,
@@ -179,22 +179,22 @@ pub struct MockCommandExecutor {
 #[cfg(test)]
 impl CommandExecutor for MockCommandExecutor {
     fn execute(&self, _program: &Path, _args: &[&str]) -> Result<std::process::Output> {
-         #[cfg(unix)]
-         let status = {
-             use std::os::unix::process::ExitStatusExt;
-             std::process::ExitStatus::from_raw(self.status_code << 8)
-         };
-         #[cfg(windows)]
-         let status = {
-             use std::os::windows::process::ExitStatusExt;
-             std::process::ExitStatus::from_raw(self.status_code as u32)
-         };
+        #[cfg(unix)]
+        let status = {
+            use std::os::unix::process::ExitStatusExt;
+            std::process::ExitStatus::from_raw(self.status_code << 8)
+        };
+        #[cfg(windows)]
+        let status = {
+            use std::os::windows::process::ExitStatusExt;
+            std::process::ExitStatus::from_raw(self.status_code as u32)
+        };
 
-         Ok(std::process::Output {
-             status,
-             stdout: self.stdout.as_bytes().to_vec(),
-             stderr: self.stderr.as_bytes().to_vec(),
-         })
+        Ok(std::process::Output {
+            status,
+            stdout: self.stdout.as_bytes().to_vec(),
+            stderr: self.stderr.as_bytes().to_vec(),
+        })
     }
 }
 
@@ -223,7 +223,7 @@ pub trait PackageBackend: std::fmt::Debug + Send + Sync {
     /// Returns an error if the package manager command fails to execute
     /// (e.g., command not found, permission denied).
     fn install(&self, package: &str) -> Result<InstallStatus>;
-    
+
     /// Searches for packages or files matching the query.
     ///
     /// # Arguments
@@ -238,7 +238,7 @@ pub trait PackageBackend: std::fmt::Debug + Send + Sync {
     ///
     /// Returns an error if the search command fails.
     fn search(&self, query: &str) -> Result<Vec<String>>;
-    
+
     /// Returns a human-readable name for this backend (e.g., "tlmgr", "miktex").
     fn name(&self) -> &'static str;
 }
@@ -253,12 +253,15 @@ pub struct TlmgrBackend {
 impl TlmgrBackend {
     /// Creates a new `TlmgrBackend` for the given executable path.
     pub fn new(path: PathBuf) -> Self {
-        Self { path, executor: Box::new(RealCommandExecutor) }
+        Self {
+            path,
+            executor: Box::new(RealCommandExecutor),
+        }
     }
-    
+
     /// Creates a new `TlmgrBackend` with a custom executor (for testing).
     pub fn with_executor(path: PathBuf, executor: Box<dyn CommandExecutor>) -> Self {
-         Self { path, executor }
+        Self { path, executor }
     }
 }
 
@@ -275,7 +278,7 @@ impl PackageBackend for TlmgrBackend {
                 message: Some(stderr.to_string()),
             });
         }
-        
+
         Ok(InstallStatus {
             name: package.to_string(),
             state: InstallState::Complete,
@@ -284,19 +287,22 @@ impl PackageBackend for TlmgrBackend {
     }
 
     fn search(&self, query: &str) -> Result<Vec<String>> {
-        let output = self.executor.execute(&self.path, &["search", "--global", "--file", query])?;
-        
+        let output = self
+            .executor
+            .execute(&self.path, &["search", "--global", "--file", query])?;
+
         if !output.status.success() {
-             return Err(anyhow!("tlmgr search failed"));
+            return Err(anyhow!("tlmgr search failed"));
         }
-        
+
         let stdout = String::from_utf8_lossy(&output.stdout);
-        let results = stdout.lines()
+        let results = stdout
+            .lines()
             .map(|l| l.split_whitespace().next().unwrap_or("").to_string())
             .filter(|s| !s.is_empty())
             .filter(|s| !s.ends_with(':')) // Filter out 'tlmgr:' lines if any
             .collect();
-            
+
         Ok(results)
     }
 
@@ -315,9 +321,12 @@ pub struct MiktexBackend {
 impl MiktexBackend {
     /// Creates a new `MiktexBackend` for the given executable path.
     pub fn new(path: PathBuf) -> Self {
-        Self { path, executor: Box::new(RealCommandExecutor) }
+        Self {
+            path,
+            executor: Box::new(RealCommandExecutor),
+        }
     }
-    
+
     /// Creates a new `MiktexBackend` with a custom executor (for testing).
     pub fn with_executor(path: PathBuf, executor: Box<dyn CommandExecutor>) -> Self {
         Self { path, executor }
@@ -330,8 +339,8 @@ impl PackageBackend for MiktexBackend {
         let output = self.executor.execute(&self.path, &["--install", package])?;
 
         if !output.status.success() {
-             let stderr = String::from_utf8_lossy(&output.stderr);
-             return Ok(InstallStatus {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Ok(InstallStatus {
                 name: package.to_string(),
                 state: InstallState::Failed,
                 message: Some(stderr.to_string()),
@@ -417,15 +426,21 @@ impl PackageManager {
         // Auto-detect
         if let Ok(path) = which::which("tlmgr") {
             info!("Detected tlmgr at {:?}", path);
-            return Self { backend: std::sync::Arc::new(TlmgrBackend::new(path)) };
+            return Self {
+                backend: std::sync::Arc::new(TlmgrBackend::new(path)),
+            };
         }
         if let Ok(path) = which::which("mpm") {
             info!("Detected miktex (mpm) at {:?}", path);
-            return Self { backend: std::sync::Arc::new(MiktexBackend::new(path)) };
+            return Self {
+                backend: std::sync::Arc::new(MiktexBackend::new(path)),
+            };
         }
-        
+
         warn!("No package manager detected");
-        Self { backend: std::sync::Arc::new(NoOpBackend) }
+        Self {
+            backend: std::sync::Arc::new(NoOpBackend),
+        }
     }
 
     /// Creates a new `PackageManager` with a specific backend (useful for testing).
@@ -442,15 +457,17 @@ impl PackageManager {
     pub fn search(&self, query: &str) -> Result<Vec<String>> {
         self.backend.search(query)
     }
-    
+
     /// Checks if a valid package manager backend is available.
     pub fn is_available(&self) -> bool {
         self.backend.name() != "none"
     }
-    
+
     /// Returns a link to the package documentation on CTAN, if available.
     pub fn get_ctan_link(filename: &str) -> Option<String> {
-        ctan_db::CTAN_DB.lookup(filename).map(|pkg| format!("https://ctan.org/pkg/{}", pkg))
+        ctan_db::CTAN_DB
+            .lookup(filename)
+            .map(|pkg| format!("https://ctan.org/pkg/{}", pkg))
     }
 }
 

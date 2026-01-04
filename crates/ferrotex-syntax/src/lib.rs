@@ -131,9 +131,9 @@ pub mod lexer;
 pub mod parser;
 
 #[cfg(test)]
-mod coverage_tests;
-#[cfg(test)]
 mod additional_tests;
+#[cfg(test)]
+mod coverage_tests;
 
 pub use parser::parse;
 use rowan::Language;

@@ -41,6 +41,10 @@ impl<'a> Parser<'a> {
     }
 
     /// Parses the input and returns the result.
+    /// Parses the input string and returns a [`ParseResult`] containing the concrete syntax tree.
+    ///
+    /// This method initializes the root node and begins recursive descent parsing of
+    /// elements until the end of the input stream is reached.
     pub fn parse(mut self) -> ParseResult {
         self.builder.start_node(SyntaxKind::Root.into());
         while self.peek() != SyntaxKind::Eof {
@@ -88,7 +92,7 @@ impl<'a> Parser<'a> {
         lexer_clone.next();
         if let Some((SyntaxKind::LBrace, _)) = lexer_clone.next() {
             let mut text = String::new();
-            while let Some((kind, content)) = lexer_clone.next() {
+            for (kind, content) in lexer_clone {
                 match kind {
                     SyntaxKind::RBrace | SyntaxKind::Eof => break,
                     _ => text.push_str(content),
@@ -100,6 +104,10 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// The main entry point for parsing an individual LaTeX element.
+    ///
+    /// Depending on the next token, it delegates to specialized functions like
+    /// [`parse_command_or_environment`] or [`parse_group`], or simply bumps the token.
     fn parse_element(&mut self) {
         match self.peek() {
             SyntaxKind::Command => self.parse_command_or_environment(),
@@ -115,6 +123,10 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// Parses a braced group `{ ... }`.
+    ///
+    /// If the closing brace Is missing, an error is recorded, but the node is
+    /// still finished to preserve the tree structure.
     fn parse_group(&mut self) {
         self.builder.start_node(SyntaxKind::Group.into());
         self.bump(); // Consume '{'
@@ -279,6 +291,12 @@ impl<'a> Parser<'a> {
         self.builder.finish_node();
     }
 
+    /// Parses a LaTeX environment `\begin{...} ... \end{...}`.
+    ///
+    /// # Error Recovery
+    /// - If the `\end` tag is missing, an error is recorded and the environment is closed at EOF.
+    /// - If the environment names mismatch (e.g., `\begin{a} \end{b}`), it records a non-fatal error
+    ///   but continues parsing the tree.
     fn parse_environment(&mut self) {
         self.builder.start_node(SyntaxKind::Environment.into());
         let begin_name = self.get_group_text_peek();
@@ -302,7 +320,10 @@ impl<'a> Parser<'a> {
                     if let Some((_, text)) = self.lexer.peek() {
                         if *text == "\\end" {
                             let end_name = self.get_group_text_peek();
-                            if !begin_name.is_empty() && !end_name.is_empty() && begin_name != end_name {
+                            if !begin_name.is_empty()
+                                && !end_name.is_empty()
+                                && begin_name != end_name
+                            {
                                 self.error(format!(
                                     "Mismatched environment: began with '{}', but ended with '{}'",
                                     begin_name, end_name
@@ -497,7 +518,7 @@ mod tests {
     fn test_parser_math_unclosed() {
         let input = r"$ x + y"; // Unclosed dollar
         let _res = parse(input);
-        // Our current parser might just treat it as a dollar token? 
+        // Our current parser might just treat it as a dollar token?
         // Need to check if it emits an error.
     }
 
@@ -527,7 +548,11 @@ mod tests {
     fn test_parser_complex_nesting() {
         let input = r"\begin{quote} { Text \begin{center} center \end{center} } \end{quote}";
         let result = parse(input);
-        assert!(result.errors.is_empty(), "Should parse nested structures without errors: {:?}", result.errors);
+        assert!(
+            result.errors.is_empty(),
+            "Should parse nested structures without errors: {:?}",
+            result.errors
+        );
     }
 
     #[test]
