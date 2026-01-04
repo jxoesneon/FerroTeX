@@ -1,4 +1,4 @@
-use super::{Delimiter, DelimiterKind, MathError, delimiters_match};
+use super::{delimiters_match, Delimiter, DelimiterKind, MathError};
 
 /// Validates delimiter matching in LaTeX mathematical expressions.
 ///

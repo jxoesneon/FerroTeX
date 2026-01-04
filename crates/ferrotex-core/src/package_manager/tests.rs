@@ -1,6 +1,6 @@
 use super::*;
-use std::path::PathBuf;
 use crate::package_manager::ctan_db::CTAN_DB;
+use std::path::PathBuf;
 
 #[derive(Debug)]
 struct MockBackend {
@@ -32,14 +32,14 @@ impl PackageBackend for MockBackend {
 fn test_package_manager_is_available() {
     let pm = PackageManager::with_backend(std::sync::Arc::new(NoOpBackend));
     assert!(!pm.is_available());
-    
-    let pm2 = PackageManager::with_backend(std::sync::Arc::new(MockBackend { 
-        install_result: Ok(InstallStatus { 
-            name: "test".into(), 
-            state: InstallState::Complete, 
-            message: None 
+
+    let pm2 = PackageManager::with_backend(std::sync::Arc::new(MockBackend {
+        install_result: Ok(InstallStatus {
+            name: "test".into(),
+            state: InstallState::Complete,
+            message: None,
         }),
-        search_result: Ok(vec![])
+        search_result: Ok(vec![]),
     }));
     assert!(pm2.is_available());
 }
@@ -48,7 +48,7 @@ fn test_package_manager_is_available() {
 fn test_ctan_lookup_geometry() {
     let link = CTAN_DB.lookup("geometry.sty");
     assert_eq!(link, Some("geometry"));
-    
+
     // Also test public API
     let link2 = PackageManager::get_ctan_link("geometry.sty");
     assert_eq!(link2, Some("https://ctan.org/pkg/geometry".to_string()));
@@ -62,8 +62,8 @@ fn test_ctan_lookup_nonexistent() {
 
 #[test]
 fn test_ctan_lookup_case_sensitive() {
-    let link = CTAN_DB.lookup("Geometry.sty"); 
-    assert_eq!(link, None); 
+    let link = CTAN_DB.lookup("Geometry.sty");
+    assert_eq!(link, None);
 }
 
 #[test]
@@ -88,10 +88,10 @@ fn test_ctan_db_contains_common_packages() {
 #[test]
 fn test_mock_backend_install_success() {
     let mock = MockBackend {
-        install_result: Ok(InstallStatus { 
-            name: "test".into(), 
-            state: InstallState::Complete, 
-            message: None 
+        install_result: Ok(InstallStatus {
+            name: "test".into(),
+            state: InstallState::Complete,
+            message: None,
         }),
         search_result: Ok(vec![]),
     };
@@ -103,10 +103,10 @@ fn test_mock_backend_install_success() {
 #[test]
 fn test_mock_backend_install_failure() {
     let mock = MockBackend {
-        install_result: Ok(InstallStatus { 
-            name: "test".into(), 
-            state: InstallState::Failed, 
-            message: Some("Failed".into()) 
+        install_result: Ok(InstallStatus {
+            name: "test".into(),
+            state: InstallState::Failed,
+            message: Some("Failed".into()),
         }),
         search_result: Ok(vec![]),
     };
@@ -119,7 +119,11 @@ fn test_mock_backend_install_failure() {
 #[test]
 fn test_mock_backend_search() {
     let mock = MockBackend {
-        install_result: Ok(InstallStatus{name: "".into(), state: InstallState::Unknown, message: None}),
+        install_result: Ok(InstallStatus {
+            name: "".into(),
+            state: InstallState::Unknown,
+            message: None,
+        }),
         search_result: Ok(vec!["p1".into(), "p2".into()]),
     };
     let pm = PackageManager::with_backend(std::sync::Arc::new(mock));
@@ -132,8 +136,8 @@ fn test_mock_backend_search() {
 fn test_real_backends_smoke() {
     let tlmgr = TlmgrBackend::new(PathBuf::from("tlmgr_dummy"));
     let miktex = MiktexBackend::new(PathBuf::from("miktex_dummy"));
-    
-    // Just verify they can be created. 
+
+    // Just verify they can be created.
     // We can't really call install() without it trying to run a command.
     // But now we can inject a mock executor!
     assert_eq!(tlmgr.name(), "tlmgr");
@@ -152,10 +156,10 @@ fn test_tlmgr_backend_execution_success() {
         stderr: "".to_string(),
         status_code: 0,
     });
-    
+
     let backend = TlmgrBackend::with_executor(PathBuf::from("/bin/tlmgr"), mock);
     let status = backend.install("package").unwrap();
-    
+
     assert_eq!(status.state, InstallState::Complete);
     // message is None on success in our impl
 }
@@ -167,10 +171,10 @@ fn test_tlmgr_backend_execution_failure() {
         stderr: "package not found".to_string(),
         status_code: 1,
     });
-    
+
     let backend = TlmgrBackend::with_executor(PathBuf::from("/bin/tlmgr"), mock);
     let status = backend.install("invalid").unwrap();
-    
+
     assert_eq!(status.state, InstallState::Failed);
     assert!(status.message.unwrap().contains("package not found"));
 }
@@ -207,10 +211,10 @@ fn test_miktex_backend_execution_success() {
         stderr: "".to_string(),
         status_code: 0,
     });
-    
+
     let backend = MiktexBackend::with_executor(PathBuf::from("/bin/mpm"), mock);
     let status = backend.install("package").unwrap();
-    
+
     assert_eq!(status.state, InstallState::Complete);
 }
 
@@ -221,10 +225,10 @@ fn test_miktex_backend_execution_failure() {
         stderr: "failed".to_string(),
         status_code: 1,
     });
-    
+
     let backend = MiktexBackend::with_executor(PathBuf::from("/bin/mpm"), mock);
     let status = backend.install("package").unwrap();
-    
+
     assert_eq!(status.state, InstallState::Failed);
 }
 
@@ -250,7 +254,11 @@ fn test_noop_backend_search() {
 #[test]
 fn test_package_manager_search_delegation() {
     let mock = MockBackend {
-        install_result: Ok(InstallStatus{name: "".into(), state: InstallState::Unknown, message: None}),
+        install_result: Ok(InstallStatus {
+            name: "".into(),
+            state: InstallState::Unknown,
+            message: None,
+        }),
         search_result: Ok(vec!["found".into()]),
     };
     let pm = PackageManager::with_backend(std::sync::Arc::new(mock));

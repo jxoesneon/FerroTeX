@@ -69,6 +69,13 @@ impl<'a> Lexer<'a> {
 
     /// Returns the next token (kind, text).
     /// If EOF, returns (SyntaxKind::Eof, "").
+    /// Returns the next token (kind, text).
+    /// If EOF, returns (SyntaxKind::Eof, "").
+    ///
+    /// # Implementation Details
+    /// The lexer consumes characters and transitions based on LaTeX special characters (`\`, `{`, `$`, etc.).
+    /// Commands are parsed by checking if the backslash is followed by alphabetic characters (multi-letter)
+    /// or a single non-alphabetic character (symbol command).
     pub fn next_token(&mut self) -> (SyntaxKind, &'a str) {
         if self.position >= self.input.len() {
             return (SyntaxKind::Eof, "");
@@ -293,16 +300,26 @@ mod tests {
                 assert!(text.starts_with('\\'));
             }
         }
-        
+
         // Literal ones
         let input2 = "{ } [ ] $ %";
         let tokens2 = tokenize(input2);
-        let kinds: Vec<_> = tokens2.into_iter().map(|(k, _)| k).filter(|k| *k != SyntaxKind::Whitespace).collect();
-        assert_eq!(kinds, vec![
-            SyntaxKind::LBrace, SyntaxKind::RBrace,
-            SyntaxKind::LBracket, SyntaxKind::RBracket,
-            SyntaxKind::Dollar, SyntaxKind::Comment
-        ]);
+        let kinds: Vec<_> = tokens2
+            .into_iter()
+            .map(|(k, _)| k)
+            .filter(|k| *k != SyntaxKind::Whitespace)
+            .collect();
+        assert_eq!(
+            kinds,
+            vec![
+                SyntaxKind::LBrace,
+                SyntaxKind::RBrace,
+                SyntaxKind::LBracket,
+                SyntaxKind::RBracket,
+                SyntaxKind::Dollar,
+                SyntaxKind::Comment
+            ]
+        );
     }
 
     #[test]
@@ -317,8 +334,16 @@ mod tests {
     fn test_lexer_complex_commands() {
         let input = r"\newcommand{\foo}[2]{#1 #2}";
         let tokens = tokenize(input);
-        assert!(tokens.iter().any(|(k, v)| *k == SyntaxKind::Command && *v == "\\newcommand"));
-        assert!(tokens.iter().any(|(k, v)| *k == SyntaxKind::Command && *v == "\\foo"));
+        assert!(
+            tokens
+                .iter()
+                .any(|(k, v)| *k == SyntaxKind::Command && *v == "\\newcommand")
+        );
+        assert!(
+            tokens
+                .iter()
+                .any(|(k, v)| *k == SyntaxKind::Command && *v == "\\foo")
+        );
     }
 
     #[test]

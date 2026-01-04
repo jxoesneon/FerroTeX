@@ -1,4 +1,3 @@
-
 use crate::LogParser;
 use crate::ir::EventPayload;
 
@@ -97,10 +96,12 @@ fn test_path_spanning_multiple_lines() {
     // Flush remaining buffer
     let mut all_events = events;
     all_events.extend(parser.finish());
-    
+
     // Should extract file.tex path joined
     // Note: The logic in extract_path_spanning should handle this joining
-    let found = all_events.iter().any(|e| matches!(&e.payload, EventPayload::FileEnter { path } if path.contains("file.tex")));
+    let found = all_events.iter().any(
+        |e| matches!(&e.payload, EventPayload::FileEnter { path } if path.contains("file.tex")),
+    );
     assert!(found, "Should have found spanning path");
 }
 
@@ -109,15 +110,19 @@ fn test_path_interrupted_by_warning() {
     let mut parser = LogParser::new();
     let log = "(./some/broken/\nLaTeX Warning: Reference undefined on input line 5.\nfile.tex";
     let events = parser.update(log);
-    
+
     // Should NOT extract file.tex as part of the previous path
     if let Some(EventPayload::FileEnter { path }) = events.first().map(|e| &e.payload) {
         assert_eq!(path, "./some/broken/");
     } else {
         panic!("First event should be FileEnter");
     }
-    
-    assert!(events.iter().any(|e| matches!(&e.payload, EventPayload::Warning { .. })));
+
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(&e.payload, EventPayload::Warning { .. }))
+    );
 }
 
 #[test]
@@ -125,11 +130,15 @@ fn test_path_interrupted_by_error() {
     let mut parser = LogParser::new();
     let log = "(./some/broken/\n! Undefined control sequence.\n";
     let events = parser.update(log);
-    
+
     if let Some(EventPayload::FileEnter { path }) = events.first().map(|e| &e.payload) {
         assert_eq!(path, "./some/broken/");
     }
-    assert!(events.iter().any(|e| matches!(&e.payload, EventPayload::ErrorStart { .. })));
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(&e.payload, EventPayload::ErrorStart { .. }))
+    );
 }
 
 #[test]
@@ -137,12 +146,15 @@ fn test_garbage_intermixed() {
     let mut parser = LogParser::new();
     let log = "Random text (./file.tex) more text\n(./other.tex\n) closing";
     let events = parser.update(log);
-    
-    let files: Vec<&String> = events.iter().filter_map(|e| match &e.payload {
-        EventPayload::FileEnter { path } => Some(path),
-        _ => None,
-    }).collect();
-    
+
+    let files: Vec<&String> = events
+        .iter()
+        .filter_map(|e| match &e.payload {
+            EventPayload::FileEnter { path } => Some(path),
+            _ => None,
+        })
+        .collect();
+
     assert!(files.contains(&&"./file.tex".to_string()));
     assert!(files.contains(&&"./other.tex".to_string()));
 }
@@ -170,13 +182,21 @@ l.5 \error
     let parser = LogParser::new();
     let events = parser.parse(log);
     assert!(!events.is_empty());
-    assert!(events.iter().any(|e| matches!(e.payload, EventPayload::ErrorStart { .. })));
-    assert!(events.iter().any(|e| matches!(e.payload, EventPayload::ErrorLineRef { .. })));
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e.payload, EventPayload::ErrorStart { .. }))
+    );
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e.payload, EventPayload::ErrorLineRef { .. }))
+    );
 }
 
 #[test]
 fn test_path_incomplete_peek() {
-    // Tests the case where a path extends to the end of a chunk, and the NEXT chunk 
+    // Tests the case where a path extends to the end of a chunk, and the NEXT chunk
     // does NOT look like a new event. The parser should return "incomplete" (true)
     // and wait for more data.
     let mut parser = LogParser::new();
@@ -188,7 +208,7 @@ fn test_path_incomplete_peek() {
     // So extract_path_spanning returns Incomplete.
     // process_buffer breaks loop.
     // No events generated yet.
-    assert!(events.is_empty()); 
+    assert!(events.is_empty());
     // Now we finish
     let final_events = parser.finish();
     // finish() appends " \n". "uncorrelated \n".

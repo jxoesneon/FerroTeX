@@ -58,7 +58,9 @@ impl AbstractMachine {
     /// Steps the abstract machine one abstract instruction.
     pub fn step(&mut self) -> Option<AbstractValue> {
         if self.expansion_depth > self.max_depth {
-            return Some(AbstractValue::AnalysisError("Maximum recursion depth exceeded".to_string()));
+            return Some(AbstractValue::AnalysisError(
+                "Maximum recursion depth exceeded".to_string(),
+            ));
         }
 
         // Pop the next token from input
@@ -66,13 +68,16 @@ impl AbstractMachine {
             match &token {
                 AbstractValue::ControlSequence(name) => {
                     if self.call_stack.contains(name) {
-                        return Some(AbstractValue::AnalysisError(format!("Infinite recursion detected in control sequence: {}", name)));
+                        return Some(AbstractValue::AnalysisError(format!(
+                            "Infinite recursion detected in control sequence: {}",
+                            name
+                        )));
                     }
                     self.call_stack.push(name.clone());
                     self.expansion_depth += 1;
-                    
+
                     self.execute_control_sequence(name);
-                    
+
                     self.expansion_depth -= 1;
                     self.call_stack.pop();
                     Some(token)
@@ -122,10 +127,13 @@ mod tests {
     fn test_abstract_def() {
         let mut machine = AbstractMachine::new();
         // Push \def to input stack
-        machine.state.input_stack.push(AbstractValue::ControlSequence("\\def".to_string()));
-        
+        machine
+            .state
+            .input_stack
+            .push(AbstractValue::ControlSequence("\\def".to_string()));
+
         machine.step();
-        
+
         // After \def, we expect 'Any' to be pushed (abstract result of definition)
         assert_eq!(machine.state.input_stack.pop(), Some(AbstractValue::Any));
     }
@@ -133,7 +141,10 @@ mod tests {
     #[test]
     fn test_abstract_unknown() {
         let mut machine = AbstractMachine::new();
-        machine.state.input_stack.push(AbstractValue::ControlSequence("\\unknown".to_string()));
+        machine
+            .state
+            .input_stack
+            .push(AbstractValue::ControlSequence("\\unknown".to_string()));
         machine.step();
         // Unknown command should just be consumed (popped) with no side effects
         assert_eq!(machine.state.input_stack.len(), 0);
@@ -145,13 +156,16 @@ mod tests {
         // Setup a situation where \foo calls \foo (simplified)
         // We simulate this by having \foo's execution push \foo back to the stack.
         // We'll need to mock the definition behavior properly.
-        machine.state.input_stack.push(AbstractValue::ControlSequence("\\foo".to_string()));
-        
+        machine
+            .state
+            .input_stack
+            .push(AbstractValue::ControlSequence("\\foo".to_string()));
+
         // We override execute_control_sequence or just simulate it here.
         // For the sake of the test, let's just push it once and see it fail on the second step if it were re-added.
         machine.call_stack.push("\\foo".to_string());
         let result = machine.step();
-        
+
         if let Some(AbstractValue::AnalysisError(msg)) = result {
             assert!(msg.contains("Infinite recursion"));
         } else {
@@ -163,7 +177,10 @@ mod tests {
     fn test_max_depth() {
         let mut machine = AbstractMachine::new();
         machine.expansion_depth = 1001;
-        machine.state.input_stack.push(AbstractValue::ControlSequence("\\any".to_string()));
+        machine
+            .state
+            .input_stack
+            .push(AbstractValue::ControlSequence("\\any".to_string()));
         let result = machine.step();
         assert!(matches!(result, Some(AbstractValue::AnalysisError(_))));
     }
@@ -186,7 +203,10 @@ mod tests {
     #[test]
     fn test_abstract_tokens() {
         let mut machine = AbstractMachine::new();
-        machine.state.input_stack.push(AbstractValue::Token("a".to_string()));
+        machine
+            .state
+            .input_stack
+            .push(AbstractValue::Token("a".to_string()));
         let result = machine.step();
         assert_eq!(result, Some(AbstractValue::Token("a".to_string())));
     }

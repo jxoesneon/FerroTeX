@@ -1,10 +1,23 @@
+//! # FerroTeX Package Indexing
+//!
+//! Provides structures and logic for indexing, caching, and retrieving metadata
+//! about installed LaTeX packages.
+//!
+//! This crate enables dynamic autocompletion of commands and environments provided
+//! by external packages by scanning the system's TeX distribution.
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 pub mod scanner;
 
+/// A persistent index of LaTeX packages and their provided metadata.
+///
+/// This index is typically populated by the `PackageScanner` and cached on disk
+/// to avoid expensive re-scans on every LSP startup.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PackageIndex {
+    /// Map of package names (e.g., "amsmath") to their metadata.
     pub packages: HashMap<String, PackageMetadata>,
 }
 
@@ -39,8 +52,7 @@ impl PackageIndex {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        let json = serde_json::to_string_pretty(self)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        let json = serde_json::to_string_pretty(self).map_err(std::io::Error::other)?;
         std::fs::write(path, json)?;
         Ok(())
     }
@@ -54,16 +66,14 @@ impl PackageIndex {
     pub fn load_from_path(path: &std::path::Path) -> Option<Self> {
         if path.exists() {
             match std::fs::read_to_string(path) {
-                Ok(content) => {
-                    match serde_json::from_str::<PackageIndex>(&content) {
-                        Ok(index) => {
-                            let packages_len = index.packages.len();
-                            log::info!("Cache hit. Loaded {} packages from cache.", packages_len);
-                            return Some(index);
-                        }
-                        Err(e) => log::warn!("Failed to parse index: {}", e),
+                Ok(content) => match serde_json::from_str::<PackageIndex>(&content) {
+                    Ok(index) => {
+                        let packages_len = index.packages.len();
+                        log::info!("Cache hit. Loaded {} packages from cache.", packages_len);
+                        return Some(index);
                     }
-                }
+                    Err(e) => log::warn!("Failed to parse index: {}", e),
+                },
                 Err(e) => log::warn!("Failed to read index: {}", e),
             }
         }
@@ -82,7 +92,10 @@ mod tests {
         meta.commands.push("test".to_string());
         index.insert("mypkg".to_string(), meta);
 
-        let temp_dir = std::env::current_dir().unwrap().join("target").join("test_cache_2");
+        let temp_dir = std::env::current_dir()
+            .unwrap()
+            .join("target")
+            .join("test_cache_2");
         let temp_file = temp_dir.join("packages.json");
 
         index.save_to_path(&temp_file).unwrap();
@@ -90,11 +103,11 @@ mod tests {
 
         let loaded = PackageIndex::load_from_path(&temp_file).unwrap();
         assert_eq!(loaded.packages.len(), 1);
-        
+
         // Test load from non-existent path
         let non_existent = temp_dir.join("missing.json");
         assert!(PackageIndex::load_from_path(&non_existent).is_none());
-        
+
         // Test load invalid JSON
         let invalid_file = temp_dir.join("invalid.json");
         std::fs::write(&invalid_file, "{ invalid }").unwrap();
@@ -111,8 +124,11 @@ mod tests {
     }
 }
 
+/// Metadata about a single LaTeX package.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PackageMetadata {
+    /// List of commands defined by this package (e.g., `["\text", "\dfrac"]`).
     pub commands: Vec<String>,
+    /// List of environments defined by this package (e.g., `["align", "gather"]`).
     pub environments: Vec<String>,
 }

@@ -36,7 +36,7 @@ impl PackageScanner {
                 return Some(p.to_path_buf());
             }
         }
-        
+
         // Fallback: try kpsewhich
         if let Ok(output) = std::process::Command::new("kpsewhich")
             .args(["-var-value", "TEXMFDIST"])
@@ -50,7 +50,7 @@ impl PackageScanner {
                 }
             }
         }
-        
+
         None
     }
 
@@ -67,8 +67,8 @@ impl PackageScanner {
                                 let pkg_name = stem.to_string_lossy().to_string();
                                 // Parse the file (read then parse)
                                 if let Ok(content) = fs::read_to_string(entry.path()) {
-                                     let metadata = self.parse_content(&content);
-                                     index.insert(pkg_name, metadata);
+                                    let metadata = self.parse_content(&content);
+                                    index.insert(pkg_name, metadata);
                                 }
                             }
                         }
@@ -76,7 +76,7 @@ impl PackageScanner {
                 }
             }
         } else {
-             log::warn!("TeX root not found. Skipping scan.");
+            log::warn!("TeX root not found. Skipping scan.");
         }
 
         index
@@ -98,7 +98,7 @@ impl PackageScanner {
         }
 
         for cap in re_env.captures_iter(content) {
-             if let Some(env) = cap.get(1) {
+            if let Some(env) = cap.get(1) {
                 metadata.environments.push(env.as_str().to_string());
             }
         }
@@ -120,9 +120,9 @@ mod tests {
             \newenvironment{myenv}{start}{end}
             \newenvironment{starenv*}{start}{end}
         "#;
-        
+
         let metadata = scanner.parse_content(content);
-        
+
         assert!(metadata.commands.contains(&"foo".to_string()));
         assert!(metadata.commands.contains(&"baz".to_string()));
         assert!(metadata.environments.contains(&"myenv".to_string()));
@@ -145,7 +145,10 @@ mod tests {
 
     #[test]
     fn test_scan_with_files() {
-        let temp_dir = std::env::current_dir().unwrap().join("target").join("test_texmf_2");
+        let temp_dir = std::env::current_dir()
+            .unwrap()
+            .join("target")
+            .join("test_texmf_2");
         std::fs::create_dir_all(&temp_dir).unwrap();
         let sty_file = temp_dir.join("testpkg.sty");
         std::fs::write(&sty_file, r"\newcommand{\testcmd}{text}").unwrap();
@@ -153,9 +156,13 @@ mod tests {
         let mut scanner = PackageScanner::new();
         scanner.tex_root = Some(temp_dir.clone());
         let index = scanner.scan();
-        
+
         assert!(index.get("testpkg").is_some());
-        assert!(index.get("testpkg").unwrap().commands.contains(&"testcmd".to_string()));
+        assert!(index
+            .get("testpkg")
+            .unwrap()
+            .commands
+            .contains(&"testcmd".to_string()));
 
         // Cleanup
         let _ = std::fs::remove_dir_all(temp_dir);

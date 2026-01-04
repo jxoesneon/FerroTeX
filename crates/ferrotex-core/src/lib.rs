@@ -65,5 +65,5 @@
 //! Currently, this crate does not define any feature flags. All functionality is
 //! available by default.
 
-pub mod package_manager;
 pub mod math_validator;
+pub mod package_manager;

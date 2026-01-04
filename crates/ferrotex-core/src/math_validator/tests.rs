@@ -130,19 +130,46 @@ fn test_delimiter_validator_nested_mismatch() {
 
 #[test]
 fn test_delimiter_kinds_match() {
-    assert!(delimiters_match(&DelimiterKind::LeftParen, &DelimiterKind::RightParen));
-    assert!(delimiters_match(&DelimiterKind::LeftBracket, &DelimiterKind::RightBracket));
-    assert!(delimiters_match(&DelimiterKind::LeftBrace, &DelimiterKind::RightBrace));
-    assert!(delimiters_match(&DelimiterKind::LeftAngle, &DelimiterKind::RightAngle));
-    assert!(delimiters_match(&DelimiterKind::LeftFloor, &DelimiterKind::RightFloor));
-    assert!(delimiters_match(&DelimiterKind::LeftCeil, &DelimiterKind::RightCeil));
+    assert!(delimiters_match(
+        &DelimiterKind::LeftParen,
+        &DelimiterKind::RightParen
+    ));
+    assert!(delimiters_match(
+        &DelimiterKind::LeftBracket,
+        &DelimiterKind::RightBracket
+    ));
+    assert!(delimiters_match(
+        &DelimiterKind::LeftBrace,
+        &DelimiterKind::RightBrace
+    ));
+    assert!(delimiters_match(
+        &DelimiterKind::LeftAngle,
+        &DelimiterKind::RightAngle
+    ));
+    assert!(delimiters_match(
+        &DelimiterKind::LeftFloor,
+        &DelimiterKind::RightFloor
+    ));
+    assert!(delimiters_match(
+        &DelimiterKind::LeftCeil,
+        &DelimiterKind::RightCeil
+    ));
 }
 
 #[test]
 fn test_delimiter_kinds_dont_match() {
-    assert!(!delimiters_match(&DelimiterKind::LeftParen, &DelimiterKind::RightBracket));
-    assert!(!delimiters_match(&DelimiterKind::LeftBracket, &DelimiterKind::RightParen));
-    assert!(!delimiters_match(&DelimiterKind::LeftBrace, &DelimiterKind::RightAngle));
+    assert!(!delimiters_match(
+        &DelimiterKind::LeftParen,
+        &DelimiterKind::RightBracket
+    ));
+    assert!(!delimiters_match(
+        &DelimiterKind::LeftBracket,
+        &DelimiterKind::RightParen
+    ));
+    assert!(!delimiters_match(
+        &DelimiterKind::LeftBrace,
+        &DelimiterKind::RightAngle
+    ));
 }
 
 #[test]
