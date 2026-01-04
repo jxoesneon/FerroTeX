@@ -1,0 +1,7 @@
+target/
+.git/
+node_modules/
+editors/vscode/out/
+editors/vscode/dist/
+.DS_Store
+*.log

@@ -6,6 +6,23 @@ The format is based on **Keep a Changelog**, and this project intends to follow 
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-01-03
+
+### "Global Expansion" Release
+
+This release brings full cross-platform support with automated binary bundling for Linux, Windows, and macOS (Intel & Apple Silicon), ensuring a "just works" experience for every user.
+
+### Added
+
+- **Multi-Platform Distribution**:
+  - Implemented automatic **Platform-Specific Bundling**. The extension now detects the OS and installs the correct pre-compiled binary seamlessly.
+  - Added support for **Linux (x64)**, **Windows (x64)**, **macOS (Intel)**, and **macOS (Arm64)**.
+  - Configured CI/CD to produce 4 distinct VSIX packages for Open VSX and GitHub Releases.
+- **Linux Validation**:
+  - Added `Dockerfile.local` and CI steps to verify compilation and binary execution on Ubuntu.
+- **Production Optimizations**:
+  - Enabled `lto = true` and `strip = true` for release builds, significantly reducing binary size and improving startup time.
+
 ## [0.20.1] - 2026-01-02
 
 ### "Stellar Security" Patch
@@ -362,6 +379,7 @@ This milestone release transforms FerroTeX into a high-fidelity "Scientific Comp
 [0.14.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.13.0...v0.14.0
 [0.15.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.14.0...v0.15.0
 [0.16.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.15.0...v0.16.0
-[Unreleased]: https://github.com/jxoesneon/FerroTeX/compare/v0.20.1...HEAD
+[Unreleased]: https://github.com/jxoesneon/FerroTeX/compare/v0.21.0...HEAD
+[0.21.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.20.1...v0.21.0
 [0.20.1]: https://github.com/jxoesneon/FerroTeX/compare/v0.20.0...v0.20.1
 [0.20.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.16.0...v0.20.0
