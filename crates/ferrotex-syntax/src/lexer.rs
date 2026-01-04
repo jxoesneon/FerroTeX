@@ -69,6 +69,13 @@ impl<'a> Lexer<'a> {
 
     /// Returns the next token (kind, text).
     /// If EOF, returns (SyntaxKind::Eof, "").
+    /// Returns the next token (kind, text).
+    /// If EOF, returns (SyntaxKind::Eof, "").
+    ///
+    /// # Implementation Details
+    /// The lexer consumes characters and transitions based on LaTeX special characters (`\`, `{`, `$`, etc.).
+    /// Commands are parsed by checking if the backslash is followed by alphabetic characters (multi-letter)
+    /// or a single non-alphabetic character (symbol command).
     pub fn next_token(&mut self) -> (SyntaxKind, &'a str) {
         if self.position >= self.input.len() {
             return (SyntaxKind::Eof, "");

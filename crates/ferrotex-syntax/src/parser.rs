@@ -41,6 +41,10 @@ impl<'a> Parser<'a> {
     }
 
     /// Parses the input and returns the result.
+    /// Parses the input string and returns a [`ParseResult`] containing the concrete syntax tree.
+    ///
+    /// This method initializes the root node and begins recursive descent parsing of
+    /// elements until the end of the input stream is reached.
     pub fn parse(mut self) -> ParseResult {
         self.builder.start_node(SyntaxKind::Root.into());
         while self.peek() != SyntaxKind::Eof {
@@ -100,6 +104,10 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// The main entry point for parsing an individual LaTeX element.
+    ///
+    /// Depending on the next token, it delegates to specialized functions like
+    /// [`parse_command_or_environment`] or [`parse_group`], or simply bumps the token.
     fn parse_element(&mut self) {
         match self.peek() {
             SyntaxKind::Command => self.parse_command_or_environment(),
@@ -115,6 +123,10 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// Parses a braced group `{ ... }`.
+    ///
+    /// If the closing brace Is missing, an error is recorded, but the node is
+    /// still finished to preserve the tree structure.
     fn parse_group(&mut self) {
         self.builder.start_node(SyntaxKind::Group.into());
         self.bump(); // Consume '{'
@@ -279,6 +291,12 @@ impl<'a> Parser<'a> {
         self.builder.finish_node();
     }
 
+    /// Parses a LaTeX environment `\begin{...} ... \end{...}`.
+    ///
+    /// # Error Recovery
+    /// - If the `\end` tag is missing, an error is recorded and the environment is closed at EOF.
+    /// - If the environment names mismatch (e.g., `\begin{a} \end{b}`), it records a non-fatal error
+    ///   but continues parsing the tree.
     fn parse_environment(&mut self) {
         self.builder.start_node(SyntaxKind::Environment.into());
         let begin_name = self.get_group_text_peek();

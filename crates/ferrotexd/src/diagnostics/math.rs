@@ -1,3 +1,8 @@
+//! # Math Diagnostics
+//!
+//! Provides Language Server Protocol (LSP) diagnostics for LaTeX mathematical
+//! expressions, including delimiter balancing and matrix structural analysis.
+
 use ferrotex_math_semantics::analysis::infer_shape;
 use ferrotex_math_semantics::delimiters::check_delimiters;
 use ferrotex_math_semantics::Shape;
@@ -5,6 +10,34 @@ use ferrotex_syntax::{SyntaxKind, SyntaxNode};
 use line_index::LineIndex;
 use tower_lsp::lsp_types::{Diagnostic, DiagnosticSeverity, Position, Range};
 
+/// Checks if an environment name is recognized as a matrix-like alignment structure.
+///
+/// **Heuristic Strategy**:
+/// We use a strict whitelist rather than a fuzzy match (e.g. `contains("matrix")`)
+/// to avoid false positives for environments that might be named similarly but
+/// do not follow standard matrix semantics (e.g., `tikzmatrix` or custom macros).
+fn is_matrix_environment(name: &str) -> bool {
+    matches!(
+        name,
+        "matrix"
+            | "pmatrix"
+            | "bmatrix"
+            | "vmatrix"
+            | "Vmatrix"
+            | "smallmatrix"
+            | "cases"
+            | "aligned"
+            | "gather"
+            | "align"
+            | "eqnarray"
+    )
+}
+
+/// Checks a syntax tree for mathematical errors and returns a list of LSP diagnostics.
+///
+/// This is the main entry point for math validation in the LSP. It performs:
+/// 1. **Delimiter validation**: Ensures `(`, `[`, `{`, `\left`, `\right` are balanced.
+/// 2. **Shape inference**: Detects jagged matrices in environments like `pmatrix` or `align`.
 pub fn check_math(root: &SyntaxNode, line_index: &LineIndex) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
@@ -40,20 +73,21 @@ pub fn check_math(root: &SyntaxNode, line_index: &LineIndex) -> Vec<Diagnostic> 
     // 2. Check matrix shapes
     for node in root.descendants() {
         if node.kind() == SyntaxKind::Environment {
-            // Check if it is a matrix environment
-            let mut is_matrix = false;
-            // Naive check: scan children for group containing "matrix"
+            // 2.1 Identify environment name
+            let mut env_name = String::new();
             for child in node.children() {
                 if child.kind() == SyntaxKind::Group {
-                    let text = child.text().to_string();
-                    if text.contains("matrix") {
-                        is_matrix = true;
-                        break;
-                    }
+                    env_name = child
+                        .text()
+                        .to_string()
+                        .trim_matches('{')
+                        .trim_matches('}')
+                        .to_string();
+                    break;
                 }
             }
 
-            if is_matrix {
+            if is_matrix_environment(&env_name) {
                 let shape = infer_shape(&node);
                 if let Shape::Invalid(msg) = shape {
                     let range = node.text_range();

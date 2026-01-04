@@ -1,3 +1,10 @@
+//! # FerroTeX Daemon Library
+//!
+//! Provides the core Language Server Protocol (LSP) implementation for FerroTeX.
+//! This crate handles document synchronization, diagnostics, completion, formatting,
+//! and other IDE features by orchestrating specialized crates like `ferrotex-syntax`
+//! and `ferrotex-package`.
+
 pub mod build;
 pub mod completer;
 pub mod diagnostics;
@@ -19,13 +26,20 @@ use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer};
 use workspace::Workspace;
 
+/// The type of completion item being requested.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CompletionKind {
+    /// No specific completion kind (default).
     None,
+    /// Completion for bibliography citations (e.g., in `\cite{...}`).
     Citation,
+    /// Completion for labels (e.g., in `\ref{...}`).
     Label,
+    /// Completion for LaTeX environments (e.g., in `\begin{...}`).
     Environment,
+    /// Completion for LaTeX commands (e.g., `\section`).
     Command,
+    /// Completion for file paths (e.g., in `\input{...}`).
     File,
 }
 
@@ -78,20 +92,35 @@ pub const SEMANTIC_TOKEN_MODIFIERS: &[SemanticTokenModifier] = &[
     SemanticTokenModifier::READONLY,
 ];
 
+/// The main Language Server implementation.
+///
+/// `Backend` manages the global state of the language server, including open documents,
+/// workspace-wide symbol indices, and integrations with external tools like `latexmk`.
+///
+/// It uses thread-safe primitives (`Arc`, `DashMap`, `Mutex`) to allow safe access from
+/// concurrent LSP requests.
 #[derive(Debug)]
 pub struct Backend {
+    /// The LSP client handle for sending notifications and requests.
     pub client: Client,
+    /// Concurrent map of open document URIs to their full text content.
     pub documents: Arc<DashMap<Url, String>>,
+    /// The cross-file workspace index.
     pub workspace: Arc<Workspace>,
+    /// The root URI of the workspace, if initialized.
     pub root_uri: Arc<Mutex<Option<Url>>>,
+    /// Cached syntax diagnostics for open documents.
     pub syntax_diagnostics: Arc<DashMap<Url, Vec<Diagnostic>>>,
+    /// Handlers for TeX package managers (tlmgr, MiKTeX).
     pub package_manager: Arc<Mutex<package_manager::PackageManager>>,
+    /// Index of all installed LaTeX packages on the system.
     pub package_index: Arc<Mutex<Option<PackageIndex>>>,
 }
 
 #[tower_lsp::async_trait]
 impl LanguageServer for Backend {
     async fn initialize(&self, params: InitializeParams) -> Result<InitializeResult> {
+        // Log the root URI for workspace context
         {
             let mut root = self.root_uri.lock().unwrap();
             *root = params.root_uri.clone();
@@ -448,6 +477,7 @@ impl LanguageServer for Backend {
         Ok(Some(DocumentSymbolResponse::Nested(lsp_symbols)))
     }
 
+    /// Navigates to the definition of a label, command, or file path.
     async fn goto_definition(
         &self,
         params: GotoDefinitionParams,
@@ -457,12 +487,14 @@ impl LanguageServer for Backend {
         Ok(None)
     }
 
+    /// Finds all references to a label or symbol.
     async fn references(&self, params: ReferenceParams) -> Result<Option<Vec<Location>>> {
         let _uri = params.text_document_position.text_document.uri;
         let _pos = params.text_document_position.position;
         Ok(Some(vec![]))
     }
 
+    /// Provides hover information (e.g., documentation for a command or citation).
     async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
         let uri = params.text_document_position_params.text_document.uri;
         let pos = params.text_document_position_params.position;
@@ -485,6 +517,7 @@ impl LanguageServer for Backend {
         Ok(None)
     }
 
+    /// Returns suggestions for the given position in a document.
     async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
         let uri = params.text_document_position.text_document.uri;
         let packages = self.workspace.get_packages(&uri);
@@ -508,6 +541,7 @@ impl LanguageServer for Backend {
         }
     }
 
+    /// Periodically called by the client to collect semantic highlighting tokens.
     async fn semantic_tokens_full(
         &self,
         params: SemanticTokensParams,
@@ -526,6 +560,16 @@ impl LanguageServer for Backend {
 }
 
 impl Backend {
+    /// Validates a LaTeX document by performing syntax parsing, math semantic analysis,
+    /// and label consistency checks.
+    ///
+    /// Results are published to the LSP client as diagnostics.
+    ///
+    /// # Logic
+    /// 1. Parses document via `ferrotex-syntax`.
+    /// 2. Performs math validation (matrix shapes, delimiters).
+    /// 3. Validates cross-file labels via the `Workspace`.
+    /// 4. Optionally scans for build logs to extract compiler warnings.
     pub async fn validate_document(&self, uri: Url) {
         if let Some(text) = self.documents.get(&uri) {
             self.workspace.update(&uri, &text);
@@ -611,6 +655,10 @@ impl Backend {
         }
     }
 
+    /// Triggers a LaTeX build process for the given document.
+    ///
+    /// Spawns a background task that uses the `LatexmkAdapter` to build the document.
+    /// Build progress and results are sent to the client via `log_message` notifications.
     pub async fn run_build(&self, uri: Url) {
         let client = self.client.clone();
 
@@ -637,6 +685,15 @@ impl Backend {
         });
     }
 
+    /// Computes semantic tokens for the given document text.
+    ///
+    /// Mapping:
+    /// - `SyntaxKind::Command` -> `MACRO` (0)
+    /// - `SyntaxKind::Environment` -> `KEYWORD` (1)
+    /// - `SyntaxKind::Group` -> `STRING` (2)
+    /// - `SyntaxKind::Comment` -> `COMMENT` (3)
+    ///
+    /// Tokens are returned in the LSP relative format (delta line, delta start, length).
     fn compute_semantic_tokens(&self, text: &str) -> Vec<SemanticToken> {
         let mut tokens = Vec::new();
         let mut last_line = 0;

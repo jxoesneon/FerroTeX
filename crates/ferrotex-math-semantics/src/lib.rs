@@ -1,9 +1,18 @@
+//! # FerroTeX Math Semantics
+//!
+//! Provides data structures and algorithms for analyzing the mathematical
+//! semantics of LaTeX expressions, specifically focusing on dimensionality
+//! and structural consistency of AMS math environments.
+
 use serde::{Deserialize, Serialize};
 
 pub mod analysis;
 pub mod delimiters;
 
 /// Represents the dimensionality and size of a mathematical object.
+///
+/// Shape inference allows FerroTeX to detect "jagged matrices" or incompatible
+/// operations (e.g., adding a vector to a matrix of mismatched size).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Shape {
     /// A scalar value (0-dimensional).
@@ -11,12 +20,18 @@ pub enum Shape {
     /// A column vector of size `n`.
     Vector(Dimension),
     /// A matrix of size `rows x cols`.
-    Matrix { rows: Dimension, cols: Dimension },
+    Matrix {
+        /// Number of rows.
+        rows: Dimension,
+        /// Number of columns.
+        cols: Dimension,
+    },
     /// A higher-order tensor with specified dimensions.
     Tensor(Vec<Dimension>),
     /// The shape is unknown or could not be inferred.
     Unknown,
     /// The object has an inconsistent shape (e.g., a matrix with rows of defined but differing lengths).
+    /// The string contains a human-readable reason for the invalidity.
     Invalid(String),
 }
 
@@ -25,7 +40,7 @@ pub enum Shape {
 pub enum Dimension {
     /// A known integer size (e.g., 3).
     Finite(usize),
-    /// A symbolic size (e.g., "n").
+    /// A symbolic size (e.g., "n" or "m").
     Symbolic(String),
     /// An unknown size.
     Unknown,

@@ -1,10 +1,23 @@
+//! # FerroTeX Package Indexing
+//!
+//! Provides structures and logic for indexing, caching, and retrieving metadata
+//! about installed LaTeX packages.
+//!
+//! This crate enables dynamic autocompletion of commands and environments provided
+//! by external packages by scanning the system's TeX distribution.
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 pub mod scanner;
 
+/// A persistent index of LaTeX packages and their provided metadata.
+///
+/// This index is typically populated by the `PackageScanner` and cached on disk
+/// to avoid expensive re-scans on every LSP startup.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PackageIndex {
+    /// Map of package names (e.g., "amsmath") to their metadata.
     pub packages: HashMap<String, PackageMetadata>,
 }
 
@@ -111,8 +124,11 @@ mod tests {
     }
 }
 
+/// Metadata about a single LaTeX package.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PackageMetadata {
+    /// List of commands defined by this package (e.g., `["\text", "\dfrac"]`).
     pub commands: Vec<String>,
+    /// List of environments defined by this package (e.g., `["align", "gather"]`).
     pub environments: Vec<String>,
 }

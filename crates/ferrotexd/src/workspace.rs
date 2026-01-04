@@ -1,3 +1,12 @@
+//! # Workspace Management
+//!
+//! Provides the central index for the FerroTeX language server, managing
+//! cross-file references, label definitions, and bibliography data.
+//!
+//! The [`Workspace`] struct acts as a thread-safe, shared repository for
+//! all document-related metadata, enabling features like "Go to Definition",
+//! "Find References", and global workspace symbols.
+
 use dashmap::DashMap;
 use ferrotex_syntax::{parse, SyntaxKind, TextRange};
 use regex::Regex;
@@ -113,7 +122,15 @@ impl Workspace {
 
     /// Updates the index for a given TeX file.
     ///
-    /// Parses the file content and extracts includes, labels, citations, etc.
+    /// This method performs a full scan of the document text to extract:
+    /// - Include references (`\input`, `\include`)
+    /// - Label definitions and references
+    /// - Citations and bibliographies
+    /// - Section hierarchy
+    /// - Used packages
+    /// - Environmental scopes
+    ///
+    /// It also detects "magic comments" like `%!TEX root` to handle multi-file project structures.
     pub fn update(&self, uri: &Url, text: &str) {
         let (
             includes,
