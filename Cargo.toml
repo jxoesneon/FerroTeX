@@ -19,5 +19,8 @@ codegen-units = 1
 [patch.crates-io]
 tectonic_xetex_layout = { path = "patches/tectonic_xetex_layout" }
 tectonic_engine_xetex = { path = "patches/tectonic_engine_xetex" }
+tectonic = { path = "upstream/tectonic" }
+tectonic_status_base = { path = "upstream/tectonic/crates/status_base" }
+tectonic_io_base = { path = "upstream/tectonic/crates/io_base" }
 
 

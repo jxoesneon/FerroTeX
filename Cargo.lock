@@ -3430,15 +3430,13 @@ dependencies = [
 [[package]]
 name = "tectonic"
 version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe58806e4ffc54487f40b91da4cbd46717807937e33e2fc830fcfef7e023ab39"
 dependencies = [
- "atty",
  "byte-unit",
  "cfg-if",
  "error-chain",
  "flate2",
  "fs2",
+ "is-terminal",
  "lazy_static",
  "libc",
  "md-5",
@@ -3471,8 +3469,6 @@ dependencies = [
 [[package]]
 name = "tectonic_bridge_core"
 version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eca0bde2f54cfb0d7df5ea184b24285db116de40a4a4746f213f85f8d707e3c8"
 dependencies = [
  "cc",
  "flate2",
@@ -3487,8 +3483,6 @@ dependencies = [
 [[package]]
 name = "tectonic_bridge_flate"
 version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "268c7fc2d0c1fb61bca8cb7f8e4ae15897b1699737d3af9142a274fa3339e243"
 dependencies = [
  "flate2",
  "libc",
@@ -3497,8 +3491,6 @@ dependencies = [
 [[package]]
 name = "tectonic_bridge_freetype2"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b89ed4e59bc7c3c5dc674940351eccdd022e0af292e72b2c50a87cb0833d6ee"
 dependencies = [
  "tectonic_dep_support",
 ]
@@ -3506,8 +3498,6 @@ dependencies = [
 [[package]]
 name = "tectonic_bridge_graphite2"
 version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ecd213f1cf97ecf247c01ec4df70a9146f1e6d38d00f7ca0dd230da031880b64"
 dependencies = [
  "tectonic_dep_support",
 ]
@@ -3515,8 +3505,6 @@ dependencies = [
 [[package]]
 name = "tectonic_bridge_harfbuzz"
 version = "0.2.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f7fa5c5f14e7d9c66b888ae50956a4858e3f833c021e580c6360dba2271eb29e"
 dependencies = [
  "cc",
  "tectonic_bridge_graphite2",
@@ -3526,8 +3514,6 @@ dependencies = [
 [[package]]
 name = "tectonic_bridge_icu"
 version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d04e6ee480283f2407ae9d0e20a8971e1a695b9f1c4495c511215abfdc21b7e"
 dependencies = [
  "tectonic_dep_support",
 ]
@@ -3535,8 +3521,6 @@ dependencies = [
 [[package]]
 name = "tectonic_bundles"
 version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "50f94aba451d974b79e713cd6a8d89858005207cf20ffcf37ff5dd7309cef7e1"
 dependencies = [
  "flate2",
  "fs2",
@@ -3550,8 +3534,6 @@ dependencies = [
 [[package]]
 name = "tectonic_cfg_support"
 version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22e8c8bc40dced65bd1983e8505cefa66bfb1b7970f819513faa438daf2bed1e"
 dependencies = [
  "lazy_static",
 ]
@@ -3559,8 +3541,6 @@ dependencies = [
 [[package]]
 name = "tectonic_dep_support"
 version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b093fd9b702c1b4a9827aa01c82aa14c774e4a138ad0f61c56988acfaf629eb"
 dependencies = [
  "pkg-config",
  "vcpkg",
@@ -3569,8 +3549,6 @@ dependencies = [
 [[package]]
 name = "tectonic_engine_bibtex"
 version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c3d46ca1a1e1b58d4bdd0b121695842b323d91e89580f560376448868ad9918"
 dependencies = [
  "libc",
  "tectonic_bridge_core",
@@ -3581,8 +3559,6 @@ dependencies = [
 [[package]]
 name = "tectonic_engine_spx2html"
 version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b868724b8b43cb6b727f0f967030df6e5b92f581b5a605e9a0f56af02ceb6bea"
 dependencies = [
  "byteorder",
  "html-escape",
@@ -3602,8 +3578,6 @@ dependencies = [
 [[package]]
 name = "tectonic_engine_xdvipdfmx"
 version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07b710579aa69220a3e17a840740c6177af350404a1f74c249e8191836d514c1"
 dependencies = [
  "cc",
  "libc",
@@ -3631,8 +3605,6 @@ dependencies = [
 [[package]]
 name = "tectonic_errors"
 version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e73c09223e74a83262aa865c76d8bd661922e9ceddbee8bddd0536a3c0441f5"
 dependencies = [
  "anyhow",
 ]
@@ -3640,8 +3612,6 @@ dependencies = [
 [[package]]
 name = "tectonic_geturl"
 version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df67ef8ab55f33aa08198912fe82e4f98f996cd0df5f97a04eb0282b0e2039a7"
 dependencies = [
  "cfg-if",
  "tectonic_errors",
@@ -3651,8 +3621,6 @@ dependencies = [
 [[package]]
 name = "tectonic_io_base"
 version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db64c6f102805277d6bbfd93d6b41135a4d46bb30449f88e40de6461fb9e788f"
 dependencies = [
  "app_dirs2",
  "flate2",
@@ -3666,8 +3634,6 @@ dependencies = [
 [[package]]
 name = "tectonic_pdf_io"
 version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39c732c3bd33a8d1b919a26832d9329fdf5bbe58897b67e09cc07a1870907734"
 dependencies = [
  "cc",
  "tectonic_bridge_core",
@@ -3679,8 +3645,6 @@ dependencies = [
 [[package]]
 name = "tectonic_status_base"
 version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "93b30a2aae392b41a2967e024d6d3c02ba4c61c740018b4295e44d2e8b6e6087"
 dependencies = [
  "tectonic_errors",
 ]
@@ -3688,8 +3652,6 @@ dependencies = [
 [[package]]
 name = "tectonic_xdv"
 version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f59de0f6d991abffd6a88b089eb92adb698f6f05c22e3bca7e91766f89868935"
 dependencies = [
  "byteorder",
 ]
@@ -4949,9 +4911,9 @@ dependencies = [
 
 [[package]]
 name = "zmij"
-version = "1.0.9"
+version = "1.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ee2a72b10d087f75fb2e1c2c7343e308fe6970527c22a41caf8372e165ff5c1"
+checksum = "30e0d8dffbae3d840f64bda38e28391faef673a7b5a6017840f2a106c8145868"
 
 [[package]]
 name = "zstd"
@@ -4981,3 +4943,11 @@ dependencies = [
  "cc",
  "pkg-config",
 ]
+
+[[patch.unused]]
+name = "tectonic_engine_xetex"
+version = "0.4.4"
+
+[[patch.unused]]
+name = "tectonic_xetex_layout"
+version = "0.2.4"
