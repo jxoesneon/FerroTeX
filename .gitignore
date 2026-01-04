@@ -58,3 +58,4 @@ editors/vscode/bin/ferrotexd
 Dockerfile.ci-test
 test-ci-locally.sh
 .docker-ci-cache//.cargo/config.toml
+Dockerfile.local

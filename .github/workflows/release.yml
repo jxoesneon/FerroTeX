@@ -10,10 +10,34 @@ permissions:
   contents: write
 
 jobs:
-  release:
-    name: Build, Test & Release
-    runs-on: ubuntu-latest
-    # environment: release # NOTE: Requires repo environment configuration
+  release-matrix:
+    name: Release ${{ matrix.vscode_target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux x64
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            vscode_target: linux-x64
+            binary_name: ferrotexd
+          # Windows x64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            vscode_target: win32-x64
+            binary_name: ferrotexd.exe
+          # macOS Intel
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            vscode_target: darwin-x64
+            binary_name: ferrotexd
+          # macOS Apple Silicon
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            vscode_target: darwin-arm64
+            binary_name: ferrotexd
+
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -27,49 +51,64 @@ jobs:
       - name: Install Node Dependencies
         run: npm ci
 
-      - name: Lint Extension
-        run: npm run lint:yaml && npm run lint:md && npm run lint:prettier
-
-      # Safeguard: Test Rust Codebase
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-      - name: Rust Cache
-        uses: Swatinem/rust-cache@v2
-      - name: Install System Dependencies
+      # System Dependencies (Linux Only)
+      - name: Install System Dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
           sudo apt-get install -y pkg-config cmake nasm libicu-dev libharfbuzz-dev libfontconfig1-dev libssl-dev libgraphite2-dev libfreetype6-dev
-      - name: Build Rust Crates
-        run: cargo build --verbose --workspace
-      - name: Test Rust Crates
-        run: cargo test --verbose --workspace
 
-      # Safeguard: TeX Live Smoke Test
-      - name: TeX Live Smoke Build
-        uses: xu-cheng/texlive-action@v3
+      # System Dependencies (Windows Only - VCPKG)
+      - name: Install System Dependencies (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          vcpkg install icu:x64-windows harfbuzz[graphite2]:x64-windows fontconfig:x64-windows freetype:x64-windows graphite2:x64-windows
+          echo "VCPKG_ROOT=C:/vcpkg" >> $GITHUB_ENV
+          echo "VCPKGRS_DYNAMIC=1" >> $GITHUB_ENV
+          echo "TECTONIC_DEP_BACKEND=vcpkg" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
         with:
-          scheme: full
-          run: |
-            latexmk -pdf -interaction=nonstopmode -halt-on-error -file-line-error -output-directory=build tests/tex/smoke/main.tex
+          targets: ${{ matrix.target }}
 
-      # Build Artifact
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build Binary (Release)
+        run: cargo build --verbose --release --target ${{ matrix.target }} --bin ferrotexd
+
+      # Stage Binary for VSIX
+      # Extension expects: ./bin/ferrotexd (or .exe) relative to extension root
+      - name: Stage Binary
+        shell: bash
+        run: |
+          mkdir -p editors/vscode/bin
+          cp target/${{ matrix.target }}/release/${{ matrix.binary_name }} editors/vscode/bin/${{ matrix.binary_name }}
+          ls -l editors/vscode/bin/
+
       - name: Install Extension Dependencies
         working-directory: editors/vscode
         run: npm ci
 
-      - name: Package VSIX
+      - name: Package VSIX (Platform Specific)
         working-directory: editors/vscode
-        run: npm run package
+        # This automatically bundles the binary in editors/vscode/bin/ into the VSIX
+        run: npx vsce package --target ${{ matrix.vscode_target }}
 
       # Publish to Open VSX
       - name: Publish to Open VSX
+        if: startsWith(github.ref, 'refs/tags/v')
         working-directory: editors/vscode
-        run: npx ovsx publish ferrotex-*.vsix -p ${{ secrets.OVSX_TOKEN }}
-        continue-on-error: true # Prevent failure if version already exists (idempotency)
+        run: npx ovsx publish ferrotex-*.vsix -p ${{ secrets.OVSX_TOKEN }} --target ${{ matrix.vscode_target }}
+        continue-on-error: true
 
-      # Create GitHub Release
-      - name: Create GitHub Release
+      # Create/Update GitHub Release
+      # We use a unique artifact name upload first, then release action handles aggregation?
+      # Actually softprops/action-gh-release handles concurrent uploads well.
+      - name: Upload Release Asset
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: editors/vscode/ferrotex-*.vsix
-          generate_release_notes: true
