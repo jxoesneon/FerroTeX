@@ -19,7 +19,7 @@ default = []
 tectonic-engine = ["tectonic", "tectonic_status_base", "tectonic_io_base"]
 
 [dependencies.tectonic]
-version = "0.15"
+version = "0.16"
 default-features = false
 optional = true
 

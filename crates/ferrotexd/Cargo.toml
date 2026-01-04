@@ -36,7 +36,7 @@ ferrotex-package = { path = "../ferrotex-package", version = "0.21.0" }
 ferrotex-math-semantics = { path = "../ferrotex-math-semantics", version = "0.21.0" }
 ferrotex-core = { path = "../ferrotex-core", version = "0.21.0" }
 
-tectonic = { version = "0.15", default-features = false, optional = true }
+tectonic = { version = "0.16", default-features = false, optional = true }
 
 [features]
 default = []

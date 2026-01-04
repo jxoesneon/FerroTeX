@@ -82,7 +82,10 @@ Requires **Rust 1.70+**.
 
 ```bash
 # Clone and build specialized binaries
+# Clone and build specialized binaries
 git clone https://github.com/jxoesneon/FerroTeX
+cd FerroTeX
+./scripts/setup_upstream.sh # Initialize local secure vendor
 cargo build --release
 
 # Run CLI parse on a log file

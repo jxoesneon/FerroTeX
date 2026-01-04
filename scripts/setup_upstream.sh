@@ -7,7 +7,7 @@ cd "$(dirname "$0")/.."
 UPSTREAM_DIR="upstream"
 TECTORIC_DIR="$UPSTREAM_DIR/tectonic"
 REPO_URL="https://github.com/tectonic-typesetting/tectonic.git"
-BRANCH="local/ferrotex-vendor"
+BRANCH="local/ferrotex-vendor-v2"
 
 # Create upstream directory if it doesn't exist
 if [ ! -d "$UPSTREAM_DIR" ]; then
