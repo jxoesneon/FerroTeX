@@ -96,6 +96,11 @@ jobs:
       - name: Build
         run: cargo build --verbose
 
+      - name: Verify Binary Execution
+        run: |
+          ./target/debug/ferrotexd --version
+          echo "Binary verified."
+
       - name: Test (Nextest)
         run: cargo nextest run --verbose --workspace
 
