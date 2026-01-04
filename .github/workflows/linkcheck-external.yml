@@ -1,8 +1,10 @@
 name: Link Check (External)
 
 "on":
-  schedule:
-    - cron: "0 6 * * *"
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
   workflow_dispatch:
 
 permissions:
