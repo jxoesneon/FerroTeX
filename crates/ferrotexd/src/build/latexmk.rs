@@ -133,8 +133,20 @@ impl LatexmkAdapter {
         file_path: &std::path::Path,
         out_dir: &std::path::Path,
     ) -> Command {
-        // PATH Augmentation for macOS (MacTeX)
+        // Handle .bat/.cmd files on Windows (needed for tests)
+        #[cfg(windows)]
+        let mut cmd = if self.binary.ends_with(".bat") || self.binary.ends_with(".cmd") {
+            let mut c = Command::new("cmd");
+            c.arg("/C").arg(&self.binary);
+            c
+        } else {
+            Command::new(&self.binary)
+        };
+
+        #[cfg(not(windows))]
         let mut cmd = Command::new(&self.binary);
+
+        // PATH Augmentation for macOS (MacTeX)
 
         #[cfg(target_os = "macos")]
         {

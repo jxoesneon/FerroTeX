@@ -1501,8 +1501,16 @@ mod tests {
     #[test]
     fn test_get_packages_inheritance() {
         let workspace = Workspace::new();
-        let root_uri = Url::parse("file:///root.tex").unwrap();
-        let sub_uri = Url::parse("file:///sub.tex").unwrap();
+        #[cfg(not(windows))]
+        let (root_uri, sub_uri) = (
+            Url::parse("file:///root.tex").unwrap(),
+            Url::parse("file:///sub.tex").unwrap()
+        );
+        #[cfg(windows)]
+        let (root_uri, sub_uri) = (
+            Url::parse("file:///C:/root.tex").unwrap(),
+            Url::parse("file:///C:/sub.tex").unwrap()
+        );
 
         workspace.update(&root_uri, r"\usepackage{rootpkg}");
         workspace.update(
@@ -1519,8 +1527,16 @@ mod tests {
     #[test]
     fn test_citation_details() {
         let workspace = Workspace::new();
-        let uri = Url::parse("file:///doc.tex").unwrap();
-        let bib_uri = Url::parse("file:///refs.bib").unwrap();
+        #[cfg(not(windows))]
+        let (uri, bib_uri) = (
+            Url::parse("file:///doc.tex").unwrap(),
+            Url::parse("file:///refs.bib").unwrap()
+        );
+        #[cfg(windows)]
+        let (uri, bib_uri) = (
+            Url::parse("file:///C:/doc.tex").unwrap(),
+            Url::parse("file:///C:/refs.bib").unwrap()
+        );
 
         workspace.update_bib(
             &bib_uri,
@@ -1554,9 +1570,18 @@ mod tests {
     #[test]
     fn test_workspace_diamond_dependency() {
         let workspace = Workspace::new();
-        let uri_a = Url::parse("file:///a.tex").unwrap();
-        let uri_b = Url::parse("file:///b.tex").unwrap();
-        let uri_c = Url::parse("file:///c.tex").unwrap();
+        #[cfg(not(windows))]
+        let (uri_a, uri_b, uri_c) = (
+            Url::parse("file:///a.tex").unwrap(),
+            Url::parse("file:///b.tex").unwrap(),
+            Url::parse("file:///c.tex").unwrap()
+        );
+        #[cfg(windows)]
+        let (uri_a, uri_b, uri_c) = (
+            Url::parse("file:///C:/a.tex").unwrap(),
+            Url::parse("file:///C:/b.tex").unwrap(),
+            Url::parse("file:///C:/c.tex").unwrap()
+        );
 
         workspace.update(&uri_a, r"\include{b.tex} \include{c.tex}");
         workspace.update(&uri_b, r"\include{c.tex}");
@@ -1569,7 +1594,11 @@ mod tests {
     #[test]
     fn test_validate_empty_bibliography() {
         let workspace = Workspace::new();
+        #[cfg(not(windows))]
         let uri = Url::parse("file:///main.tex").unwrap();
+        #[cfg(windows)]
+        let uri = Url::parse("file:///C:/main.tex").unwrap();
+
         workspace.update(&uri, r"\bibliography{ }");
         let diags = workspace.validate_bibliographies();
         // scan_file parses "\bibliography{ }" -> bibs entry with path "".
@@ -1582,7 +1611,10 @@ mod tests {
     #[test]
     fn test_validate_citations_missing_bib() {
         let workspace = Workspace::new();
+        #[cfg(not(windows))]
         let uri = Url::parse("file:///doc.tex").unwrap();
+        #[cfg(windows)]
+        let uri = Url::parse("file:///C:/doc.tex").unwrap();
 
         // We reference a bib that doesn't exist, and use a citation
         workspace.update(&uri, r"\bibliography{missing} \cite{something}");
@@ -1595,7 +1627,11 @@ mod tests {
     #[test]
     fn test_workspace_remove_file() {
         let workspace = Workspace::new();
+        #[cfg(not(windows))]
         let uri = Url::parse("file:///temp.tex").unwrap();
+        #[cfg(windows)]
+        let uri = Url::parse("file:///C:/temp.tex").unwrap();
+
         workspace.update(&uri, r"\label{lost}");
 
         assert!(workspace.indices.contains_key(&uri));
