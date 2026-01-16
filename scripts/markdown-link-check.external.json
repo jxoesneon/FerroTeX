@@ -8,6 +8,12 @@
     },
     {
       "pattern": "^https://127\\.0\\.0\\.1"
+    },
+    {
+      "pattern": "^https://ko-fi\\.com/jxoesneon"
+    },
+    {
+      "pattern": "^https://crates\\.io/crates/jxoesneon-tectonic"
     }
   ],
   "timeout": "20s",

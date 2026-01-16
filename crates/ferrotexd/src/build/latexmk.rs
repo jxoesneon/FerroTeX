@@ -8,7 +8,30 @@ use tokio::process::Command;
 /// Implementation of `BuildEngine` using the `latexmk` command-line tool.
 ///
 /// Handles spawning `latexmk` with appropriate flags for PDF generation and interaction modes.
-pub struct LatexmkAdapter;
+#[derive(Debug)]
+pub struct LatexmkAdapter {
+    binary: String,
+}
+
+impl LatexmkAdapter {
+    pub fn new() -> Self {
+        Self {
+            binary: "latexmk".to_string(),
+        }
+    }
+
+    pub fn with_binary(binary: &str) -> Self {
+        Self {
+            binary: binary.to_string(),
+        }
+    }
+}
+
+impl Default for LatexmkAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[async_trait]
 impl BuildEngine for LatexmkAdapter {
@@ -37,32 +60,14 @@ impl BuildEngine for LatexmkAdapter {
         tokio::fs::create_dir_all(&out_dir).await?;
 
         // latexmk -pdf -interaction=nonstopmode -halt-on-error -file-line-error -outdir=<dist> <file>
-        // PATH Augmentation for macOS (MacTeX)
-        let mut cmd = Command::new("latexmk");
-
-        #[cfg(target_os = "macos")]
-        {
-            let current_path = std::env::var("PATH").unwrap_or_default();
-            // Common MacTeX path
-            let mactex_path = "/Library/TeX/texbin";
-            if std::path::Path::new(mactex_path).exists() && !current_path.contains(mactex_path) {
-                let new_path = format!("{}:{}", current_path, mactex_path);
-                cmd.env("PATH", new_path);
-            }
-        }
+        let mut cmd = self.create_command(&file_path, &out_dir);
 
         let mut child = cmd
-            .arg("-pdf")
-            .arg("-interaction=nonstopmode")
-            .arg("-halt-on-error")
-            .arg("-file-line-error")
-            .arg(format!("-outdir={}", out_dir.to_string_lossy()))
-            .arg(&file_path)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .current_dir(parent_dir) // Run in file's directory
             .spawn()
-            .context("Failed to spawn latexmk. Ensure it is installed and in your PATH (e.g. /Library/TeX/texbin).")?;
+            .context(format!("Failed to spawn {}. Ensure it is installed and in your PATH (e.g. /Library/TeX/texbin).", self.binary))?;
 
         let stdout = child.stdout.take().context("Failed to open stdout")?;
         let stderr = child.stderr.take().context("Failed to open stderr")?;
@@ -119,5 +124,268 @@ impl BuildEngine for LatexmkAdapter {
                 Ok(BuildStatus::Failure(BuildLog { stdout, stderr }))
             }
         }
+    }
+}
+
+impl LatexmkAdapter {
+    pub fn create_command(
+        &self,
+        file_path: &std::path::Path,
+        out_dir: &std::path::Path,
+    ) -> Command {
+        // Handle .bat/.cmd files on Windows (needed for tests)
+        #[cfg(windows)]
+        let mut cmd = if self.binary.ends_with(".bat") || self.binary.ends_with(".cmd") {
+            let mut c = Command::new("cmd");
+            c.arg("/C").arg(&self.binary);
+            c
+        } else {
+            Command::new(&self.binary)
+        };
+
+        #[cfg(not(windows))]
+        let mut cmd = Command::new(&self.binary);
+
+        // PATH Augmentation for macOS (MacTeX)
+
+        #[cfg(target_os = "macos")]
+        {
+            let current_path = std::env::var("PATH").unwrap_or_default();
+            // Common MacTeX path
+            let mactex_path = "/Library/TeX/texbin";
+            if std::path::Path::new(mactex_path).exists() && !current_path.contains(mactex_path) {
+                let new_path = format!("{}:{}", current_path, mactex_path);
+                cmd.env("PATH", new_path);
+            }
+        }
+
+        cmd.arg("-pdf")
+            .arg("-interaction=nonstopmode")
+            .arg("-halt-on-error")
+            .arg("-file-line-error")
+            .arg(format!("-outdir={}", out_dir.to_string_lossy()))
+            .arg(file_path);
+
+        cmd
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn test_latexmk_command_creation() {
+        let adapter = LatexmkAdapter::new();
+        let file = Path::new("main.tex");
+        let out = Path::new("build");
+        let cmd = adapter.create_command(file, out);
+        let debug_str = format!("{:?}", cmd);
+        assert!(debug_str.contains("latexmk"));
+        assert!(debug_str.contains("-pdf"));
+        assert!(debug_str.contains("main.tex"));
+        assert!(debug_str.contains("-outdir=build"));
+    }
+
+    #[tokio::test]
+    async fn test_build_failure() {
+        let adapter = LatexmkAdapter::with_binary("nonexistent_latexmk");
+        let temp_dir = tempfile::tempdir().unwrap();
+        let tex_path = temp_dir.path().join("test.tex");
+        // Create file so path existence checks pass if any (none currently in build() before spawn)
+        tokio::fs::File::create(&tex_path).await.unwrap();
+
+        let uri = url::Url::from_file_path(&tex_path).unwrap();
+        let request = BuildRequest {
+            document_uri: uri,
+            workspace_root: None,
+        };
+
+        // Expect failure because latexmk is not in path
+        let result = adapter.build(&request, None).await;
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("Failed to spawn nonexistent_latexmk"));
+    }
+
+    #[tokio::test]
+    async fn test_build_success() {
+        #[cfg(unix)]
+        use std::os::unix::fs::PermissionsExt;
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        
+        #[cfg(unix)]
+        let script_name = "mock_latexmk.sh";
+        #[cfg(windows)]
+        let script_name = "mock_latexmk.bat";
+
+        let script_path = temp_dir.path().join(script_name);
+        let tex_path = temp_dir.path().join("main.tex");
+        let build_dir = temp_dir.path().join("build");
+
+        // Create dummy tex file
+        tokio::fs::write(&tex_path, "\\documentclass{article}")
+            .await
+            .unwrap();
+
+        // Create mock latexmk script
+        #[cfg(unix)]
+        let script_content = format!(
+            r#"#!/bin/sh
+# Mock latexmk
+mkdir -p "{}"
+touch "{}/main.pdf"
+echo "Mock latexmk build success"
+exit 0
+"#,
+            build_dir.to_string_lossy(),
+            build_dir.to_string_lossy()
+        );
+
+        #[cfg(windows)]
+        let script_content = format!(
+            r#"@echo off
+if not exist "{}" mkdir "{}"
+type nul > "{}\main.pdf"
+echo Mock latexmk build success
+exit 0
+"#,
+            build_dir.to_string_lossy(),
+            build_dir.to_string_lossy(),
+            build_dir.to_string_lossy()
+        );
+
+        tokio::fs::write(&script_path, script_content)
+            .await
+            .unwrap();
+
+        #[cfg(unix)]
+        {
+            let mut perms = tokio::fs::metadata(&script_path)
+                .await
+                .unwrap()
+                .permissions();
+            perms.set_mode(0o755);
+            tokio::fs::set_permissions(&script_path, perms)
+                .await
+                .unwrap();
+        }
+
+        let adapter = LatexmkAdapter::with_binary(script_path.to_str().unwrap());
+
+        let uri = url::Url::from_file_path(&tex_path).unwrap();
+        let request = BuildRequest {
+            document_uri: uri,
+            workspace_root: None,
+        };
+
+        let result = adapter.build(&request, None).await;
+        assert!(result.is_ok());
+        if let BuildStatus::Success(path) = result.unwrap() {
+            assert_eq!(path, build_dir.join("main.pdf"));
+            assert!(path.exists());
+        } else {
+            panic!("Expected BuildStatus::Success");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_build_success_with_logs() {
+        #[cfg(unix)]
+        use std::os::unix::fs::PermissionsExt;
+        use std::sync::{Arc, Mutex};
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        
+        #[cfg(unix)]
+        let script_name = "mock_latexmk_logs.sh";
+        #[cfg(windows)]
+        let script_name = "mock_latexmk_logs.bat";
+
+        let script_path = temp_dir.path().join(script_name);
+        let tex_path = temp_dir.path().join("main.tex");
+        let build_dir = temp_dir.path().join("build");
+
+        tokio::fs::write(&tex_path, "\\documentclass{article}")
+            .await
+            .unwrap();
+
+        // Mock script that outputs to stdout and stderr
+        #[cfg(unix)]
+        let script_content = format!(
+            r#"#!/bin/sh
+mkdir -p "{}"
+touch "{}/main.pdf"
+echo "Log stdout line 1"
+echo "Log stderr line 1" >&2
+echo "Log stdout line 2"
+exit 0
+"#,
+            build_dir.to_string_lossy(),
+            build_dir.to_string_lossy()
+        );
+
+        #[cfg(windows)]
+        let script_content = format!(
+            r#"@echo off
+if not exist "{}" mkdir "{}"
+type nul > "{}\main.pdf"
+echo Log stdout line 1
+echo Log stderr line 1 1>&2
+echo Log stdout line 2
+exit 0
+"#,
+            build_dir.to_string_lossy(),
+            build_dir.to_string_lossy(),
+            build_dir.to_string_lossy()
+        );
+
+        tokio::fs::write(&script_path, script_content)
+            .await
+            .unwrap();
+
+        #[cfg(unix)]
+        {
+            let mut perms = tokio::fs::metadata(&script_path)
+                .await
+                .unwrap()
+                .permissions();
+            perms.set_mode(0o755);
+            tokio::fs::set_permissions(&script_path, perms)
+                .await
+                .unwrap();
+        }
+
+        let adapter = LatexmkAdapter::with_binary(script_path.to_str().unwrap());
+
+        let uri = url::Url::from_file_path(&tex_path).unwrap();
+        let request = BuildRequest {
+            document_uri: uri,
+            workspace_root: None,
+        };
+
+        let logs = Arc::new(Mutex::new(Vec::new()));
+        let logs_clone = logs.clone();
+        let callback = Box::new(move |msg: String| {
+            logs_clone.lock().unwrap().push(msg);
+        });
+
+        let result = adapter.build(&request, Some(callback)).await;
+        assert!(result.is_ok());
+
+        let captured_logs = logs.lock().unwrap();
+        assert!(captured_logs
+            .iter()
+            .any(|l| l.contains("[stdout] Log stdout line 1")));
+        assert!(captured_logs
+            .iter()
+            .any(|l| l.contains("[stderr] Log stderr line 1")));
+        assert!(captured_logs
+            .iter()
+            .any(|l| l.contains("[stdout] Log stdout line 2")));
     }
 }

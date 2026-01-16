@@ -4,7 +4,7 @@
 //! It initializes the `Backend` and starts the LSP server using `tower-lsp`.
 
 use dashmap::DashMap;
-use ferrotexd::{workspace::Workspace, Backend};
+use ferrotexd::{build::latexmk::LatexmkAdapter, workspace::Workspace, Backend};
 use std::sync::{Arc, Mutex};
 use tower_lsp::{LspService, Server};
 
@@ -29,6 +29,7 @@ async fn main() {
             ferrotex_core::package_manager::PackageManager::new(),
         )),
         package_index: Arc::new(Mutex::new(None)),
+        build_engine: Arc::new(LatexmkAdapter::new()),
     });
 
     Server::new(stdin, stdout, socket).serve(service).await;

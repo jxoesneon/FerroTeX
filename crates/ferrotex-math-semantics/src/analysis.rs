@@ -65,7 +65,9 @@ pub fn infer_shape(node: &SyntaxNode) -> Shape {
                                 let g_text = group.text().to_string();
                                 let count_str =
                                     g_text.trim_matches(|c| c == '{' || c == '}').trim();
-                                if let Ok(n) = count_str.parse::<usize>() && n > 1 {
+                                if let Ok(n) = count_str.parse::<usize>()
+                                    && n > 1
+                                {
                                     current_row_cols += n - 1;
                                 }
                                 it.next(); // Consume count group

@@ -221,4 +221,16 @@ mod tests {
         );
         assert!(transform.execute().is_ok());
     }
+
+    #[test]
+    fn test_compiler_builder_chaining() {
+        let out_dir = PathBuf::from("build");
+        let compiler = Compiler::new("tectonic", out_dir.clone())
+            .with_args(vec!["-X".to_string(), "compile".to_string()]);
+
+        assert_eq!(compiler.engine, "tectonic");
+        assert_eq!(compiler.output_dir, out_dir);
+        assert_eq!(compiler.extra_args.len(), 2);
+        assert_eq!(compiler.extra_args[0], "-X");
+    }
 }

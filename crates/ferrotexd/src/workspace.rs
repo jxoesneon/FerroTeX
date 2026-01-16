@@ -7,6 +7,7 @@
 //! all document-related metadata, enabling features like "Go to Definition",
 //! "Find References", and global workspace symbols.
 
+use crate::macros::{scan_macros, MacroDef};
 use dashmap::DashMap;
 use ferrotex_syntax::{parse, SyntaxKind, TextRange};
 use regex::Regex;
@@ -19,7 +20,7 @@ use tower_lsp::lsp_types::{SymbolKind, Url};
 #[derive(Debug, Default)]
 pub struct Workspace {
     /// Per-file index containing includes, definitions, citations, etc.
-    indices: DashMap<Url, FileIndex>,
+    pub indices: DashMap<Url, FileIndex>,
     /// Bibliography index containing parsed BibTeX entries.
     bib_indices: DashMap<Url, ferrotex_syntax::bibtex::BibFile>,
     /// Explicit root overrides from `%!TEX root` comments.
@@ -48,6 +49,8 @@ pub struct FileIndex {
     pub environments: Vec<EnvDef>,
     /// List of deprecated command usages.
     pub deprecated_usages: Vec<(TextRange, String)>,
+    /// List of user-defined macros.
+    pub macros: Vec<MacroDef>,
 }
 
 /// Represents an environment definition.
@@ -143,6 +146,7 @@ impl Workspace {
             magic_root,
             deprecated_usages,
             environments,
+            macros,
         ) = scan_file(text);
 
         if let Some(root_path) = magic_root {
@@ -163,6 +167,7 @@ impl Workspace {
                 packages,
                 environments,
                 deprecated_usages,
+                macros,
             },
         );
     }
@@ -430,6 +435,18 @@ impl Workspace {
                     ));
                 }
             }
+
+            // Macros
+            for mac in &index.macros {
+                if mac.name.to_lowercase().contains(&query) {
+                    results.push((
+                        mac.name.clone(),
+                        SymbolKind::FUNCTION,
+                        uri.clone(),
+                        mac.definition_range,
+                    ));
+                }
+            }
         }
 
         // 2. Search BibTeX files (Entries)
@@ -666,6 +683,7 @@ type ScanResult = (
     Option<String>,           // magic_root
     Vec<(TextRange, String)>, // deprecated_usages
     Vec<EnvDef>,              // environments
+    Vec<MacroDef>,            // macros
 );
 
 fn scan_file(text: &str) -> ScanResult {
@@ -694,30 +712,28 @@ fn scan_file(text: &str) -> ScanResult {
 
     let mut last_was_dollar = false;
     let mut last_dollar_range: Option<TextRange> = None;
-    let mut opening_display_math: Option<TextRange> = None; // Track opening $$
+    let mut opening_display_math: Option<TextRange> = None;
+    let mut last_cmd: Option<(String, TextRange)> = None; // Track pending command (name, range)
 
     for element in root.descendants_with_tokens() {
         match element.kind() {
             SyntaxKind::Dollar => {
+                last_cmd = None;
                 if last_was_dollar {
+                    // ... math logic ...
                     if let Some(prev_range) = last_dollar_range {
                         if prev_range.end() == element.text_range().start() {
-                            // Found consecutive $$
                             let combined_range =
                                 TextRange::new(prev_range.start(), element.text_range().end());
-
                             if let Some(opening_range) = opening_display_math {
-                                // This is the closing $$, mark the entire block
                                 let full_block_range =
                                     TextRange::new(opening_range.start(), combined_range.end());
                                 deprecated_usages
                                     .push((full_block_range, "displaymath".to_string()));
                                 opening_display_math = None;
                             } else {
-                                // This is an opening $$, remember it
                                 opening_display_math = Some(combined_range);
                             }
-
                             last_was_dollar = false;
                             last_dollar_range = None;
                             continue;
@@ -731,33 +747,35 @@ fn scan_file(text: &str) -> ScanResult {
                 last_was_dollar = false;
                 last_dollar_range = None;
 
+                if element.kind() != SyntaxKind::Whitespace
+                    && element.kind() != SyntaxKind::Command
+                    && element.kind() != SyntaxKind::Comment
+                    && element.as_node().is_none()
+                {
+                    last_cmd = None;
+                }
+
                 if element.kind() == SyntaxKind::Command {
                     let text = element.to_string();
                     let deprecated = ["\\bf", "\\it", "\\sc", "\\rm", "\\sf", "\\tt", "\\sl"];
-                    if deprecated.contains(&text.as_str()) {
-                        // Check if this command is inside a group (e.g., {\bf ...})
-                        // by looking at parent context
+                    if deprecated.contains(&text.trim()) {
+                        // trim needed?
+                        // ... deprecated logic ...
                         let mut in_group = false;
                         let mut group_range = element.text_range();
-
                         if let Some(token) = element.as_token() {
                             if let Some(parent) = token.parent() {
-                                // Check if parent is a Group node
                                 if parent.kind() == SyntaxKind::Group {
                                     in_group = true;
                                     group_range = parent.text_range();
                                 }
                             }
                         }
-
-                        // Store command with context info
-                        // Format: "cmd:in_group" or just "cmd" for standalone
                         let context_marker = if in_group {
                             format!("{}:group", text)
                         } else {
                             text.clone()
                         };
-
                         deprecated_usages.push((
                             if in_group {
                                 group_range
@@ -767,52 +785,134 @@ fn scan_file(text: &str) -> ScanResult {
                             context_marker,
                         ));
                     }
+
+                    let cmd_name = if let Some(idx) = text.find(['{', '[', ' ']) {
+                        &text[..idx]
+                    } else {
+                        text.trim()
+                    };
+
+                    let interesting_cmds = [
+                        "\\section",
+                        "\\subsection",
+                        "\\subsubsection",
+                        "\\chapter",
+                        "\\paragraph",
+                        "\\subparagraph",
+                        "\\label",
+                        "\\ref",
+                        "\\cite",
+                        "\\bibliography",
+                        "\\include",
+                        "\\input",
+                    ];
+
+                    if interesting_cmds.contains(&cmd_name) {
+                        // 1. Try immediate extraction from text (e.g. \cmd{arg} as one token)
+                        let mut captured_arg = None;
+                        if let Some(start) = text.find('{') {
+                            if let Some(end) = text.rfind('}') {
+                                if end > start {
+                                    captured_arg = Some(text[start + 1..end].to_string());
+                                }
+                            }
+                        }
+
+                        // 2. Try nested structure (children)
+                        if captured_arg.is_none() {
+                            if let Some(node) = element.as_node() {
+                                if let Some((name, _)) = extract_label_data(node) {
+                                    captured_arg = Some(name);
+                                }
+                            }
+                        }
+
+                        if let Some(arg) = captured_arg {
+                            // Process immediately
+                            let range = element.text_range();
+                            match cmd_name {
+                                "\\label" => defs.push(LabelDef { name: arg, range }),
+                                "\\ref" => refs.push(LabelRef { name: arg, range }),
+                                "\\bibliography" => {
+                                    for path in arg.split(',') {
+                                        bibs.push(BibRef {
+                                            path: path.trim().to_string(),
+                                            range,
+                                        });
+                                    }
+                                }
+                                "\\include" | "\\input" => {
+                                    includes.push(IncludeRef { path: arg, range })
+                                }
+                                "\\cite" => {
+                                    for key in arg.split(',') {
+                                        citations.push(CitationRef {
+                                            key: key.trim().to_string(),
+                                            range,
+                                        });
+                                    }
+                                }
+                                _ => sections.push(SectionDef { name: arg, range }), // Sections
+                            }
+                            last_cmd = None;
+                        } else {
+                            // Pending for next group
+                            last_cmd = Some((cmd_name.to_string(), element.text_range()));
+                        }
+                    } else {
+                        last_cmd = None;
+                    }
                 } else if let Some(node) = element.as_node() {
                     match node.kind() {
-                        SyntaxKind::Include => {
-                            if let Some((name, range)) = extract_label_data(node) {
-                                includes.push(IncludeRef { path: name, range });
-                            }
-                        }
-                        SyntaxKind::LabelDefinition => {
-                            if let Some((name, range)) = extract_label_data(node) {
-                                defs.push(LabelDef { name, range });
-                            }
-                        }
-                        SyntaxKind::LabelReference => {
-                            if let Some((name, range)) = extract_label_data(node) {
-                                refs.push(LabelRef { name, range });
-                            }
-                        }
-                        SyntaxKind::Citation => {
-                            if let Some((keys, range)) = extract_label_data(node) {
-                                for key in keys.split(',') {
-                                    let trimmed = key.trim();
-                                    if !trimmed.is_empty() {
-                                        citations.push(CitationRef {
-                                            key: trimmed.to_string(),
-                                            range,
-                                        });
-                                    }
-                                }
-                            }
-                        }
+                        // Redundant handlers removed.
                         SyntaxKind::Bibliography => {
-                            if let Some((paths, range)) = extract_label_data(node) {
-                                for path in paths.split(',') {
-                                    let trimmed = path.trim();
-                                    if !trimmed.is_empty() {
-                                        bibs.push(BibRef {
-                                            path: trimmed.to_string(),
-                                            range,
-                                        });
-                                    }
-                                }
-                            }
+                            // Handled by SyntaxKind::Command
+                            last_cmd = None;
                         }
-                        SyntaxKind::Section => {
-                            if let Some((name, range)) = extract_label_data(node) {
-                                sections.push(SectionDef { name, range });
+                        SyntaxKind::Group => {
+                            if let Some((cmd_name, cmd_range)) = last_cmd.take() {
+                                let text = node.text().to_string();
+                                let content = if text.starts_with('{') && text.ends_with('}') {
+                                    &text[1..text.len() - 1]
+                                } else {
+                                    &text
+                                };
+                                let arg = content.to_string();
+
+                                match cmd_name.as_str() {
+                                    "\\label" => defs.push(LabelDef {
+                                        name: arg,
+                                        range: cmd_range,
+                                    }),
+                                    "\\ref" => refs.push(LabelRef {
+                                        name: arg,
+                                        range: cmd_range,
+                                    }),
+                                    "\\bibliography" => {
+                                        for path in arg.split(',') {
+                                            bibs.push(BibRef {
+                                                path: path.trim().to_string(),
+                                                range: cmd_range,
+                                            });
+                                        }
+                                    }
+                                    "\\include" | "\\input" => includes.push(IncludeRef {
+                                        path: arg,
+                                        range: cmd_range,
+                                    }),
+                                    "\\cite" => {
+                                        for key in arg.split(',') {
+                                            citations.push(CitationRef {
+                                                key: key.trim().to_string(),
+                                                range: cmd_range,
+                                            });
+                                        }
+                                    }
+                                    _ => sections.push(SectionDef {
+                                        name: arg,
+                                        range: cmd_range,
+                                    }), // Sections
+                                }
                             }
                         }
                         SyntaxKind::Environment => {
@@ -822,6 +922,7 @@ fn scan_file(text: &str) -> ScanResult {
                                     range: node.text_range(),
                                 });
                             }
+                            last_cmd = None;
                         }
                         _ => {}
                     }
@@ -864,6 +965,8 @@ fn scan_file(text: &str) -> ScanResult {
         }
     }
 
+    let macros = scan_macros(&root);
+
     (
         includes,
         defs,
@@ -875,6 +978,7 @@ fn scan_file(text: &str) -> ScanResult {
         magic_root,
         deprecated_usages,
         environments,
+        macros,
     )
 }
 
@@ -883,7 +987,11 @@ pub fn extract_group_text(node: &ferrotex_syntax::SyntaxNode) -> Option<String> 
 }
 
 pub fn extract_label_data(node: &ferrotex_syntax::SyntaxNode) -> Option<(String, TextRange)> {
-    let group = node.children().find(|n| n.kind() == SyntaxKind::Group)?;
+    let group = if node.kind() == SyntaxKind::Group {
+        node.clone()
+    } else {
+        node.children().find(|n| n.kind() == SyntaxKind::Group)?
+    };
     let text = group.text().to_string();
     let range = group.text_range();
 
@@ -959,6 +1067,110 @@ mod tests {
             deprecated.iter().any(|d| d.1 == "displaymath"),
             "Should detect display math block"
         );
+    }
+
+    #[test]
+    fn test_scan_file_commands() {
+        let text = r#"
+        \section{Sec 1}
+        \subsection{Sub 1}
+        \subsubsection{SubSub 1}
+        \paragraph{Para 1}
+        \subparagraph{SubPara 1}
+        \chapter{Chap 1}
+        \label{lbl:1}
+        \ref{lbl:1}
+        \cite{ref:1}
+        \bibliography{bib1}
+        \include{inc1}
+        \input{inp1}
+        "#;
+        let res = scan_file(text);
+
+        // Sections
+        assert_eq!(res.5.len(), 6); // sec, subsec, subsub, para, subpara, chapter
+
+        // Defs
+        assert_eq!(res.1.len(), 1);
+        assert_eq!(res.1[0].name, "lbl:1");
+
+        // Refs
+        assert_eq!(res.2.len(), 1);
+        assert_eq!(res.2[0].name, "lbl:1");
+
+        // Citations
+        assert_eq!(res.3.len(), 1);
+        assert_eq!(res.3[0].key, "ref:1");
+
+        // Bibs
+        assert_eq!(res.4.len(), 1);
+        assert_eq!(res.4[0].path, "bib1");
+
+        // Includes
+        assert_eq!(res.0.len(), 2);
+        assert!(res.0.iter().any(|i| i.path == "inc1"));
+        assert!(res.0.iter().any(|i| i.path == "inp1"));
+    }
+
+    #[test]
+    fn test_scan_file_complex_packages() {
+        let text = r"\usepackage[opt=1]{pkg1, pkg2} \RequirePackage{pkg3}";
+        // Note: scan_file implementation regex only matches \usepackage currently?
+        // Let's check regex: r"\\usepackage(?:\[[^\]]*\])?\{([^}]+)\}"
+        // It does NOT match RequirePackage.
+
+        let res = scan_file(text);
+        assert!(res.6.contains(&"pkg1".to_string()));
+        assert!(res.6.contains(&"pkg2".to_string()));
+        assert!(!res.6.contains(&"pkg3".to_string()));
+    }
+
+    #[test]
+    fn test_extract_label_data_edge_cases() {
+        use ferrotex_syntax::parse;
+        let text = r"{} { } {label}";
+        let p = parse(text);
+        let root = p.syntax();
+        let children: Vec<_> = root.children().collect();
+
+        // {}
+        assert_eq!(extract_group_text(&children[0]), Some("".to_string()));
+
+        // { }
+        assert_eq!(extract_group_text(&children[1]), Some("".to_string()));
+
+        // {label}
+        assert_eq!(extract_group_text(&children[2]), Some("label".to_string()));
+    }
+
+    #[test]
+    fn test_resolve_bib_uri_edge_cases() {
+        let base = Url::parse("file:///root/main.tex").unwrap();
+
+        // Empty
+        assert!(resolve_bib_uri(&base, "").is_none());
+        assert!(resolve_bib_uri(&base, "   ").is_none());
+
+        // With extension
+        let res = resolve_bib_uri(&base, "ref.bib").unwrap();
+        assert_eq!(res.to_string(), "file:///root/ref.bib");
+
+        // Without extension
+        let res2 = resolve_bib_uri(&base, "ref").unwrap();
+        assert_eq!(res2.to_string(), "file:///root/ref.bib");
+
+        // Quotes
+        let res3 = resolve_bib_uri(&base, "\"ref\"").unwrap();
+        assert_eq!(res3.to_string(), "file:///root/ref.bib");
+    }
+
+    #[test]
+    fn test_scan_file_environments() {
+        let text = r"\begin{env1} \end{env1} \begin{env2} inner \end{env2}";
+        let res = scan_file(text);
+        assert_eq!(res.9.len(), 2);
+        assert!(res.9.iter().any(|e| e.name == "env1"));
+        assert!(res.9.iter().any(|e| e.name == "env2"));
     }
 
     #[test]
@@ -1039,5 +1251,539 @@ mod tests {
         let index = workspace.indices.get(&uri).unwrap();
         assert_eq!(index.sections.len(), 1);
         assert_eq!(index.sections[0].name, "Introduction");
+    }
+
+    #[test]
+    fn test_macro_definition_extraction() {
+        let workspace = Workspace::new();
+        let uri = Url::parse("file:///macros.tex").unwrap();
+        let text = r"
+            \newcommand{\simple}{Hello}
+            \newcommand{\withargs}[2]{Arg #1 and #2}
+            \newcommand{\optarg}[2][default]{Opt #1, Mand #2}
+        ";
+
+        workspace.update(&uri, text);
+        let index = workspace.indices.get(&uri).unwrap();
+
+        assert_eq!(index.macros.len(), 3);
+
+        let simple = index.macros.iter().find(|m| m.name == "\\simple").unwrap();
+        assert_eq!(simple.args, 0);
+        assert!(!simple.has_optional);
+
+        let withargs = index
+            .macros
+            .iter()
+            .find(|m| m.name == "\\withargs")
+            .unwrap();
+        assert_eq!(withargs.args, 2);
+        assert!(!withargs.has_optional);
+
+        let optarg = index.macros.iter().find(|m| m.name == "\\optarg").unwrap();
+        assert_eq!(optarg.args, 2);
+        assert!(optarg.has_optional);
+    }
+    #[test]
+    fn test_workspace_full_scan() {
+        let workspace = Workspace::new();
+        let uri = Url::parse("file:///full.tex").unwrap();
+        let text = r#"
+% !TEX root = master.tex
+
+\documentclass{article}
+\usepackage{amsmath, geometry}
+\usepackage[utf8]{inputenc}
+
+\newcommand{\mycmd}{My Command}
+
+\begin{document}
+    \section{Introduction}
+    \label{sec:intro}
+    This is a test document with \cite{ref1, ref2}.
+    See Section \ref{sec:intro}.
+
+    \input{chapter1.tex}
+
+    \begin{equation}
+        E = mc^2
+    \end{equation}
+
+    Some deprecated usage: {\bf bold text} and $$ x = y $$ display math.
+
+    \bibliography{refs}
+\end{document}
+        "#;
+
+        workspace.update(&uri, text);
+
+        // DEBUG: Print syntax tree
+        let parse = parse(text);
+        println!("Syntax Tree: {:#?}", parse.syntax());
+
+        let index = workspace.indices.get(&uri).expect("Index not created");
+        println!("Found Sections: {:?}", index.sections);
+
+        // Verify Magic Root
+        assert_eq!(
+            workspace.get_explicit_root(&uri),
+            Some("master.tex".to_string())
+        );
+
+        // Verify Packages
+        assert!(index.packages.contains(&"amsmath".to_string()));
+        assert!(index.packages.contains(&"geometry".to_string()));
+        assert!(index.packages.contains(&"inputenc".to_string()));
+
+        // Verify Sections
+        assert_eq!(index.sections.len(), 1);
+        assert_eq!(index.sections[0].name, "Introduction");
+
+        // Verify Labels & Refs
+        assert_eq!(index.definitions.len(), 1);
+        assert_eq!(index.definitions[0].name, "sec:intro");
+        assert_eq!(index.references.len(), 1);
+        assert_eq!(index.references[0].name, "sec:intro");
+
+        // Verify Citations
+        assert_eq!(index.citations.len(), 2);
+        assert!(index.citations.iter().any(|c| c.key == "ref1"));
+        assert!(index.citations.iter().any(|c| c.key == "ref2"));
+
+        // Verify Includes
+        assert_eq!(index.includes.len(), 1);
+        assert_eq!(index.includes[0].path, "chapter1.tex");
+
+        // Verify Bibliographies
+        assert_eq!(index.bibliographies.len(), 1);
+        assert_eq!(index.bibliographies[0].path, "refs");
+
+        // Verify Environments
+        let eqs = index
+            .environments
+            .iter()
+            .filter(|e| e.name == "equation")
+            .count();
+        assert_eq!(eqs, 1);
+        let docs = index
+            .environments
+            .iter()
+            .filter(|e| e.name == "document")
+            .count();
+        assert_eq!(docs, 1);
+
+        // Verify Macros
+        assert_eq!(index.macros.len(), 1);
+        assert_eq!(index.macros[0].name, "\\mycmd");
+
+        // Verify Deprecation
+        // {\bf ...} creates one, $$ ... $$ creates another
+        // Note: The parser might perform recovery or structure things differently
+        // But scan_file looks for SyntaxKind::Dollar sequences for $$
+        let bf_dep = index
+            .deprecated_usages
+            .iter()
+            .any(|(_, msg)| msg.contains("\\bf"));
+        assert!(bf_dep, "Should detect \\bf deprecated usage");
+
+        let math_dep = index
+            .deprecated_usages
+            .iter()
+            .any(|(_, msg)| msg == "displaymath");
+        assert!(math_dep, "Should detect display math $$ usage");
+    }
+
+    #[test]
+    fn test_workspace_lookup_apis() {
+        let workspace = Workspace::new();
+        let uri = Url::parse("file:///lookup.tex").unwrap();
+        let text = r#"
+\section{My Section}
+\label{sec:my}
+\ref{sec:my}
+\newcommand{\mycmd}{cmd}
+        "#;
+        workspace.update(&uri, text);
+
+        // Test find_definitions
+        let defs = workspace.find_definitions("sec:my");
+        assert_eq!(defs.len(), 1, "Should find definition");
+        assert_eq!(defs[0].0, uri);
+
+        // Test find_references
+        let refs = workspace.find_references("sec:my");
+        assert_eq!(refs.len(), 1, "Should find reference");
+        assert_eq!(refs[0].0, uri);
+
+        // Test query_symbols
+        // 1. Label
+        let symbols = workspace.query_symbols("sec:my");
+        assert!(
+            symbols
+                .iter()
+                .any(|(name, kind, _, _)| name == "sec:my" && *kind == SymbolKind::CONSTANT),
+            "Should find label symbol"
+        );
+
+        // 2. Section
+        let symbols = workspace.query_symbols("my section");
+        assert!(
+            symbols
+                .iter()
+                .any(|(name, kind, _, _)| name == "My Section" && *kind == SymbolKind::STRING),
+            "Should find section symbol"
+        );
+
+        // 3. Macro
+        let symbols = workspace.query_symbols("mycmd");
+        assert!(
+            symbols
+                .iter()
+                .any(|(name, kind, _, _)| name == "\\mycmd" && *kind == SymbolKind::FUNCTION),
+            "Should find macro symbol"
+        );
+    }
+
+    #[test]
+    fn test_validate_bibliographies() {
+        let workspace = Workspace::new();
+        let uri = Url::parse("file:///main.tex").unwrap();
+        // Invalid path
+        workspace.update(&uri, r"\bibliography{missing}");
+        let diags = workspace.validate_bibliographies();
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].2.contains("Missing bibliography"));
+
+        // Valid path but missing file
+        let bib_uri = Url::parse("file:///refs.bib").unwrap();
+        // If I update with bibliography that exists
+        workspace.update_bib(&bib_uri, "");
+        workspace.update(&uri, r"\bibliography{refs.bib}");
+        let diags2 = workspace.validate_bibliographies();
+        assert!(diags2.is_empty(), "Should resolve existing bib");
+    }
+
+    #[test]
+    fn test_validate_citations_and_labels() {
+        let workspace = Workspace::new();
+        let uri = Url::parse("file:///doc.tex").unwrap();
+
+        // 1. Undefined citation
+        workspace.update(&uri, r"\cite{undef}");
+        let diags = workspace.validate_citations();
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].2.contains("Undefined citation"));
+
+        // 2. Defined citation
+        let bib_uri = Url::parse("file:///refs.bib").unwrap();
+        workspace.update_bib(&bib_uri, "@article{defined, title={T}}");
+        // We need to link bib to doc
+        workspace.update(&uri, r"\bibliography{refs.bib} \cite{defined}");
+        let diags2 = workspace.validate_citations();
+        assert!(diags2.is_empty());
+
+        // 3. Duplicate labels
+        workspace.update(&uri, r"\label{dup} \label{dup}");
+        let label_diags = workspace.validate_labels();
+        assert!(!label_diags.is_empty());
+        assert!(label_diags[0].2.contains("Duplicate label definition")); // "Duplicate label definition"
+
+        // 4. Undefined reference
+        workspace.update(&uri, r"\ref{missing}");
+        let ref_diags = workspace.validate_labels();
+        // Should contain duplicate label error AND undefined reference
+        // workspace state has duplicated labels from prev step + undefined ref
+        assert!(ref_diags
+            .iter()
+            .any(|d| d.2.contains("Undefined reference")));
+    }
+
+    #[test]
+    fn test_get_packages_inheritance() {
+        let workspace = Workspace::new();
+        #[cfg(not(windows))]
+        let (root_uri, sub_uri) = (
+            Url::parse("file:///root.tex").unwrap(),
+            Url::parse("file:///sub.tex").unwrap()
+        );
+        #[cfg(windows)]
+        let (root_uri, sub_uri) = (
+            Url::parse("file:///C:/root.tex").unwrap(),
+            Url::parse("file:///C:/sub.tex").unwrap()
+        );
+
+        workspace.update(&root_uri, r"\usepackage{rootpkg}");
+        workspace.update(
+            &sub_uri,
+            r"%!TEX root = root.tex
+        \usepackage{subpkg}",
+        );
+
+        let pkgs = workspace.get_packages(&sub_uri);
+        assert!(pkgs.contains(&"rootpkg".to_string()));
+        assert!(pkgs.contains(&"subpkg".to_string()));
+    }
+
+    #[test]
+    fn test_citation_details() {
+        let workspace = Workspace::new();
+        #[cfg(not(windows))]
+        let (uri, bib_uri) = (
+            Url::parse("file:///doc.tex").unwrap(),
+            Url::parse("file:///refs.bib").unwrap()
+        );
+        #[cfg(windows)]
+        let (uri, bib_uri) = (
+            Url::parse("file:///C:/doc.tex").unwrap(),
+            Url::parse("file:///C:/refs.bib").unwrap()
+        );
+
+        workspace.update_bib(
+            &bib_uri,
+            "@article{key1, title={Test Title}, author={Author}, year={2023}}",
+        );
+        workspace.update(&uri, r"\bibliography{refs.bib}");
+
+        let details = workspace.get_citation_details("key1");
+        assert!(details.is_some());
+        let d = details.unwrap();
+        assert!(d.contains("Test Title"));
+        assert!(d.contains("Author"));
+        assert!(d.contains("2023"));
+
+        let none = workspace.get_citation_details("missing");
+        assert!(none.is_none());
+    }
+
+    #[test]
+    fn test_scan_file_commands_split_args() {
+        let text = r"\section {Split Title} \label {split:lbl}";
+        let res = scan_file(text);
+
+        assert_eq!(res.5.len(), 1);
+        assert_eq!(res.5[0].name, "Split Title");
+
+        assert_eq!(res.1.len(), 1);
+        assert_eq!(res.1[0].name, "split:lbl");
+    }
+
+    #[test]
+    fn test_workspace_diamond_dependency() {
+        let workspace = Workspace::new();
+        #[cfg(not(windows))]
+        let (uri_a, uri_b, uri_c) = (
+            Url::parse("file:///a.tex").unwrap(),
+            Url::parse("file:///b.tex").unwrap(),
+            Url::parse("file:///c.tex").unwrap()
+        );
+        #[cfg(windows)]
+        let (uri_a, uri_b, uri_c) = (
+            Url::parse("file:///C:/a.tex").unwrap(),
+            Url::parse("file:///C:/b.tex").unwrap(),
+            Url::parse("file:///C:/c.tex").unwrap()
+        );
+
+        workspace.update(&uri_a, r"\include{b.tex} \include{c.tex}");
+        workspace.update(&uri_b, r"\include{c.tex}");
+        workspace.update(&uri_c, "Content");
+
+        let cycles = workspace.detect_cycles();
+        assert!(cycles.is_empty(), "Diamond dependency is not a cycle");
+    }
+
+    #[test]
+    fn test_validate_empty_bibliography() {
+        let workspace = Workspace::new();
+        #[cfg(not(windows))]
+        let uri = Url::parse("file:///main.tex").unwrap();
+        #[cfg(windows)]
+        let uri = Url::parse("file:///C:/main.tex").unwrap();
+
+        workspace.update(&uri, r"\bibliography{ }");
+        let diags = workspace.validate_bibliographies();
+        // scan_file parses "\bibliography{ }" -> bibs entry with path "".
+        // resolve_bib_uri("") returns None.
+        // So we expect "Invalid bibliography path".
+        assert!(!diags.is_empty());
+        assert!(diags[0].2.contains("Invalid bibliography path"));
+    }
+
+    #[test]
+    fn test_validate_citations_missing_bib() {
+        let workspace = Workspace::new();
+        #[cfg(not(windows))]
+        let uri = Url::parse("file:///doc.tex").unwrap();
+        #[cfg(windows)]
+        let uri = Url::parse("file:///C:/doc.tex").unwrap();
+
+        // We reference a bib that doesn't exist, and use a citation
+        workspace.update(&uri, r"\bibliography{missing} \cite{something}");
+
+        let diags = workspace.validate_citations();
+        // Should be empty because we suppress citation errors if bib is missing
+        assert!(diags.is_empty());
+    }
+
+    #[test]
+    fn test_workspace_remove_file() {
+        let workspace = Workspace::new();
+        #[cfg(not(windows))]
+        let uri = Url::parse("file:///temp.tex").unwrap();
+        #[cfg(windows)]
+        let uri = Url::parse("file:///C:/temp.tex").unwrap();
+
+        workspace.update(&uri, r"\label{lost}");
+
+        assert!(workspace.indices.contains_key(&uri));
+        assert!(workspace.get_all_labels().contains(&"lost".to_string()));
+
+        workspace.remove(&uri);
+        assert!(!workspace.indices.contains_key(&uri));
+        assert!(!workspace.get_all_labels().contains(&"lost".to_string()));
+    }
+
+    #[test]
+    fn test_validate_deprecated_diagnostics() {
+        let workspace = Workspace::new();
+        let uri = Url::parse("file:///legacy.tex").unwrap();
+        let text = r"Old style {\bf bold}";
+        workspace.update(&uri, text);
+
+        let diags = workspace.validate_deprecated();
+        assert_eq!(diags.len(), 1);
+        assert_eq!(diags[0].0, uri);
+        assert!(diags[0].2.contains("deprecated"));
+    }
+
+    #[test]
+    fn test_scan_file_detached_args() {
+        // Try to force parser to produce detached command/group nodes
+        // Using comments usually breaks string scan logic
+        // if string scan blindly regexes? No, string scan uses find('{')
+        // \section % comment
+        // {Title}
+        let text = "\\section % comment\n{Title}";
+        let res = scan_file(text);
+
+        assert_eq!(res.5.len(), 1);
+        assert_eq!(res.5[0].name, "Title");
+    }
+
+    #[test]
+    fn test_obsolete_package_offset() {
+        // Test offset calculation when obsolete package is NOT at start
+        let text = r"\usepackage{ valid, times }";
+        let res = scan_file(text);
+
+        // Should detect times
+        let deprecated = res.8;
+        assert_eq!(deprecated.len(), 1);
+        assert!(deprecated[0].1.contains("package:times"));
+
+        // Verify range is correct (not 0)
+        let range = deprecated[0].0;
+        assert!(u32::from(range.start()) > 10);
+    }
+
+    #[test]
+    fn test_workspace_getters() {
+        let workspace = Workspace::new();
+        let uri = Url::parse("file:///main.tex").unwrap();
+
+        // 1. Includes
+        workspace.update(&uri, r"\include{chap1} \bibliography{refs}");
+        let incs = workspace.get_includes(&uri);
+        assert_eq!(incs.len(), 1);
+        assert_eq!(incs[0].path, "chap1");
+
+        // 2. Bibliographies
+        let bibs = workspace.get_bibliographies(&uri);
+        assert_eq!(bibs.len(), 1);
+        assert_eq!(bibs[0].path, "refs");
+
+        // 3. All Citations (with empty workspace first)
+        assert!(workspace.get_all_citation_keys().is_empty());
+
+        // 4. Add BibTeX
+        let bib_uri = Url::parse("file:///refs.bib").unwrap();
+        workspace.update_bib(&bib_uri, "@article{k1, t={T}}");
+        // Update main to ref bib
+        workspace.update(&uri, r"\bibliography{refs.bib}");
+
+        let keys = workspace.get_all_citation_keys();
+        assert_eq!(keys.len(), 1);
+        assert_eq!(keys[0], "k1");
+    }
+
+    #[test]
+    fn test_scan_file_edge_large_input() {
+        // Create large input > 1024 bytes to trigger truncation check in magic root scan
+        let mut text = String::with_capacity(2048);
+        for _ in 0..1100 {
+            text.push(' ');
+        }
+        text.push_str("% !TeX root = hidden.tex"); // This should be ignored as it's too far
+
+        let res = scan_file(&text);
+        assert_eq!(res.7, None, "Magic root should be ignored if not in header");
+
+        // But if at start, it works
+        let text2 = "% !TeX root = visible.tex\n".to_string() + &text;
+        let res2 = scan_file(&text2);
+        assert_eq!(res2.7, Some("visible.tex".to_string()));
+    }
+
+    #[test]
+    fn test_query_symbols_bibtex() {
+        let workspace = Workspace::new();
+        let uri = Url::parse("file:///refs.bib").unwrap();
+        workspace.update_bib(&uri, "@article{knuth, title={The Art}}");
+
+        let symbols = workspace.query_symbols("knuth");
+        assert_eq!(symbols.len(), 1);
+        assert_eq!(symbols[0].0, "knuth");
+        assert_eq!(symbols[0].1, SymbolKind::CLASS);
+    }
+
+    #[test]
+    fn test_workspace_citations_unreferenced() {
+        // Test get_all_citation_keys when there are NO referenced bibs
+        // This hits the "referenced_bibs.is_empty()" branch in get_all_citation_keys
+        let workspace = Workspace::new();
+        // Add a bib file but DO NOT reference it in any tex file
+        let bib_uri = Url::parse("file:///orphan.bib").unwrap();
+        workspace.update_bib(&bib_uri, "@article{orphan_key, title={Orphan}}");
+
+        // Should still find the key by scanning all known bibs
+        let keys = workspace.get_all_citation_keys();
+        assert_eq!(keys.len(), 1);
+        assert_eq!(keys[0], "orphan_key");
+
+        // Also test has_citation_key fallback
+        assert!(workspace.has_citation_key("orphan_key"));
+    }
+
+    #[test]
+    fn test_scan_file_malformed_braces() {
+        // Test scanner resilience with weird brace patterns
+        // 1. Closing brace without opening
+        let text1 = "some text } more text";
+        let res1 = scan_file(text1);
+        assert!(res1.0.is_empty());
+
+        // 2. Opening brace without command
+        let text2 = "{ pure group }";
+        let res2 = scan_file(text2);
+        assert!(res2.0.is_empty());
+
+        // 3. Command with detached malformed arg
+        // \cmd } {
+        let text3 = "\\cmd } {";
+        _ = scan_file(text3); // Should not panic
+
+        // 4. Broken package scan
+        let text4 = "\\usepackage{incomplete";
+        let res4 = scan_file(text4);
+        assert!(res4.6.is_empty());
     }
 }

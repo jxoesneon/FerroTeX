@@ -31,7 +31,7 @@ pub fn find_hover(
 
     // First check: are we directly on a command?
     if current.kind() == SyntaxKind::Command {
-        return handle_command_hover(&current.to_string());
+        return handle_command_hover(&current.to_string(), workspace);
     }
 
     // Check for citation (can be inside command groups)
@@ -60,7 +60,7 @@ pub fn find_hover(
     // Fallback for flat parser trees (where parent is Root):
     // Check if the token text looks like a command
     if token.text().starts_with("\\") {
-        return handle_command_hover(token.text());
+        return handle_command_hover(token.text(), workspace);
     }
 
     None
@@ -173,8 +173,8 @@ fn handle_citation_hover(
     }
 }
 
-/// Handles hover for common LaTeX commands
-fn handle_command_hover(text: &str) -> Option<Hover> {
+/// Handles hover for common LaTeX commands and user-defined macros
+fn handle_command_hover(text: &str, workspace: &crate::workspace::Workspace) -> Option<Hover> {
     // Extract command name only (stop at { or [ or space or non-command char)
     // Commands like \section* need to keep the *
     // Commands like \section{...} need to stop at {
@@ -188,7 +188,44 @@ fn handle_command_hover(text: &str) -> Option<Hover> {
     // Also trim newline if somehow present (though parser usually separates)
     let cmd = cmd.trim();
 
-    // Common document structure commands
+    // 1. Check user-defined macros first
+    // We need to iterate over all indexed files to find the macro definition.
+    // Ideally, Workspace should have a lookup method, but for now we iterate indices.
+    for entry in workspace.indices.iter() {
+        if let Some(macro_def) = entry.value().macros.iter().find(|m| m.name == cmd) {
+            let args_sig = if macro_def.args > 0 {
+                let mut s = String::new();
+                if macro_def.has_optional {
+                    s.push_str("[opt]");
+                    for i in 2..=macro_def.args {
+                        s.push_str(&format!("{{arg{}}}", i));
+                    }
+                } else {
+                    for i in 1..=macro_def.args {
+                        s.push_str(&format!("{{arg{}}}", i));
+                    }
+                }
+                s
+            } else {
+                String::new()
+            };
+
+            return Some(Hover {
+                contents: HoverContents::Markup(MarkupContent {
+                    kind: MarkupKind::Markdown,
+                    value: format!(
+                        "🔧 **User Macro**\n\n`{}{}`\n\nDefined in: `{}`",
+                        cmd,
+                        args_sig,
+                        entry.key()
+                    ),
+                }),
+                range: None,
+            });
+        }
+    }
+
+    // 2. Common document structure commands
     let (description, example) = match cmd {
         "\\section" | "\\section*" => (
             "📑 **Section heading**",
@@ -466,6 +503,280 @@ mod tests {
                 assert!(m.value.contains("Art"));
             }
             _ => panic!("Wrong hover content type"),
+        }
+    }
+
+    #[test]
+    fn test_hover_environments_extensive() {
+        let environments = vec![
+            ("equation", "Numbered/unnumbered display equation"),
+            ("equation*", "Numbered/unnumbered display equation"),
+            ("align", "Aligned multi-line equations"),
+            ("align*", "Aligned multi-line equations"),
+            ("gather", "Centered multi-line equations"),
+            ("gather*", "Centered multi-line equations"),
+            ("figure", "Floating figure environment"),
+            ("table", "Floating table environment"),
+            ("itemize", "Bulleted list"),
+            ("enumerate", "Numbered list"),
+            ("abstract", "Document abstract"),
+            ("mycustomenv", "Custom environment"),
+        ];
+
+        let workspace = crate::workspace::Workspace::default();
+
+        for (env, expected_desc) in environments {
+            let input = format!(r"\begin{{{}}} \end{{{}}}", env, env);
+            let p = parse(&input);
+            let offset = TextSize::from(input.find("\\begin").unwrap() as u32);
+
+            let hover = find_hover(&p.syntax(), offset, &workspace)
+                .unwrap_or_else(|| panic!("No hover found for environment: {}", env));
+
+            match hover.contents {
+                HoverContents::Markup(m) => {
+                    assert!(
+                        m.value.contains(expected_desc),
+                        "Desc '{}' not found for {}",
+                        expected_desc,
+                        env
+                    );
+                    if env == "mycustomenv" {
+                        assert!(m.value.contains("Custom environment"));
+                    }
+                }
+                _ => panic!("Wrong hover content type"),
+            }
+        }
+    }
+
+    #[test]
+    fn test_hover_commands_extensive() {
+        let commands = vec![
+            // Structure
+            ("\\section", "Section heading"),
+            ("\\section*", "Section heading"),
+            ("\\subsection", "Subsection heading"),
+            ("\\subsubsection", "Subsubsection heading"),
+            ("\\chapter", "Chapter heading"),
+            // Formatting
+            ("\\textbf", "Bold text"),
+            ("\\textit", "Italic text"),
+            ("\\texttt", "Typewriter text"),
+            ("\\emph", "Emphasized text"),
+            ("\\underline", "Underlined text"),
+            // Math
+            ("\\frac", "Fraction"),
+            ("\\sqrt", "Square root"),
+            ("\\sum", "Summation"),
+            ("\\int", "Integral"),
+            ("\\prod", "Product"),
+            ("\\lim", "Limit"),
+            // AMS / Symbols
+            ("\\text", "Text in math mode"),
+            ("\\mathbb", "Blackboard bold"),
+            ("\\boldsymbol", "Bold math symbol"),
+            // References
+            ("\\label", "Label"),
+            ("\\ref", "Reference"),
+            ("\\eqref", "Equation reference"),
+            ("\\cite", "Citation"),
+            ("\\cref", "Smart reference"),
+            // Graphics
+            ("\\includegraphics", "Include image"),
+            ("\\graphicspath", "Set graphics path"),
+            // Misc
+            ("\\usepackage", "Package import"),
+            ("\\documentclass", "Document class"),
+            ("\\unknowncmd", ""), // Should return None
+            // Add missing commands for coverage
+            ("\\textsf", "Sans-serif font"),
+            ("\\textrm", "Roman font"),
+            ("\\newpage", "Page break"),
+            ("\\clearpage", "Clear page"),
+            ("\\hspace", "Horizontal space"),
+            ("\\vspace", "Vertical space"),
+            ("\\setlist", "Configure lists"),
+            ("\\url", "URL"),
+            ("\\href", "Hyperlink"),
+            ("\\multirow", "Merge table rows"),
+            ("\\multicolumn", "Merge table columns"),
+            ("\\bottomrule", "Bottom table rule"),
+            ("\\midrule", "Middle table rule"),
+            ("\\toprule", "Top table rule"),
+            ("\\colorbox", "Colored box"),
+            ("\\textcolor", "Colored text"),
+            ("\\graphicspath", "Set graphics path"),
+            ("\\includegraphics", "Include image"),
+            ("\\cref", "Smart reference"),
+            ("\\eqref", "Equation reference"),
+            ("\\cite", "Citation"),
+            ("\\ref", "Reference"),
+            ("\\label", "Label"),
+            ("\\boldsymbol", "Bold math symbol"),
+            ("\\mathbb", "Blackboard bold"),
+            ("\\text", "Text in math mode"),
+            ("\\lim", "Limit"),
+            ("\\prod", "Product"),
+            ("\\int", "Integral"),
+            ("\\sum", "Summation"),
+            ("\\sqrt", "Square root"),
+            ("\\frac", "Fraction"),
+            ("\\underline", "Underlined text"),
+            ("\\emph", "Emphasized text"),
+            ("\\texttt", "Typewriter text"),
+            ("\\textit", "Italic text"),
+            ("\\textbf", "Bold text"),
+            ("\\chapter", "Chapter heading"),
+            ("\\subsubsection", "Subsubsection heading"),
+            ("\\subsection", "Subsection heading"),
+            ("\\section", "Section heading"),
+            ("\\enquote", "Quotation marks"),
+            // ("\\begin", "Environment start"), // Handled by environment hover
+            // ("\\end", "Environment end"),     // Handled by environment hover
+            ("\\SI", "Number with unit"),
+            ("\\si", "Unit only"),
+            ("\\num", "Formatted number"),
+            ("\\lstlisting", "Code listing"),
+            ("\\verb", "Inline verbatim"),
+            ("\\algorithm", "Algorithm environment"),
+            ("\\bibliography", "Bibliography file"),
+            ("\\bibliographystyle", "Bibliography style"),
+        ];
+
+        let workspace = crate::workspace::Workspace::default();
+
+        for (cmd, expected_desc) in commands {
+            // Need correct syntax for args?
+            // e.g. \frac{a}{b}. But parser is robust.
+            // Some commands like \sqrt might parse differently if no args?
+            // Command hover usually triggers on the command token itself, args optional.
+
+            let input = format!("{}{{content}}", cmd); // NO space to ensure correct parsing
+            let p = parse(&input);
+
+            // Find start of command (handle * properly)
+            // search for the base command part
+            let search_term = if cmd.starts_with('\\') {
+                &cmd[1..]
+            } else {
+                cmd
+            };
+            // If cmd has *, search term includes it? find() works.
+
+            let offset_pos = input.find(search_term).unwrap_or(0);
+            // Adjust for leading \ (find returns index of search_term which excludes \)
+            // input: "\section {content}". find("section") -> 1.
+            // offset should be 0 (start of token).
+            // Actually find_hover expects offset INSIDE the token.
+            // 0 matches \. 1 matches s. Both are inside Command token.
+
+            let offset = TextSize::from(offset_pos as u32);
+
+            let hover = find_hover(&p.syntax(), offset, &workspace);
+
+            if expected_desc.is_empty() {
+                assert!(hover.is_none(), "Expected no hover for {}", cmd);
+            } else {
+                let h = hover.expect(&format!("No hover found for command {}", cmd));
+                match h.contents {
+                    HoverContents::Markup(m) => {
+                        assert!(
+                            m.value.contains(expected_desc),
+                            "Desc '{}' not found for {} (got: {})",
+                            expected_desc,
+                            cmd,
+                            m.value
+                        );
+                    }
+                    _ => panic!("Wrong hover content type"),
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_hover_citation_missing() {
+        let workspace = crate::workspace::Workspace::default();
+        let input = r#"\cite{missingref}"#;
+        let p = parse(input);
+        let offset = TextSize::from(input.find("missingref").unwrap() as u32);
+
+        let hover = find_hover(&p.syntax(), offset, &workspace);
+
+        if let Some(h) = hover {
+            match h.contents {
+                HoverContents::Markup(m) => {
+                    assert!(m.value.contains("missingref"));
+                }
+                _ => {}
+            }
+        }
+    }
+
+    #[test]
+    fn test_hover_user_macro() {
+        use tower_lsp::lsp_types::Url;
+        let workspace = crate::workspace::Workspace::default();
+        let uri = Url::parse("file:///macros.tex").unwrap();
+        // Define a macro in the workspace
+        workspace.update(&uri, r"\newcommand{\mycmd}[2]{Arg #1, #2}");
+
+        // Now hover usage
+        let input = r"\mycmd{a}{b}";
+        let p = parse(input);
+        let offset = TextSize::from(input.find("mycmd").unwrap() as u32);
+
+        let hover = find_hover(&p.syntax(), offset, &workspace);
+        assert!(hover.is_some(), "Should find user macro hover");
+        match hover.unwrap().contents {
+            HoverContents::Markup(m) => {
+                assert!(m.value.contains("User Macro"));
+                assert!(m.value.contains("\\mycmd"));
+                assert!(m.value.contains("{arg1}{arg2}"));
+                assert!(m.value.contains("macros.tex"));
+            }
+            _ => panic!("Wrong hover content type"),
+        }
+    }
+
+    #[test]
+    fn test_hover_between_tokens() {
+        let input = r" \section{A}";
+        let p = parse(input);
+        let offset = TextSize::from(1); // Between space and \
+        let workspace = crate::workspace::Workspace::default();
+
+        let hover = find_hover(&p.syntax(), offset, &workspace);
+        assert!(hover.is_some());
+        match hover.unwrap().contents {
+            HoverContents::Markup(m) => assert!(m.value.contains("Section heading")),
+            _ => panic!("Wrong hover type"),
+        }
+    }
+
+    #[test]
+    fn test_hover_user_macro_optional() {
+        use tower_lsp::lsp_types::Url;
+        let workspace = crate::workspace::Workspace::default();
+        let uri = Url::parse("file:///macros.tex").unwrap();
+        // Define a macro with optional argument: \newcommand{\opt}[2][default]{...}
+        // This corresponds to args=2, has_optional=true
+        workspace.update(&uri, r"\newcommand{\myopt}[2][def]{Opt #1, #2}");
+
+        let input = r"\myopt[val]{res}";
+        let p = parse(input);
+        let offset = TextSize::from(input.find("myopt").unwrap() as u32);
+
+        let hover =
+            find_hover(&p.syntax(), offset, &workspace).expect("Should find optional macro");
+        match hover.contents {
+            HoverContents::Markup(m) => {
+                // Expected signature: \myopt[opt]{arg2}
+                assert!(m.value.contains(r"\myopt[opt]{arg2}"));
+                assert!(m.value.contains("macros.tex"));
+            }
+            _ => panic!("Wrong type"),
         }
     }
 }

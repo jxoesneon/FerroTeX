@@ -122,6 +122,24 @@ mod tests {
         // Just verify it returns something or None without crashing
         let _ = PackageIndex::cache_path();
     }
+
+    #[test]
+    fn test_package_index_read_error() {
+        let temp_dir = std::env::current_dir()
+            .unwrap()
+            .join("target")
+            .join("test_cache_error");
+        std::fs::create_dir_all(&temp_dir).unwrap();
+
+        // Create a directory where the file should be
+        let bad_path = temp_dir.join("bad.json");
+        std::fs::create_dir(&bad_path).unwrap();
+
+        // load_from_path should fail to read (it's a dir) and log warning, returning None
+        assert!(PackageIndex::load_from_path(&bad_path).is_none());
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
 }
 
 /// Metadata about a single LaTeX package.

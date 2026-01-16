@@ -2,6 +2,19 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
+/// A `Lockfile` captures the state of a workspace at a specific point in time.
+/// It maps file paths to their SHA-256 content fingerprints.
+///
+/// # Examples
+///
+/// ```no_run
+/// use ferrotex_build::Lockfile;
+/// use std::path::Path;
+///
+/// let mut lock = Lockfile::new();
+/// lock.entries.insert("main.tex".to_string(), "abc123hash".to_string());
+/// lock.save(Path::new("ferrotex.lock")).unwrap();
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Lockfile {
     pub version: String,
@@ -9,6 +22,7 @@ pub struct Lockfile {
 }
 
 impl Lockfile {
+    /// Creates a new, empty lockfile for the current version.
     pub fn new() -> Self {
         Self {
             version: "0.20.0".to_string(),
@@ -16,12 +30,20 @@ impl Lockfile {
         }
     }
 
+    /// Saves the lockfile to the specified path in JSON format.
+    ///
+    /// # Errors
+    /// Returns an error if the file cannot be written or serialization fails.
     pub fn save(&self, path: &std::path::Path) -> anyhow::Result<()> {
         let content = serde_json::to_string_pretty(self)?;
         std::fs::write(path, content)?;
         Ok(())
     }
 
+    /// Loads a lockfile from disk.
+    ///
+    /// # Errors
+    /// Returns an error if the file is missing, unreadable, or contains invalid JSON.
     pub fn load(path: &std::path::Path) -> anyhow::Result<Self> {
         let content = std::fs::read_to_string(path)?;
         let lock: Self = serde_json::from_str(&content)?;
@@ -41,6 +63,9 @@ pub struct ArtifactId(pub String);
 
 /// An Artifact is a concrete input or output of the build process.
 /// Examples: Source File, PDF, Log File, Object File.
+///
+/// # Required Implementation
+/// Every artifact must provide a unique `ArtifactId` and a content-based `fingerprint`.
 pub trait Artifact {
     /// Returns the unique ID of this artifact.
     fn id(&self) -> ArtifactId;
@@ -66,7 +91,9 @@ pub trait Transform {
     fn outputs(&self) -> HashSet<ArtifactId>;
 
     /// Executes the transform implementation.
-    /// Returns true if successful.
+    ///
+    /// # Errors
+    /// Returns `Err` with a descriptive message if the execution fails (e.g. compiler error).
     fn execute(&self) -> Result<(), String>;
 }
 

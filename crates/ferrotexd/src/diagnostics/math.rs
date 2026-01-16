@@ -184,4 +184,16 @@ mod tests {
         // Let's just ensure it scans.
         let _ = diags;
     }
+
+    #[test]
+    fn test_check_math_multicolumn() {
+        // Valid 2x3 matrix using \multicolumn
+        let input = r"\begin{pmatrix} A & \multicolumn{2}{c}{B} \\ C & D & E \end{pmatrix}";
+        let parsed = parse(input);
+        let root = SyntaxNode::new_root(parsed.green_node());
+        let line_index = LineIndex::new(input);
+
+        let diags = check_math(&root, &line_index);
+        assert!(diags.is_empty(), "Multicolumn matrix should be valid");
+    }
 }

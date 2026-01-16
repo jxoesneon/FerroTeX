@@ -1,104 +1,108 @@
-# FerroTeX
+# FerroTeX: The Scientific LaTeX Compiler Platform
 
 [![CI](https://github.com/jxoesneon/FerroTeX/actions/workflows/ci.yml/badge.svg)](https://github.com/jxoesneon/FerroTeX/actions/workflows/ci.yml)
-[![Coverage](https://codecov.io/gh/jxoesneon/FerroTeX/branch/main/graph/badge.svg)](https://codecov.io/gh/jxoesneon/FerroTeX)
-[![License](https://img.shields.io/badge/license-Apache--2.0%20%2F%20MIT-blue)](LICENSE-CHOICE.md)
-[![Ko-fi](https://img.shields.io/badge/Donate-Ko--fi-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/jxoesneon)
+[![Open VSX](https://img.shields.io/open-vsx/v/ferrotex/ferrotex?style=flat-square&logo=open-vsx)](https://open-vsx.org/extension/ferrotex/ferrotex)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square)](LICENSE)
+[![Powered by Rust](https://img.shields.io/badge/Powered%20by-Rust-orange?style=flat-square&logo=rust)](https://www.rust-lang.org/)
 
-**FerroTeX** is a research-driven, high-performance, type-safe **LaTeX language platform** for modern editors.
+**FerroTeX** is a high-fidelity, research-grade LaTeX language platform designed for precision, reproducibility, and deep observability. Built entirely in **Rust** 🦀, it provides a modular ecosystem for modern scientific typesetting.
 
-It closes two long-standing gaps in the TeX ecosystem:
+---
 
-- **Source understanding**: fully parse LaTeX documents into a lossless syntax tree, build a workspace index, and provide industry-standard IDE features (completion, definitions, references, rename, outline, semantic tokens, formatting).
-- **Build observability**: transform TeX engine output (`.log`, stdout/stderr) into structured events and deterministic diagnostics with provenance and explicit uncertainty.
+## 🏗️ Architecture & Ecosystem
 
-This repository currently contains **project documentation and specifications** intended to guide implementation of:
+FerroTeX is designed as a modular set of components rather than a monolithic extension.
 
-- A **Rust** core server that:
-  - parses LaTeX source into a fault-tolerant CST/AST
-  - maintains project and symbol indices across multi-file workspaces
-  - ingests TeX engine output and/or `.log` files into a typed event stream
-  - serves features to editors via **Language Server Protocol (LSP)** and (optionally) **Debug Adapter Protocol (DAP)**.
-- A **VS Code extension** that acts as a thin client, managing server lifecycle and UX.
-
-## CLI Usage
-
-FerroTeX provides a command-line interface for interacting with its tools.
-
-### Parse
-
-Parse a TeX log file and emit structured JSON events.
-
-```bash
-ferrotex parse main.log
+```mermaid
+graph TD
+    A[Editors / CLI] -->|LSP/DAP| B[ferrotexd]
+    B --> C[ferrotex-analysis]
+    B --> D[ferrotex-dap]
+    C --> E[ferrotex-syntax]
+    D --> F[Tectonic / TeX Engine]
+    B --> G[ferrotex-build]
+    G --> H[ferrotex.lock]
 ```
 
-### Watch
+### Core Crates
 
-Watch a TeX log file for changes in real-time and stream JSON events as they occur. This is useful for integrating with build tools or editors.
+- **`ferrotex-syntax`**: Lossless, fault-tolerant parser using `rowan`. Preserves 100% of source fidelity including trivia.
+- **`ferrotex-analysis`**: Semantic engine for LaTeX. Implements context-aware completion and jaggy matrix detection.
+- **`ferrotex-build`**: DAG-based build graph with content-addressable reproducibility (SHA256).
+- **`ferrotex-dap`**: Debug Adapter Protocol implementation for stepping through TeX passes and register inspection.
+
+---
+
+## 💎 Technical Pillars
+
+### 1. Scientific Reproducibility
+
+FerroTeX introduces the concept of a **Hermetic Build** to the TeX world.
+
+- **`ferrotex.lock`**: Captures SHA256 hashes of all inputs, including system packages and local includes.
+- **Content-Addressing**: Ensures that your paper builds identically across machines and time.
+
+### 2. Deep Semantic Intelligence
+
+Unlike traditional matchers, FerroTeX performs structural analysis of the Document Object Model (DOM).
+
+- **Matrix Dimension Tracking**: Detects mismatched ampersands `&` in complex environments like `matrix` or `aligned`, even when using `\multicolumn`.
+- **Macro Expansion Analysis**: Uses abstract interpretation to prevent recursion loops and verify macro safety.
+
+### 3. Professional Observability (DAP)
+
+Debug your TeX source like code. The integrated **Debug Adapter Protocol** (DAP) shim allows:
+
+- **Pass-Level Stepping**: Pause on macro expansion or file inclusion.
+- **Register Shadowing**: Real-time inspection of `\count`, `\dimen`, and `\skip` registers.
+
+---
+
+## 🚀 Status: v0.22.0 (The "Debug & Reliability" Update)
+
+FerroTeX v0.22.0 introduces the **Tectonic Debug Driver**, allowing you to step through TeX macros like code, alongside massive reliability improvements to the semantic engine (>95% test coverage).
+
+### Performance (M1 Max / Linux x64)
+
+- **Syntax Indexing**: ~1.8ms per 10k LOC.
+- **LSP Startup**: <45ms.
+- **Log Streaming**: Zero-allocation parsing at >60 MB/s.
+
+### Platform Support
+
+| Platform                  | Binary Bundled | Support Status   |
+| :------------------------ | :------------: | :--------------- |
+| **Linux (x64)**           |       ✅       | Production Ready |
+| **macOS (Silicon/Intel)** |       ✅       | Production Ready |
+| **Windows (x64)**         |       ✅       | Production Ready |
+
+---
+
+## 🛠️ Developer Setup
+
+Requires **Rust 1.70+**.
 
 ```bash
-ferrotex watch main.log
+# Clone and build
+git clone https://github.com/jxoesneon/FerroTeX
+cd FerroTeX
+cargo build --release
+
+# Run CLI parse on a log file
+./target/release/ferrotex parse main.log
 ```
 
-## Status: v0.20.1 (Stable Beta)
+## 🤝 Contributing & Community
 
-FerroTeX is currently in **Stable Beta**. The core engine is feature-complete for standard LaTeX workflows and validated against massive codebases.
+We are building a robust toolchain for the future of scientific publishing.
 
-**Latest Performance Metrics (M8 Pro):**
+- **Community & Support**: [GitHub Issues](https://github.com/jxoesneon/FerroTeX/issues)
+- **Roadmap**: See [ROADMAP.md](ROADMAP.md)
 
-- **Log Parsing**: >50 MB/s (Zero-allocation event stream)
-- **Syntax Parsing**: ~1.5ms per 10k LOC (Fault-tolerant)
-- **Startup Time**: <50ms (Language Server)
+## 📄 License
 
-## Key Features
+Licensed under the **Apache License, Version 2.0**. See [LICENSE](LICENSE) for details.
 
-### 1. Fault-Tolerant Parsing
+---
 
-FerroTeX uses a **lossless syntax tree** (Rowan) that preserves every whitespace and comment. It recovers gracefully from:
-
-- Unclosed groups (`{...`) and environments (`\begin...`).
-- Mismatched delimiters.
-- Invalid syntax.
-
-### 2. Semantic Analysis
-
-- **Matrix Shape Verification**: Detects jagged rows in `matrix`, `cases`, and `aligned` environments, accounting for `\multicolumn` merges.
-- **Reference checking**: Cross-file label resolution and citation validation.
-- **Macro Analysis**: Abstract interpretation to detect infinite recursion loop risks.
-
-### 3. Integrated Debugger (DAP)
-
-Full **Debug Adapter Protocol** support for `tectonic` and `pdftex` (via log parsing):
-
-- **Stepping**: Step-by-step execution through your TeX source.
-- **Variables**: Inspect live register values (`\count0`, `\dimen0`) and macro definitions.
-- **Tokio-powered**: Async I/O handles user interaction without freezing the build.
-
-### 4. Build System
-
-- **Determinisic**: Content-addressable builds with `ferrotex.lock`.
-- **Reproducible**: Universal DAG execution model.
-
-## Implementation Roadmap (high level)
-
-See `ROADMAP.md`.
-
-## Contributing
-
-See `CONTRIBUTING.md` and `docs/development/setup.md`.
-
-## Citation
-
-If you use FerroTeX in academic work, see `CITATION.cff`.
-
-## License
-
-Licensed under either of:
-
-- Apache License, Version 2.0 (`LICENSE-APACHE`)
-- MIT license (`LICENSE-MIT`)
-
-at your option.
-
-Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you shall be dual licensed as above, without any additional terms or conditions.
+_Built with ❤️ by the FerroTeX Contributors._

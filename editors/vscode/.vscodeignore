@@ -19,3 +19,4 @@ out/**
 
 # Keep dist
 !dist/**
+!bin/**

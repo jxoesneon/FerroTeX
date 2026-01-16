@@ -2,7 +2,7 @@
   "name": "ferrotex",
   "displayName": "FerroTeX",
   "description": "High-performance LaTeX language support with IDE features, PDF preview, and intelligent diagnostics.",
-  "version": "0.21.0",
+  "version": "0.22.0",
   "publisher": "ferrotex",
   "license": "Apache-2.0",
   "repository": {
@@ -22,9 +22,14 @@
     "latex",
     "tex",
     "lsp",
-    "language server",
+    "scientific",
+    "reproducible",
+    "tectonic",
+    "bibtex",
     "pdf",
     "synctex",
+    "rust",
+    "equation",
     "typesetting"
   ],
   "badges": [
@@ -56,7 +61,10 @@
   "categories": [
     "Programming Languages",
     "Linters",
-    "Formatters"
+    "Formatters",
+    "Debuggers",
+    "Snippets",
+    "Other"
   ],
   "activationEvents": [
     "onLanguage:latex",
