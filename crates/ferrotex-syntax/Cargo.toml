@@ -7,11 +7,11 @@ license = "Apache-2.0 OR MIT"
 repository = "https://github.com/jxoesneon/FerroTeX"
 
 [dependencies]
-rowan = "0.15"
+rowan = "0.16"
 
 
 [dev-dependencies]
-criterion = "0.5"
+criterion = "0.8"
 
 [[bench]]
 name = "parser_benchmark"
