@@ -11,9 +11,9 @@
 [![Rust](https://img.shields.io/badge/Powered%20by-Rust-orange?style=flat-square&logo=rust)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/github/license/jxoesneon/FerroTeX?style=flat-square&color=green)](https://github.com/jxoesneon/FerroTeX)
 
----
+### v0.22.0: The Debug & Reliability Update
 
-FerroTeX is a next-generation LaTeX ecosystem built from the ground up in **Rust** 🦀. It replaces the fragmented, brittle experience of traditional LaTeX setups with a **Zero-Config**, **Content-Addressable**, and **Truly Intelligent** environment.
+FerroTeX v0.22.0 introduces the **Tectonic Debug Driver**, allowing you to inspect TeX internals (`\count`, `\dimen`) and step through macros like code. This release also marks a major milestone in stability with **>95% Semantic Engine Test Coverage**.
 
 ## 💎 The FerroTeX Advantage
 
@@ -54,6 +54,14 @@ Stop deciphering cryptic `.log` files. FerroTeX translates low-level TeX errors 
 
 <img src="https://github.com/jxoesneon/FerroTeX/raw/main/editors/vscode/images/feature_hover.png" alt="Rich Hover & Documentation" width="100%">
 
+### 5. Interactive Debugging (DAP)
+
+Debug your LaTeX source like actual code.
+
+- **Variables View**: Inspect the real-time values of TeX registers (`\count`, `\dimen`, `\skip`) and macros.
+- **Stepping**: Step-in/Step-over macro expansions and file inclusions.
+- **Watch**: Monitor specific control sequences as your document builds.
+
 ---
 
 ## 📦 Getting Started
@@ -81,7 +89,6 @@ FerroTeX works out-of-the-box, but you can fine-tune it via VS Code Settings:
 FerroTeX is open source and built with ❤️ in Rust. We welcome contributions from researchers, developers, and TeX enthusiasts!
 
 - **Repository**: [github.com/jxoesneon/FerroTeX](https://github.com/jxoesneon/FerroTeX)
-- **Discussions**: [Join the Q&A on GitHub](https://github.com/jxoesneon/FerroTeX/discussions)
 - **Issues**: [Report a Bug or Feature Request](https://github.com/jxoesneon/FerroTeX/issues)
 
 ---

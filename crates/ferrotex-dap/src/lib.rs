@@ -1,7 +1,9 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-pub mod shim;
+pub mod debug_session;
+pub use crate::debug_session::DebugDriver;
+use crate::debug_session::EngineCommand;
 
 /// Represents a raw DAP message (Request, Response, or Event).
 ///
@@ -77,6 +79,16 @@ pub trait DebugAdapter {
 
     /// Called to disconnect/terminate the session.
     fn disconnect(&mut self) -> Result<()>;
+
+    /// Called when the client requests 'evaluate'.
+    fn evaluate(&mut self, _args: serde_json::Value) -> Result<serde_json::Value> {
+        Ok(serde_json::json!({ "result": "", "variablesReference": 0, "expensive": false }))
+    }
+
+    /// Called when the client requests 'attach'.
+    fn attach(&mut self, _args: serde_json::Value) -> Result<serde_json::Value> {
+        Ok(serde_json::json!({}))
+    }
 }
 
 /// A generic session handler that wraps a specific Adapter implementation
@@ -181,6 +193,8 @@ impl<A: DebugAdapter> DebugSession<A> {
             "stepIn" => self.adapter.step_in().map(|_| serde_json::Value::Null),
             "scopes" => self.adapter.scopes(args),
             "variables" => self.adapter.variables(args),
+            "evaluate" => self.adapter.evaluate(args),
+            "attach" => self.adapter.attach(args),
             _ => Ok(serde_json::json!({})),
         };
 
@@ -212,22 +226,22 @@ impl<A: DebugAdapter> DebugSession<A> {
     }
 }
 
-#[cfg(feature = "tectonic-engine")]
-use crate::shim::{EngineCommand, EngineEvent};
-#[cfg(feature = "tectonic-engine")]
+#[cfg(feature = "jxoesneon-tectonic-engine")]
+use crate::debug_session::EngineEvent;
+#[cfg(feature = "jxoesneon-tectonic-engine")]
 use std::collections::HashMap;
-#[cfg(feature = "tectonic-engine")]
+#[cfg(feature = "jxoesneon-tectonic-engine")]
 use std::sync::mpsc::Sender;
-#[cfg(feature = "tectonic-engine")]
+#[cfg(feature = "jxoesneon-tectonic-engine")]
 use std::sync::{Arc, Mutex};
 
-#[cfg(feature = "tectonic-engine")]
+#[cfg(feature = "jxoesneon-tectonic-engine")]
 pub struct TectonicAdapter {
     shim_tx: Option<Sender<EngineCommand>>,
     shadow_vars: Arc<Mutex<HashMap<String, String>>>,
 }
 
-#[cfg(feature = "tectonic-engine")]
+#[cfg(feature = "jxoesneon-tectonic-engine")]
 impl TectonicAdapter {
     pub fn new() -> Self {
         Self {
@@ -237,7 +251,7 @@ impl TectonicAdapter {
     }
 }
 
-#[cfg(feature = "tectonic-engine")]
+#[cfg(feature = "jxoesneon-tectonic-engine")]
 impl DebugAdapter for TectonicAdapter {
     fn initialize(&mut self, _args: serde_json::Value) -> Result<serde_json::Value> {
         Ok(serde_json::json!({
@@ -248,12 +262,12 @@ impl DebugAdapter for TectonicAdapter {
     }
 
     fn launch(&mut self, args: serde_json::Value) -> Result<()> {
-        use crate::shim::TectonicShim;
+        use crate::debug_session::TectonicDebugSession;
         let program = args["program"]
             .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing 'program' in launch args"))?;
-        let shim = TectonicShim::new(std::path::PathBuf::from(program));
-        let (tx, rx) = shim.spawn();
+        let driver = TectonicDebugSession::new(std::path::PathBuf::from(program));
+        let (tx, rx) = driver.spawn();
         self.shim_tx = Some(tx);
 
         let vars = self.shadow_vars.clone();
@@ -347,7 +361,7 @@ impl DebugAdapter for TectonicAdapter {
     }
 }
 
-#[cfg(feature = "tectonic-engine")]
+#[cfg(feature = "jxoesneon-tectonic-engine")]
 fn send_raw_dap(msg: &serde_json::Value, stdout: &mut impl std::io::Write) -> Result<()> {
     let resp_json = serde_json::to_string(msg)?;
     let resp_body = format!("Content-Length: {}\r\n\r\n{}", resp_json.len(), resp_json);
@@ -363,7 +377,7 @@ pub fn run_mock_session() -> Result<()> {
 }
 
 struct MockAdapter {
-    shim_tx: Option<std::sync::mpsc::Sender<crate::shim::EngineCommand>>,
+    shim_tx: Option<std::sync::mpsc::Sender<crate::debug_session::EngineCommand>>,
 }
 
 impl DebugAdapter for MockAdapter {
@@ -376,8 +390,8 @@ impl DebugAdapter for MockAdapter {
     }
 
     fn launch(&mut self, _args: serde_json::Value) -> Result<()> {
-        use crate::shim::Shim;
-        let shim = crate::shim::MockShim;
+        use crate::debug_session::DebugDriver;
+        let shim = crate::debug_session::MockDebugSession;
         let (tx, _rx) = shim.spawn();
         self.shim_tx = Some(tx);
         Ok(())
@@ -385,14 +399,14 @@ impl DebugAdapter for MockAdapter {
 
     fn continue_execution(&mut self) -> Result<()> {
         if let Some(tx) = &self.shim_tx {
-            tx.send(crate::shim::EngineCommand::Continue)?;
+            tx.send(crate::debug_session::EngineCommand::Continue)?;
         }
         Ok(())
     }
 
     fn next(&mut self) -> Result<()> {
         if let Some(tx) = &self.shim_tx {
-            tx.send(crate::shim::EngineCommand::Step)?;
+            tx.send(crate::debug_session::EngineCommand::Step)?;
         }
         Ok(())
     }
@@ -412,7 +426,7 @@ impl DebugAdapter for MockAdapter {
     }
     fn disconnect(&mut self) -> Result<()> {
         if let Some(tx) = &self.shim_tx {
-            let _ = tx.send(crate::shim::EngineCommand::Terminate);
+            let _ = tx.send(EngineCommand::Terminate);
         }
         Ok(())
     }
@@ -428,8 +442,8 @@ pub fn run_mock_session_with_io(
     Ok(())
 }
 
-#[cfg(feature = "tectonic-engine")]
-pub fn run_tectonic_session() -> Result<()> {
+#[cfg(feature = "jxoesneon-tectonic-engine")]
+pub fn run_jxoesneon_tectonic_session() -> Result<()> {
     let adapter = TectonicAdapter::new();
     let mut session = DebugSession::new(adapter);
     session.run_loop()?;
@@ -455,6 +469,24 @@ mod tests {
         match back {
             ProtocolMessage::Request { seq, .. } => assert_eq!(seq, 1),
             _ => panic!("Wrong type"),
+        }
+
+        let event = ProtocolMessage::Event {
+            seq: 2,
+            event: "stopped".to_string(),
+            body: Some(json!({"reason": "step"})),
+        };
+        let js_event = serde_json::to_string(&event).unwrap();
+        assert!(js_event.contains("\"type\":\"event\""));
+        assert!(js_event.contains("\"event\":\"stopped\""));
+
+        let back_event: ProtocolMessage = serde_json::from_str(&js_event).unwrap();
+        match back_event {
+            ProtocolMessage::Event { seq, event, .. } => {
+                assert_eq!(seq, 2);
+                assert_eq!(event, "stopped");
+            }
+            _ => panic!("Wrong type for event"),
         }
     }
 
@@ -594,5 +626,315 @@ mod tests {
         let mut reader = std::io::Cursor::new("");
         let mut stdout = Vec::new();
         assert!(session.run_session(&mut reader, &mut stdout).is_ok());
+    }
+    #[test]
+    #[cfg(feature = "jxoesneon-tectonic-engine")]
+    fn test_tectonic_adapter_lifecycle() {
+        let mut adapter = TectonicAdapter::new();
+
+        // initialize
+        let caps = adapter.initialize(json!({})).unwrap();
+        assert!(caps["supportsConfigurationDoneRequest"].as_bool().unwrap());
+
+        // launch
+        let temp = tempfile::tempdir().unwrap();
+        let tex_path = temp.path().join("test_adapter.tex");
+        // Use a macro to trigger the expansion hook and a register update
+        std::fs::write(&tex_path, "\\count0=42 \\def\\foo{bar} \\foo").unwrap();
+        adapter
+            .launch(json!({"program": tex_path.to_str().unwrap()}))
+            .unwrap();
+
+        // Wait for it to stop at the macro expansion
+        // (This might take a moment as the engine starts)
+        std::thread::sleep(std::time::Duration::from_millis(1500));
+
+        // check variables
+        let vars = adapter.variables(json!({})).unwrap();
+        assert!(vars["variables"].is_array());
+        // Note: count0 might not be reported yet if it hasn't stopped or reported status.
+        // But the thread should be alive.
+
+        // continue
+        adapter.continue_execution().unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(500));
+
+        // next
+        adapter.next().unwrap();
+
+        // disconnect
+        adapter.disconnect().unwrap();
+    }
+
+    #[test]
+    fn test_debug_session_content_length_edge_cases() {
+        let mut session = DebugSession::new(SimpleAdapter);
+        let input_data = "Content-Length: 0\r\n\r\nContent-Length: 2\r\n\r\n{}";
+        let mut reader = std::io::Cursor::new(input_data);
+        let mut stdout = Vec::new();
+        // Should skip the 0-length and try to parse the 2-length one (which will fail to parse as Request, but not crash)
+        session.run_session(&mut reader, &mut stdout).unwrap();
+    }
+    #[test]
+    #[cfg(feature = "jxoesneon-tectonic-engine")]
+    fn test_tectonic_adapter_error_paths() {
+        let mut adapter = TectonicAdapter::new();
+        // launch without program
+        assert!(adapter.launch(json!({})).is_err());
+
+        // continue without launch
+        adapter.continue_execution().unwrap();
+
+        // variables with some data
+        {
+            let mut v = adapter.shadow_vars.lock().unwrap();
+            v.insert("test".to_string(), "val".to_string());
+        }
+        let vars = adapter.variables(json!({})).unwrap();
+        assert_eq!(vars["variables"][0]["name"], "test");
+    }
+
+    #[test]
+    fn test_protocol_parsing_errors() {
+        let mut session = DebugSession::new(SimpleAdapter);
+        let mut stdout = Vec::new();
+
+        // Invalid content-length
+        let input_invalid = "Content-Length: abc\r\n\r\n{}";
+        let mut reader = std::io::Cursor::new(input_invalid);
+        session.run_session(&mut reader, &mut stdout).unwrap();
+
+        // Case-insensitive check
+        let input_case = "content-length: 2\r\n\r\n{}";
+        let mut reader = std::io::Cursor::new(input_case);
+        session.run_session(&mut reader, &mut stdout).unwrap();
+
+        // Missing body (EOF)
+        let input_eof = "Content-Length: 10\r\n\r\n";
+        let mut reader = std::io::Cursor::new(input_eof);
+        let _ = session.run_session(&mut reader, &mut stdout);
+    }
+
+    #[test]
+    fn test_debug_session_large_message() {
+        let mut session = DebugSession::new(SimpleAdapter);
+        let large_body = json!({"type":"request","seq":1,"command":"next"}).to_string();
+        let input_data = format!("Content-Length: {}\r\n\r\n{}", large_body.len(), large_body);
+        let mut reader = std::io::Cursor::new(input_data);
+        let mut stdout = Vec::new();
+        session.run_session(&mut reader, &mut stdout).unwrap();
+    }
+
+    #[test]
+    #[cfg(feature = "jxoesneon-tectonic-engine")]
+    fn test_tectonic_adapter_utils() {
+        let mut stdout = Vec::new();
+        let msg = json!({"test": "val"});
+        send_raw_dap(&msg, &mut stdout).unwrap();
+        assert!(
+            String::from_utf8(stdout)
+                .unwrap()
+                .contains("Content-Length:")
+        );
+    }
+    #[test]
+    #[cfg(feature = "jxoesneon-tectonic-engine")]
+    fn test_tectonic_adapter_variables_deep() {
+        let mut adapter = TectonicAdapter::new();
+        {
+            let mut v = adapter.shadow_vars.lock().unwrap();
+            v.insert("foo".to_string(), "bar".to_string());
+        }
+
+        // request scopes
+        let res = adapter.scopes(json!({"frameId": 1})).unwrap();
+        let variables_reference = res["scopes"][0]["variablesReference"].as_i64().unwrap();
+
+        // request variables
+        let res = adapter
+            .variables(json!({"variablesReference": variables_reference}))
+            .unwrap();
+        assert_eq!(res["variables"][0]["name"], "foo");
+        assert_eq!(res["variables"][0]["value"], "bar");
+    }
+
+    #[test]
+    fn test_protocol_parsing_extra_headers() {
+        let mut session = DebugSession::new(SimpleAdapter);
+        let body = json!({"type":"request","seq":1,"command":"next"}).to_string();
+        // Include extra headers to test the loop
+        let input_data = format!(
+            "X-Ignored: value\r\nContent-Length: {}\r\nAnother-Header: 123\r\n\r\n{}",
+            body.len(),
+            body
+        );
+        let mut reader = std::io::Cursor::new(input_data);
+        let mut stdout = Vec::new();
+        session.run_session(&mut reader, &mut stdout).unwrap();
+        assert!(
+            String::from_utf8(stdout)
+                .unwrap()
+                .contains("\"success\":true")
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "jxoesneon-tectonic-engine")]
+    fn test_adapter_initialize_capabilities() {
+        let mut adapter = TectonicAdapter::new();
+        let res = adapter.initialize(json!({})).unwrap();
+        assert!(res.get("supportsVariableType").is_some());
+    }
+
+    #[test]
+    fn test_session_unknown_command() {
+        let mut session = DebugSession::new(SimpleAdapter);
+        let mut stdout = Vec::new();
+        session
+            .handle_request(1, "unknown", None, &mut stdout)
+            .unwrap();
+        assert!(
+            String::from_utf8(stdout)
+                .unwrap()
+                .contains("\"success\":true")
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "jxoesneon-tectonic-engine")]
+    fn test_tectonic_adapter_evaluate_and_attach() {
+        let mut adapter = TectonicAdapter::new();
+        // Now methods are in the trait and available on the struct
+        let res = adapter
+            .evaluate(serde_json::json!({"expression": "1+1"}))
+            .unwrap();
+        assert_eq!(res["result"], "");
+
+        let res = adapter.attach(serde_json::json!({})).unwrap();
+        assert_eq!(res, serde_json::json!({}));
+    }
+
+    #[test]
+    fn test_protocol_parsing_eof() {
+        let mut session = DebugSession::new(SimpleAdapter);
+        let mut reader = std::io::Cursor::new("");
+        let mut stdout = Vec::new();
+        session.run_session(&mut reader, &mut stdout).unwrap();
+        assert!(stdout.is_empty());
+    }
+
+    #[test]
+    fn test_handle_request_evaluate() {
+        let mut session = DebugSession::new(SimpleAdapter);
+        let mut stdout = Vec::new();
+        session
+            .handle_request(
+                1,
+                "evaluate",
+                Some(json!({"expression": "1+1"})),
+                &mut stdout,
+            )
+            .unwrap();
+        let out_str = String::from_utf8(stdout).unwrap();
+        assert!(out_str.contains("\"success\":true"));
+        assert!(out_str.contains("\"result\":"));
+    }
+
+    #[test]
+    fn test_handle_request_attach() {
+        let mut session = DebugSession::new(SimpleAdapter);
+        let mut stdout = Vec::new();
+        session
+            .handle_request(1, "attach", Some(json!({})), &mut stdout)
+            .unwrap();
+        let out_str = String::from_utf8(stdout).unwrap();
+        assert!(out_str.contains("\"success\":true"));
+    }
+
+    #[test]
+    #[cfg(feature = "jxoesneon-tectonic-engine")]
+    fn test_tectonic_adapter_scopes_and_step_in() {
+        let mut adapter = TectonicAdapter::new();
+
+        // scopes returns correct structure
+        let scopes = adapter.scopes(json!({})).unwrap();
+        assert!(scopes["scopes"].is_array());
+
+        // step_in is a no-op but should succeed
+        adapter.step_in().unwrap();
+
+        // evaluate and attach use default implementations
+        let eval = adapter.evaluate(json!({"expression": "test"})).unwrap();
+        assert_eq!(eval["result"], "");
+
+        let attach = adapter.attach(json!({})).unwrap();
+        assert!(attach.is_object());
+    }
+
+    #[test]
+    fn test_run_mock_session_evaluate_attach() {
+        let commands = vec![
+            json!({"type":"request","seq":1,"command":"evaluate","arguments":{"expression":"1+1"}}),
+            json!({"type":"request","seq":2,"command":"attach","arguments":{}}),
+        ];
+
+        let mut input_data = String::new();
+        for cmd in commands {
+            let body = cmd.to_string();
+            input_data.push_str(&format!("Content-Length: {}\r\n\r\n{}", body.len(), body));
+        }
+
+        let mut reader = std::io::Cursor::new(input_data);
+        let mut stdout = Vec::new();
+
+        run_mock_session_with_io(&mut reader, &mut stdout).unwrap();
+
+        let out_str = String::from_utf8(stdout).unwrap();
+        assert!(out_str.contains("\"command\":\"evaluate\""));
+        assert!(out_str.contains("\"command\":\"attach\""));
+    }
+
+    #[test]
+    #[cfg(feature = "jxoesneon-tectonic-engine")]
+    fn test_send_raw_dap() {
+        let msg = json!({"type": "event", "event": "stopped", "body": {"reason": "step"}});
+        let mut stdout = Vec::new();
+        send_raw_dap(&msg, &mut stdout).unwrap();
+        let out_str = String::from_utf8(stdout).unwrap();
+        assert!(out_str.contains("Content-Length:"));
+        assert!(out_str.contains("\"event\":\"stopped\""));
+    }
+
+    #[test]
+    #[cfg(feature = "jxoesneon-tectonic-engine")]
+    fn test_tectonic_adapter_launch_and_events() {
+        let mut adapter = TectonicAdapter::new();
+
+        // Initialize first
+        adapter.initialize(json!({})).unwrap();
+
+        // Launch with a simple TeX file
+        let temp = tempfile::tempdir().unwrap();
+        let tex_path = temp.path().join("event_test.tex");
+        std::fs::write(
+            &tex_path,
+            "\\documentclass{article}\\begin{document}Test\\end{document}",
+        )
+        .unwrap();
+
+        // This will spawn the engine thread
+        adapter
+            .launch(json!({"program": tex_path.to_str().unwrap()}))
+            .unwrap();
+
+        // Wait briefly for engine to start
+        std::thread::sleep(std::time::Duration::from_millis(500));
+
+        // Continue to let it run
+        adapter.continue_execution().unwrap();
+        adapter.next().unwrap();
+
+        // Disconnect
+        adapter.disconnect().unwrap();
     }
 }

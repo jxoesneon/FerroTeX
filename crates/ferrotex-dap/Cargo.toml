@@ -1,6 +1,6 @@
 [package]
 name = "ferrotex-dap"
-version = "0.21.0"
+version = "0.22.0"
 edition = "2024"
 
 [dependencies]
@@ -12,22 +12,36 @@ sha2 = "0.10"
 hex = "0.4"
 # crossbeam-channel = "0.5" # Likely needed for message passing
 # dap-types? Writing raw for now to avoid bulky deps
-ferrotex-build = { path = "../ferrotex-build", version = "0.21.0" }
+ferrotex-build = { path = "../ferrotex-build", version = "0.22.0" }
 
 [features]
 default = []
-tectonic-engine = ["tectonic", "tectonic_status_base", "tectonic_io_base"]
+jxoesneon-tectonic-engine = ["jxoesneon-tectonic", "jxoesneon-tectonic-status_base", "jxoesneon-tectonic-io_base", "jxoesneon-tectonic-bridge_core"]
 
-[dependencies.tectonic]
-version = "0.16"
+[dependencies.jxoesneon-tectonic]
+package = "tectonic"
+path = "/Users/meilynlopezcubero/tectonic"
+version = "0.17.3"
 default-features = false
 optional = true
 
-[dependencies.tectonic_status_base]
-version = "0.2"
+[dependencies.jxoesneon-tectonic-status_base]
+package = "tectonic_status_base"
+path = "/Users/meilynlopezcubero/tectonic/crates/status_base"
+version = "0.17.3"
 optional = true
 
-[dependencies.tectonic_io_base]
-version = "0.4"
+[dependencies.jxoesneon-tectonic-io_base]
+package = "tectonic_io_base"
+path = "/Users/meilynlopezcubero/tectonic/crates/io_base"
+version = "0.17.3"
 optional = true
 
+[dependencies.jxoesneon-tectonic-bridge_core]
+package = "tectonic_bridge_core"
+path = "/Users/meilynlopezcubero/tectonic/crates/bridge_core"
+version = "0.17.3"
+optional = true
+
+[dev-dependencies]
+tempfile = "3.10"

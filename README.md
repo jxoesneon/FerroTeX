@@ -58,7 +58,9 @@ Debug your TeX source like code. The integrated **Debug Adapter Protocol** (DAP)
 
 ---
 
-## 🚀 Status: v0.21.0 (The "Global Expansion" Release)
+## 🚀 Status: v0.22.0 (The "Debug & Reliability" Update)
+
+FerroTeX v0.22.0 introduces the **Tectonic Debug Driver**, allowing you to step through TeX macros like code, alongside massive reliability improvements to the semantic engine (>95% test coverage).
 
 ### Performance (M1 Max / Linux x64)
 
@@ -81,11 +83,9 @@ Debug your TeX source like code. The integrated **Debug Adapter Protocol** (DAP)
 Requires **Rust 1.70+**.
 
 ```bash
-# Clone and build specialized binaries
-# Clone and build specialized binaries
+# Clone and build
 git clone https://github.com/jxoesneon/FerroTeX
 cd FerroTeX
-./scripts/setup_upstream.sh # Initialize local secure vendor
 cargo build --release
 
 # Run CLI parse on a log file

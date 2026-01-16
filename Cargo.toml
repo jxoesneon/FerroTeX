@@ -16,7 +16,4 @@ lto = true
 strip = true
 codegen-units = 1
 
-[patch.crates-io]
-tectonic = { path = "upstream/tectonic" }
-tectonic_status_base = { path = "upstream/tectonic/crates/status_base" }
-tectonic_io_base = { path = "upstream/tectonic/crates/io_base" }
+
