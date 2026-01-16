@@ -3752,6 +3752,7 @@ dependencies = [
 [[package]]
 name = "tectonic"
 version = "0.17.3"
+source = "git+https://github.com/jxoesneon/tectonic#7f7c7663ec2651be1c21ed53598ca7fd3dbce86d"
 dependencies = [
  "anyhow",
  "byte-unit",
@@ -3795,6 +3796,7 @@ dependencies = [
 [[package]]
 name = "tectonic_bridge_core"
 version = "0.17.3"
+source = "git+https://github.com/jxoesneon/tectonic#7f7c7663ec2651be1c21ed53598ca7fd3dbce86d"
 dependencies = [
  "cc",
  "flate2",
@@ -3809,6 +3811,7 @@ dependencies = [
 [[package]]
 name = "tectonic_bridge_flate"
 version = "0.17.3"
+source = "git+https://github.com/jxoesneon/tectonic#7f7c7663ec2651be1c21ed53598ca7fd3dbce86d"
 dependencies = [
  "flate2",
  "libc",
@@ -3817,6 +3820,7 @@ dependencies = [
 [[package]]
 name = "tectonic_bridge_fontconfig"
 version = "0.17.3"
+source = "git+https://github.com/jxoesneon/tectonic#7f7c7663ec2651be1c21ed53598ca7fd3dbce86d"
 dependencies = [
  "libc",
  "tectonic_bridge_png",
@@ -3826,6 +3830,7 @@ dependencies = [
 [[package]]
 name = "tectonic_bridge_freetype2"
 version = "0.17.3"
+source = "git+https://github.com/jxoesneon/tectonic#7f7c7663ec2651be1c21ed53598ca7fd3dbce86d"
 dependencies = [
  "libc",
  "tectonic_bridge_flate",
@@ -3836,6 +3841,7 @@ dependencies = [
 [[package]]
 name = "tectonic_bridge_graphite2"
 version = "0.17.3"
+source = "git+https://github.com/jxoesneon/tectonic#7f7c7663ec2651be1c21ed53598ca7fd3dbce86d"
 dependencies = [
  "libc",
  "tectonic_dep_support",
@@ -3844,6 +3850,7 @@ dependencies = [
 [[package]]
 name = "tectonic_bridge_harfbuzz"
 version = "0.17.3"
+source = "git+https://github.com/jxoesneon/tectonic#7f7c7663ec2651be1c21ed53598ca7fd3dbce86d"
 dependencies = [
  "cc",
  "libc",
@@ -3857,6 +3864,7 @@ dependencies = [
 [[package]]
 name = "tectonic_bridge_icu"
 version = "0.17.3"
+source = "git+https://github.com/jxoesneon/tectonic#7f7c7663ec2651be1c21ed53598ca7fd3dbce86d"
 dependencies = [
  "tectonic_dep_support",
 ]
@@ -3864,6 +3872,7 @@ dependencies = [
 [[package]]
 name = "tectonic_bridge_png"
 version = "0.17.3"
+source = "git+https://github.com/jxoesneon/tectonic#7f7c7663ec2651be1c21ed53598ca7fd3dbce86d"
 dependencies = [
  "tectonic_dep_support",
 ]
@@ -3871,6 +3880,7 @@ dependencies = [
 [[package]]
 name = "tectonic_bundles"
 version = "0.17.3"
+source = "git+https://github.com/jxoesneon/tectonic#7f7c7663ec2651be1c21ed53598ca7fd3dbce86d"
 dependencies = [
  "flate2",
  "tectonic_errors",
@@ -3884,6 +3894,7 @@ dependencies = [
 [[package]]
 name = "tectonic_cfg_support"
 version = "0.17.3"
+source = "git+https://github.com/jxoesneon/tectonic#7f7c7663ec2651be1c21ed53598ca7fd3dbce86d"
 dependencies = [
  "lazy_static",
 ]
@@ -3891,6 +3902,7 @@ dependencies = [
 [[package]]
 name = "tectonic_dep_support"
 version = "0.17.3"
+source = "git+https://github.com/jxoesneon/tectonic#7f7c7663ec2651be1c21ed53598ca7fd3dbce86d"
 dependencies = [
  "pkg-config",
  "vcpkg",
@@ -3899,6 +3911,7 @@ dependencies = [
 [[package]]
 name = "tectonic_engine_bibtex"
 version = "0.17.3"
+source = "git+https://github.com/jxoesneon/tectonic#7f7c7663ec2651be1c21ed53598ca7fd3dbce86d"
 dependencies = [
  "indexmap",
  "libc",
@@ -3910,6 +3923,7 @@ dependencies = [
 [[package]]
 name = "tectonic_engine_spx2html"
 version = "0.17.3"
+source = "git+https://github.com/jxoesneon/tectonic#7f7c7663ec2651be1c21ed53598ca7fd3dbce86d"
 dependencies = [
  "byteorder",
  "html-escape",
@@ -3929,6 +3943,7 @@ dependencies = [
 [[package]]
 name = "tectonic_engine_xdvipdfmx"
 version = "0.17.3"
+source = "git+https://github.com/jxoesneon/tectonic#7f7c7663ec2651be1c21ed53598ca7fd3dbce86d"
 dependencies = [
  "cc",
  "libc",
@@ -3940,6 +3955,7 @@ dependencies = [
 [[package]]
 name = "tectonic_engine_xetex"
 version = "0.17.3"
+source = "git+https://github.com/jxoesneon/tectonic#7f7c7663ec2651be1c21ed53598ca7fd3dbce86d"
 dependencies = [
  "cc",
  "libc",
@@ -3958,6 +3974,7 @@ dependencies = [
 [[package]]
 name = "tectonic_errors"
 version = "0.17.3"
+source = "git+https://github.com/jxoesneon/tectonic#7f7c7663ec2651be1c21ed53598ca7fd3dbce86d"
 dependencies = [
  "anyhow",
 ]
@@ -3965,6 +3982,7 @@ dependencies = [
 [[package]]
 name = "tectonic_geturl"
 version = "0.17.3"
+source = "git+https://github.com/jxoesneon/tectonic#7f7c7663ec2651be1c21ed53598ca7fd3dbce86d"
 dependencies = [
  "cfg-if",
  "tectonic_errors",
@@ -3974,6 +3992,7 @@ dependencies = [
 [[package]]
 name = "tectonic_io_base"
 version = "0.17.3"
+source = "git+https://github.com/jxoesneon/tectonic#7f7c7663ec2651be1c21ed53598ca7fd3dbce86d"
 dependencies = [
  "app_dirs2",
  "flate2",
@@ -3987,6 +4006,7 @@ dependencies = [
 [[package]]
 name = "tectonic_mac_core"
 version = "0.17.3"
+source = "git+https://github.com/jxoesneon/tectonic#7f7c7663ec2651be1c21ed53598ca7fd3dbce86d"
 dependencies = [
  "libc",
  "tectonic_cfg_support",
@@ -3995,6 +4015,7 @@ dependencies = [
 [[package]]
 name = "tectonic_pdf_io"
 version = "0.17.3"
+source = "git+https://github.com/jxoesneon/tectonic#7f7c7663ec2651be1c21ed53598ca7fd3dbce86d"
 dependencies = [
  "cc",
  "tectonic_bridge_core",
@@ -4006,6 +4027,7 @@ dependencies = [
 [[package]]
 name = "tectonic_status_base"
 version = "0.17.3"
+source = "git+https://github.com/jxoesneon/tectonic#7f7c7663ec2651be1c21ed53598ca7fd3dbce86d"
 dependencies = [
  "tectonic_errors",
 ]
@@ -4013,6 +4035,7 @@ dependencies = [
 [[package]]
 name = "tectonic_xdv"
 version = "0.17.3"
+source = "git+https://github.com/jxoesneon/tectonic#7f7c7663ec2651be1c21ed53598ca7fd3dbce86d"
 dependencies = [
  "byteorder",
 ]
@@ -4020,6 +4043,7 @@ dependencies = [
 [[package]]
 name = "tectonic_xetex_layout"
 version = "0.17.3"
+source = "git+https://github.com/jxoesneon/tectonic#7f7c7663ec2651be1c21ed53598ca7fd3dbce86d"
 dependencies = [
  "cc",
  "enrede",

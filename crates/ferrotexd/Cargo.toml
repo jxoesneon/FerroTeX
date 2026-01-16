@@ -38,7 +38,7 @@ ferrotex-core = { path = "../ferrotex-core", version = "0.22.0" }
 
 [dependencies.jxoesneon-tectonic]
 package = "tectonic"
-path = "/Users/meilynlopezcubero/tectonic"
+git = "https://github.com/jxoesneon/tectonic"
 version = "0.17.3"
 default-features = false
 optional = true

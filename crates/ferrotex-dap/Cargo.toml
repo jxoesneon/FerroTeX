@@ -20,26 +20,26 @@ jxoesneon-tectonic-engine = ["jxoesneon-tectonic", "jxoesneon-tectonic-status_ba
 
 [dependencies.jxoesneon-tectonic]
 package = "tectonic"
-path = "/Users/meilynlopezcubero/tectonic"
+git = "https://github.com/jxoesneon/tectonic"
 version = "0.17.3"
 default-features = false
 optional = true
 
 [dependencies.jxoesneon-tectonic-status_base]
 package = "tectonic_status_base"
-path = "/Users/meilynlopezcubero/tectonic/crates/status_base"
+git = "https://github.com/jxoesneon/tectonic"
 version = "0.17.3"
 optional = true
 
 [dependencies.jxoesneon-tectonic-io_base]
 package = "tectonic_io_base"
-path = "/Users/meilynlopezcubero/tectonic/crates/io_base"
+git = "https://github.com/jxoesneon/tectonic"
 version = "0.17.3"
 optional = true
 
 [dependencies.jxoesneon-tectonic-bridge_core]
 package = "tectonic_bridge_core"
-path = "/Users/meilynlopezcubero/tectonic/crates/bridge_core"
+git = "https://github.com/jxoesneon/tectonic"
 version = "0.17.3"
 optional = true
 
