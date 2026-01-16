@@ -205,7 +205,13 @@ mod tests {
         use std::os::unix::fs::PermissionsExt;
 
         let temp_dir = tempfile::tempdir().unwrap();
-        let script_path = temp_dir.path().join("mock_latexmk.sh");
+        
+        #[cfg(unix)]
+        let script_name = "mock_latexmk.sh";
+        #[cfg(windows)]
+        let script_name = "mock_latexmk.bat";
+
+        let script_path = temp_dir.path().join(script_name);
         let tex_path = temp_dir.path().join("main.tex");
         let build_dir = temp_dir.path().join("build");
 
@@ -215,6 +221,7 @@ mod tests {
             .unwrap();
 
         // Create mock latexmk script
+        #[cfg(unix)]
         let script_content = format!(
             r#"#!/bin/sh
 # Mock latexmk
@@ -223,6 +230,19 @@ touch "{}/main.pdf"
 echo "Mock latexmk build success"
 exit 0
 "#,
+            build_dir.to_string_lossy(),
+            build_dir.to_string_lossy()
+        );
+
+        #[cfg(windows)]
+        let script_content = format!(
+            r#"@echo off
+if not exist "{}" mkdir "{}"
+type nul > "{}\main.pdf"
+echo Mock latexmk build success
+exit 0
+"#,
+            build_dir.to_string_lossy(),
             build_dir.to_string_lossy(),
             build_dir.to_string_lossy()
         );
@@ -268,7 +288,13 @@ exit 0
         use std::sync::{Arc, Mutex};
 
         let temp_dir = tempfile::tempdir().unwrap();
-        let script_path = temp_dir.path().join("mock_latexmk_logs.sh");
+        
+        #[cfg(unix)]
+        let script_name = "mock_latexmk_logs.sh";
+        #[cfg(windows)]
+        let script_name = "mock_latexmk_logs.bat";
+
+        let script_path = temp_dir.path().join(script_name);
         let tex_path = temp_dir.path().join("main.tex");
         let build_dir = temp_dir.path().join("build");
 
@@ -277,6 +303,7 @@ exit 0
             .unwrap();
 
         // Mock script that outputs to stdout and stderr
+        #[cfg(unix)]
         let script_content = format!(
             r#"#!/bin/sh
 mkdir -p "{}"
@@ -286,6 +313,21 @@ echo "Log stderr line 1" >&2
 echo "Log stdout line 2"
 exit 0
 "#,
+            build_dir.to_string_lossy(),
+            build_dir.to_string_lossy()
+        );
+
+        #[cfg(windows)]
+        let script_content = format!(
+            r#"@echo off
+if not exist "{}" mkdir "{}"
+type nul > "{}\main.pdf"
+echo Log stdout line 1
+echo Log stderr line 1 1>&2
+echo Log stdout line 2
+exit 0
+"#,
+            build_dir.to_string_lossy(),
             build_dir.to_string_lossy(),
             build_dir.to_string_lossy()
         );
