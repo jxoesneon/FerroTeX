@@ -11,7 +11,7 @@
 [![Rust](https://img.shields.io/badge/Powered%20by-Rust-orange?style=flat-square&logo=rust)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/github/license/jxoesneon/FerroTeX?style=flat-square&color=green)](https://github.com/jxoesneon/FerroTeX)
 
-### v0.22.0: The Debug & Reliability Update
+## v0.22.0: The Debug & Reliability Update
 
 FerroTeX v0.22.0 introduces the **Tectonic Debug Driver**, allowing you to inspect TeX internals (`\count`, `\dimen`) and step through macros like code. This release also marks a major milestone in stability with **>95% Semantic Engine Test Coverage**.
 
@@ -68,10 +68,10 @@ Debug your LaTeX source like actual code.
 
 FerroTeX is designed for **Frictionless Onboarding**.
 
-1.  **Install**: Search for `FerroTeX` in the VS Code Extensions view (or find it on [Open VSX](https://open-vsx.org/extension/ferrotex/ferrotex)).
-2.  **Open**: Open any `.tex` or `.latex` file.
-3.  **Build**: Press `Cmd+Alt+B` (macOS) or `Ctrl+Alt+B` (Windows/Linux) to generate your PDF.
-4.  **Preview**: Click the **Preview Icon** in the editor title menu to view your document in the integrated viewer.
+1. **Install**: Search for `FerroTeX` in the VS Code Extensions view (or find it on [Open VSX](https://open-vsx.org/extension/ferrotex/ferrotex)).
+2. **Open**: Open any `.tex` or `.latex` file.
+3. **Build**: Press `Cmd+Alt+B` (macOS) or `Ctrl+Alt+B` (Windows/Linux) to generate your PDF.
+4. **Preview**: Click the **Preview Icon** in the editor title menu to view your document in the integrated viewer.
 
 ## 🔧 Configuration
 

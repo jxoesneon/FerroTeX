@@ -35,9 +35,9 @@ sequenceDiagram
 
 ### Key Components
 
-1.  **Blocker Logic**: When the engine requests I/O, we check the current "Stepping Mode". If enabled, we perform a blocking receive on a synchronization channel.
-2.  **State Shadowing**: While the engine is blocked, we can safely read the `tectonic_xetex_layout` structures to extract macro definitions and register values with zero risk of race conditions.
-3.  **On-the-fly Hashing**: As a side effect of interception, we calculate SHA256 hashes for every file read, providing the data needed for `ferrotex.lock` reproducibility without an extra I/O pass.
+1. **Blocker Logic**: When the engine requests I/O, we check the current "Stepping Mode". If enabled, we perform a blocking receive on a synchronization channel.
+2. **State Shadowing**: While the engine is blocked, we can safely read the `tectonic_xetex_layout` structures to extract macro definitions and register values with zero risk of race conditions.
+3. **On-the-fly Hashing**: As a side effect of interception, we calculate SHA256 hashes for every file read, providing the data needed for `ferrotex.lock` reproducibility without an extra I/O pass.
 
 ## 💎 Benefits
 
