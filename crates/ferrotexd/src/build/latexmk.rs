@@ -201,6 +201,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_build_success() {
+        #[cfg(unix)]
         use std::os::unix::fs::PermissionsExt;
 
         let temp_dir = tempfile::tempdir().unwrap();
@@ -230,14 +231,17 @@ exit 0
             .await
             .unwrap();
 
-        let mut perms = tokio::fs::metadata(&script_path)
-            .await
-            .unwrap()
-            .permissions();
-        perms.set_mode(0o755);
-        tokio::fs::set_permissions(&script_path, perms)
-            .await
-            .unwrap();
+        #[cfg(unix)]
+        {
+            let mut perms = tokio::fs::metadata(&script_path)
+                .await
+                .unwrap()
+                .permissions();
+            perms.set_mode(0o755);
+            tokio::fs::set_permissions(&script_path, perms)
+                .await
+                .unwrap();
+        }
 
         let adapter = LatexmkAdapter::with_binary(script_path.to_str().unwrap());
 
@@ -259,6 +263,7 @@ exit 0
 
     #[tokio::test]
     async fn test_build_success_with_logs() {
+        #[cfg(unix)]
         use std::os::unix::fs::PermissionsExt;
         use std::sync::{Arc, Mutex};
 
@@ -289,14 +294,17 @@ exit 0
             .await
             .unwrap();
 
-        let mut perms = tokio::fs::metadata(&script_path)
-            .await
-            .unwrap()
-            .permissions();
-        perms.set_mode(0o755);
-        tokio::fs::set_permissions(&script_path, perms)
-            .await
-            .unwrap();
+        #[cfg(unix)]
+        {
+            let mut perms = tokio::fs::metadata(&script_path)
+                .await
+                .unwrap()
+                .permissions();
+            perms.set_mode(0o755);
+            tokio::fs::set_permissions(&script_path, perms)
+                .await
+                .unwrap();
+        }
 
         let adapter = LatexmkAdapter::with_binary(script_path.to_str().unwrap());
 
