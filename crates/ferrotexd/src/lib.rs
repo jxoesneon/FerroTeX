@@ -833,7 +833,7 @@ impl Backend {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::build::{BuildLog, BuildStatus};
+    use crate::build::BuildStatus;
     use tower_lsp::LspService;
 
     #[derive(Debug)]

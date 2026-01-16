@@ -89,6 +89,7 @@ FerroTeX works out-of-the-box, but you can fine-tune it via VS Code Settings:
 FerroTeX is open source and built with ❤️ in Rust. We welcome contributions from researchers, developers, and TeX enthusiasts!
 
 - **Repository**: [github.com/jxoesneon/FerroTeX](https://github.com/jxoesneon/FerroTeX)
+  If you encounter any issues or have feature requests, please file an issue on [GitHub](https://github.com/jxoesneon/FerroTeX/issues).
 - **Issues**: [Report a Bug or Feature Request](https://github.com/jxoesneon/FerroTeX/issues)
 
 ---

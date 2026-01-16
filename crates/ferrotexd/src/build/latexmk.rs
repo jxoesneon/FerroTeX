@@ -201,7 +201,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_build_success() {
-        use crate::build::BuildStatus;
         use std::os::unix::fs::PermissionsExt;
 
         let temp_dir = tempfile::tempdir().unwrap();
@@ -260,7 +259,6 @@ exit 0
 
     #[tokio::test]
     async fn test_build_success_with_logs() {
-        use crate::build::BuildStatus;
         use std::os::unix::fs::PermissionsExt;
         use std::sync::{Arc, Mutex};
 

@@ -246,7 +246,7 @@ mod tests {
         write!(file, "Initial content\n").unwrap();
         let mut read_file = File::open(&log_path).unwrap();
 
-        let changes = process_log_change(&mut read_file, &mut pos, &mut parser).unwrap();
+        let _changes = process_log_change(&mut read_file, &mut pos, &mut parser).unwrap();
         // Initial content might not trigger an event, but pos should advance
         assert!(pos > 0);
 

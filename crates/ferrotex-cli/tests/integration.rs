@@ -4,19 +4,19 @@ use std::io::Write;
 
 #[test]
 fn test_cli_help() {
-    let mut cmd = Command::cargo_bin("ferrotex-cli").unwrap();
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_ferrotex-cli"));
     cmd.arg("--help").assert().success();
 }
 
 #[test]
 fn test_cli_version() {
-    let mut cmd = Command::cargo_bin("ferrotex-cli").unwrap();
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_ferrotex-cli"));
     cmd.arg("--version").assert().success();
 }
 
 #[test]
 fn test_cli_parse() {
-    let mut cmd = Command::cargo_bin("ferrotex-cli").unwrap();
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_ferrotex-cli"));
 
     let temp = tempfile::tempdir().unwrap();
     let log_path = temp.path().join("test.log");
@@ -33,7 +33,7 @@ fn test_cli_parse() {
 
 #[test]
 fn test_cli_verify_missing_lock() {
-    let mut cmd = Command::cargo_bin("ferrotex-cli").unwrap();
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_ferrotex-cli"));
     let temp = tempfile::tempdir().unwrap();
     let lock_path = temp.path().join("nonexistent.lock");
 
