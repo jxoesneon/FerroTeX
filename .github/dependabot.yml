@@ -1,14 +1,55 @@
 version: 2
 updates:
+  # Maintain GitHub Actions workflows
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+
+  # Maintain Root NPM (Scripts & Tooling)
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
       interval: "weekly"
+    groups:
+      npm-dev-dependencies:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "build"
+      include: "scope"
+
+  # Maintain Rust Crates (Core Logic)
   - package-ecosystem: "cargo"
     directory: "/"
     schedule:
       interval: "weekly"
+    groups:
+      rust-dependencies:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    # Allow major updates only for lockfile/dev-deps safety by default?
+    # Actually, standard policy is to allow all but rely on groups to minimize spam.
+
+  # Maintain VS Code Extension (Frontend)
+  - package-ecosystem: "npm"
+    directory: "/editors/vscode"
+    schedule:
+      interval: "weekly"
+    groups:
+      vscode-dependencies:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "editors"
+      include: "scope"

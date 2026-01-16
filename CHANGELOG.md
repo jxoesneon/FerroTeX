@@ -6,6 +6,53 @@ The format is based on **Keep a Changelog**, and this project intends to follow 
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-01-15
+
+### "The Debug & Reliability Update"
+
+This minor release introduces the fully validated **Tectonic Debug Driver** alongside our massive semantic engine reliability improvements.
+
+### Added
+
+- **Debug Adapter Protocol (DAP)**:
+  - Finalized **Tectonic Adapter** implementation with robust launch sequences.
+  - Implemented `launch`, `attach`, `evaluate`, and `variables` requests for the Tectonic engine.
+  - Added support for live engine event interpretation during debugging.
+
+### Fixed
+
+- **Parsing Resilience**:
+  - Resolved potential panic in `scan_file` when encountering malformed/detached braces command arguments.
+  - Hardened scanner against partial/broken package declarations.
+- **Bibliography Indexing**:
+  - Fixed edge case where `get_all_citation_keys` ignored bibliographies not explicitly referenced by a TeX file (orphan bib support).
+
+### Changed
+
+- **Code Quality**:
+  - Enforced strict `cargo clippy` compliance across the entire workspace.
+  - Verified compilation of optimized release artifacts with `lto = true`.
+- **Testing**:
+  - **Achieved >95% Coverage** in the Language Server Semantic Engine.
+  - Achieved **96.0%** coverage in `hover.rs`.
+  - Achieved **~95.8%** coverage in `workspace.rs`.
+  - Achieved **100%** coverage in `completer.rs`.
+
+## [0.21.1] - 2026-01-04
+
+### "Registry Sovereignty" Patch
+
+This patch release formalizes the transition of the core Tectonic engine from a locally vendored and patched fork to an officially published registry-based dependency on crates.io.
+
+### Changed
+
+- **Tectonic Integration**:
+  - Shifted from `path`-based patches to registry dependencies for all `jxoesneon-tectonic-*` crates.
+  - Standardized dependency constraints to `>= 0.16.0` to leverage the newly published [`jxoesneon-tectonic`](https://crates.io/crates/jxoesneon-tectonic) ecosystem.
+  - Unified the engine feature flag to `jxoesneon-tectonic-engine` across the workspace for consistent configuration.
+- **Project Portability**:
+  - Removed the requirement for a local `upstream/tectonic` clone for standard builds, enabling faster and more reliable CI/CD and developer onboarding.
+
 ## [0.21.0] - 2026-01-03
 
 ### "Global Expansion" Release

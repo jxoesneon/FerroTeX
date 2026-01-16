@@ -213,3 +213,48 @@ pub fn suggest_package(command: &str) -> Option<String> {
         )
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_explain_known_error() {
+        let msg = "Something Undefined control sequence happened";
+        let explanation = explain(msg).expect("Should find explanation");
+        assert_eq!(explanation.summary, "Unknown command");
+    }
+
+    #[test]
+    fn test_explain_unknown_error() {
+        let msg = "Random system failure";
+        assert!(explain(msg).is_none());
+    }
+
+    #[test]
+    fn test_extract_undefined_command() {
+        assert_eq!(
+            extract_undefined_command("Undefined control sequence \\foo"),
+            Some("\\foo".to_string())
+        );
+        assert_eq!(
+            extract_undefined_command("Undefined control sequence \\bar baz"),
+            Some("\\bar".to_string())
+        );
+        // Edge case: simple backslash check
+        assert_eq!(
+            extract_undefined_command("Error \\mycommand "),
+            Some("\\mycommand".to_string())
+        );
+    }
+
+    #[test]
+    fn test_suggest_package() {
+        let suggestion = suggest_package("\\includegraphics");
+        assert!(suggestion.is_some());
+        assert!(suggestion.unwrap().contains("usepackage{graphicx}"));
+
+        let unknown = suggest_package("\\unknowncmd");
+        assert!(unknown.is_none());
+    }
+}

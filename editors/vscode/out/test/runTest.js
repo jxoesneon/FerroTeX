@@ -29,10 +29,11 @@ async function main() {
     try {
         const extensionDevelopmentPath = path.resolve(__dirname, "../../");
         const extensionTestsPath = path.resolve(__dirname, "./suite/index");
+        const testWorkspace = process.env.TEST_WORKSPACE || path.resolve(extensionDevelopmentPath, "../../demo");
         await (0, test_electron_1.runTests)({
             extensionDevelopmentPath,
             extensionTestsPath,
-            launchArgs: [path.resolve(extensionDevelopmentPath, "../../demo")],
+            launchArgs: [testWorkspace],
         });
     }
     catch (err) {

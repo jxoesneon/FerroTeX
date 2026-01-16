@@ -19,6 +19,7 @@ async fn setup_server() -> (BufReader<ReadHalf<DuplexStream>>, WriteHalf<DuplexS
             ferrotex_core::package_manager::PackageManager::new(),
         )),
         package_index: std::sync::Arc::new(std::sync::Mutex::new(None)),
+        build_engine: std::sync::Arc::new(ferrotexd::build::latexmk::LatexmkAdapter::new()),
     });
 
     let (server_read, server_write) = tokio::io::split(server_side);

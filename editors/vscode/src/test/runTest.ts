@@ -6,10 +6,12 @@ async function main() {
     const extensionDevelopmentPath = path.resolve(__dirname, "../../");
     const extensionTestsPath = path.resolve(__dirname, "./suite/index");
 
+    const testWorkspace =
+      process.env.TEST_WORKSPACE || path.resolve(extensionDevelopmentPath, "../../demo");
     await runTests({
       extensionDevelopmentPath,
       extensionTestsPath,
-      launchArgs: [path.resolve(extensionDevelopmentPath, "../../demo")],
+      launchArgs: [testWorkspace],
     });
   } catch (err) {
     console.error("Failed to run tests:", err);

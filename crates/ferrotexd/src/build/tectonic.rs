@@ -103,3 +103,20 @@ impl BuildEngine for TectonicAdapter {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_tectonic_adapter_name() {
+        let adapter = TectonicAdapter;
+        assert_eq!(adapter.name(), "tectonic");
+    }
+
+    #[tokio::test]
+    async fn test_tectonic_adapter_instantiation() {
+        let adapter = TectonicAdapter;
+        assert_eq!(adapter.name(), "tectonic");
+    }
+}

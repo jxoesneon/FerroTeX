@@ -365,4 +365,28 @@ mod tests {
         assert_eq!(tokens[1], (SyntaxKind::Whitespace, "\u{00A0}"));
         assert_eq!(tokens[2], (SyntaxKind::Text, "b"));
     }
+
+    #[test]
+    fn test_lexer_comment_eof() {
+        let input = "% comment";
+        let tokens = tokenize(input);
+        assert_eq!(tokens, vec![(SyntaxKind::Comment, "% comment")]);
+    }
+
+    #[test]
+    fn test_lexer_command_termination() {
+        let input = r"\cmd.";
+        let tokens = tokenize(input);
+        assert_eq!(
+            tokens,
+            vec![(SyntaxKind::Command, r"\cmd"), (SyntaxKind::Text, ".")]
+        );
+    }
+
+    #[test]
+    fn test_lexer_unicode_command() {
+        let input = r"\é";
+        let tokens = tokenize(input);
+        assert_eq!(tokens, vec![(SyntaxKind::Command, r"\é")]);
+    }
 }

@@ -29,7 +29,7 @@ pub enum BuildStatus {
 }
 
 #[async_trait]
-pub trait BuildEngine: Send + Sync {
+pub trait BuildEngine: std::fmt::Debug + Send + Sync {
     /// uniquely identifies the engine (e.g. "latexmk", "tectonic")
     fn name(&self) -> &str;
 
@@ -44,5 +44,5 @@ pub trait BuildEngine: Send + Sync {
 }
 
 pub mod latexmk;
-#[cfg(feature = "use-tectonic")]
+#[cfg(feature = "use-jxoesneon-tectonic")]
 pub mod tectonic;
