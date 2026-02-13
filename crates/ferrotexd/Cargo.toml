@@ -15,13 +15,13 @@ dashmap = "6.1"
 crossbeam-channel = "0.5"
 notify = "8.2"
 reqwest = { version = "0.13", features = ["blocking", "json"] }
-zip = "4.6"
-tempfile = "3.8"
+zip = "7.4"
+tempfile = "3.25"
 url = "2.5"
 glob = "0.3"
 walkdir = "2.4"
-regex = "1.10"
-uuid = { version = "1.6", features = ["v4"] }
+regex = "1.12"
+uuid = { version = "1.20", features = ["v4"] }
 line-index = "0.1"
 dirs = "6.0"
 which = "8.0"
