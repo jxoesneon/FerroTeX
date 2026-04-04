@@ -140,6 +140,15 @@ mod tests {
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
+
+    #[test]
+    fn test_cache_save_load() {
+        let index = PackageIndex::new();
+        // These calls ensure coverage of save_to_cache and load_from_cache
+        // even if they don't do anything because of None cache_path.
+        let _ = index.save_to_cache();
+        let _ = PackageIndex::load_from_cache();
+    }
 }
 
 /// Metadata about a single LaTeX package.

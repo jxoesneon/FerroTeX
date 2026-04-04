@@ -34,3 +34,28 @@ async fn main() {
 
     Server::new(stdin, stdout, socket).serve(service).await;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ferrotexd::build::latexmk::LatexmkAdapter;
+
+    #[test]
+    fn test_backend_instantiation_logic() {
+        let (service, _socket) = LspService::new(|client| Backend {
+            client,
+            documents: Arc::new(DashMap::new()),
+            workspace: Arc::new(Workspace::new()),
+            root_uri: Arc::new(Mutex::new(None)),
+            syntax_diagnostics: Arc::new(DashMap::new()),
+            package_manager: Arc::new(Mutex::new(
+                ferrotex_core::package_manager::PackageManager::new(),
+            )),
+            package_index: Arc::new(Mutex::new(None)),
+            build_engine: Arc::new(LatexmkAdapter::new()),
+        });
+        
+        let backend = service.inner();
+        assert!(backend.documents.is_empty());
+    }
+}

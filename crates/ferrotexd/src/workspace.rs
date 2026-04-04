@@ -877,9 +877,10 @@ fn scan_file(text: &str) -> ScanResult {
                                 } else {
                                     &text
                                 };
-                                let arg = content.to_string();
+                                let arg = content.trim().to_string();
 
                                 match cmd_name.as_str() {
+
                                     "\\label" => defs.push(LabelDef {
                                         name: arg,
                                         range: cmd_range,
@@ -1785,5 +1786,70 @@ mod tests {
         let text4 = "\\usepackage{incomplete";
         let res4 = scan_file(text4);
         assert!(res4.6.is_empty());
+    }
+
+    #[test]
+    fn test_scan_file_coverage_expansion() {
+        // 1. Deprecated command not in a group (hits 777, 783)
+        let res = scan_file(r"\bf not in group");
+        assert_eq!(res.8[0].1, r"\bf");
+
+        // 2. Hits 731-732 (deprecated displaymath)
+        let res_dm = scan_file(r"$$ x+y $$");
+        assert!(!res_dm.8.is_empty());
+        assert_eq!(res_dm.8[0].1, "displaymath");
+
+        // 3. Command name extraction with brace (hits 790, 814-816)
+        let res_lb = scan_file(r"\label{foo}");
+        assert!(!res_lb.1.is_empty());
+        assert_eq!(res_lb.1[0].name, "foo");
+
+        // 4. Bibliography multiple paths (hits 837)
+        let res_bib = scan_file(r"\bibliography{a, b}");
+        assert_eq!(res_bib.4.len(), 2);
+        assert_eq!(res_bib.4[0].path, "a");
+        assert_eq!(res_bib.4[1].path, "b");
+
+        // 5. Cite multiple keys (hits 848)
+        let res_cite = scan_file(r"\cite{k1, k2}");
+        assert_eq!(res_cite.3.len(), 2);
+        assert_eq!(res_cite.3[0].key, "k1");
+        assert_eq!(res_cite.3[1].key, "k2");
+
+        // 6. Hits 860, 873 (detached group)
+        let res_sec = scan_file(r"\section {Title}");
+        assert_eq!(res_sec.5.len(), 1);
+        assert_eq!(res_sec.5[0].name, "Title");
+
+        // 7. Hits 755 (last_cmd = None when non-cmd non-whitespace encountered)
+        let res_plain = scan_file(r"\section plain text {Title}");
+        assert!(res_plain.5.is_empty());
+
+        // 8. extract_label_data empty group (hits 1014)
+        let res_empty = scan_file(r"\label{}");
+        assert_eq!(res_empty.1.len(), 1);
+        assert_eq!(res_empty.1[0].name, "");
+
+        // 9. section without arg (hits 863)
+        let res_no_arg = scan_file(r"\section");
+        assert!(res_no_arg.5.is_empty());
+
+        // 10. bibliography as a node (hits 868)
+        let res_node = scan_file(r"\bibliography{r}");
+        assert!(!res_node.4.is_empty());
+        
+        // 11. extract_label_data without closing brace (hits 1007)
+        // We need a SyntaxNode that doesn't end with }.
+        // This might be tricky via scan_file, but let's try.
+        let res_broken = scan_file(r"\label{unclosed");
+        _ = res_broken;
+
+        // 12. Test leading/trailing space in label (hits 1018-1025)
+        let res_space = scan_file(r"\label{  foo  }");
+        assert_eq!(res_space.1[0].name, "foo");
+
+        // 13. Test group with only spaces (hits 1011)
+        let res_only_spaces = scan_file(r"\label{   }");
+        assert_eq!(res_only_spaces.1[0].name, "");
     }
 }

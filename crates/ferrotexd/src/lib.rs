@@ -789,8 +789,8 @@ impl Backend {
         let parse_res = ferrotex_syntax::parse(text);
         let line_index = LineIndex::new(text);
 
-        for node in parse_res.syntax().descendants() {
-            let kind = node.kind();
+        for element in parse_res.syntax().descendants_with_tokens() {
+            let kind = element.kind();
             let token_type = match kind {
                 SyntaxKind::Command => 0,     // MACRO
                 SyntaxKind::Environment => 1, // KEYWORD
@@ -799,7 +799,7 @@ impl Backend {
                 _ => continue,
             };
 
-            let range = node.text_range();
+            let range = element.text_range();
             let start = line_index.line_col(range.start());
             let end = line_index.line_col(range.end());
 
@@ -1258,5 +1258,62 @@ mod tests {
 
         // Allow some time for the spawn to run
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+
+    #[test]
+    fn test_completion_kind_coverage() {
+        let kind = CompletionKind::Command;
+        assert_eq!(kind, CompletionKind::Command);
+        assert_ne!(kind, CompletionKind::Environment);
+        let copy = kind;
+        assert_eq!(copy, kind);
+        let _ = format!("{:?}", kind); // Exercise Debug
+    }
+
+    #[tokio::test]
+    async fn test_compute_semantic_tokens_detailed() {
+        let service = setup().await;
+        let backend = service.inner();
+        let text = "% comment\n\\section{Title}\n\\begin{itemize}\n\\item Item\n\\end{itemize}";
+        let tokens = backend.compute_semantic_tokens(text);
+        
+        assert!(!tokens.is_empty());
+        // Verify we find at least one of each expected type
+        assert!(tokens.iter().any(|t| t.token_type == 3)); // COMMENT
+        assert!(tokens.iter().any(|t| t.token_type == 0)); // MACRO
+        assert!(tokens.iter().any(|t| t.token_type == 2)); // STRING (Group)
+    }
+
+    #[tokio::test]
+    async fn test_execute_command_invalid_args() {
+        let service = setup().await;
+        let backend = service.inner();
+
+        // Build with invalid URI
+        let params = ExecuteCommandParams {
+            command: "ferrotex.internal.build".to_string(),
+            arguments: vec![serde_json::Value::String("invalid-uri".to_string())],
+            ..Default::default()
+        };
+        let res = backend.execute_command(params).await;
+        assert!(res.is_err());
+
+        // SyncTeX Forward with missing args
+        let params = ExecuteCommandParams {
+            command: "ferrotex.synctex_forward".to_string(),
+            arguments: vec![serde_json::Value::String("file:///test.tex".to_string())],
+            ..Default::default()
+        };
+        let res = backend.execute_command(params).await;
+        assert!(res.is_ok()); // It uses unwrap_or(0) for missing line/col
+
+        // SyncTeX Inverse with invalid URI
+        let params = ExecuteCommandParams {
+            command: "ferrotex.synctex_inverse".to_string(),
+            arguments: vec![serde_json::Value::String("not-a-uri".to_string())],
+            ..Default::default()
+        };
+        let res = backend.execute_command(params).await;
+        assert!(res.is_err());
     }
 }

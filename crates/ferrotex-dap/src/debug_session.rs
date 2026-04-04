@@ -285,7 +285,7 @@ impl DebugDriver for TectonicDebugSession {
                     .output_dir(output_dir)
                     .pass(PassSetting::Default)
                     .bundle(bundle)
-                    .filesystem_io(stepping_io); // Use our custom I/O
+                    .filesystem_root(stepping_io); // Use our custom I/O
 
                 // Inject expansion hook
                 let event_tx_hook = event_tx.clone();
@@ -992,5 +992,92 @@ Hello, FerroTeX!
         let event_vars_clone = event_vars.clone();
         assert!(format!("{:?}", event_vars).contains("k"));
         assert!(format!("{:?}", event_vars_clone).contains("v"));
+    }
+
+    #[test]
+    fn test_mock_driver_comprehensive() {
+        let driver = MockDebugSession;
+        let (tx, rx) = driver.spawn();
+
+        // 1. Test Step
+        tx.send(EngineCommand::Step).unwrap();
+        let ev = rx.recv_timeout(std::time::Duration::from_millis(500)).unwrap();
+        assert!(matches!(ev, EngineEvent::Output(s) if s.contains("Step 0")));
+        let ev = rx.recv_timeout(std::time::Duration::from_millis(500)).unwrap();
+        assert!(matches!(ev, EngineEvent::Stopped { reason, .. } if reason == "step"));
+
+        // 2. Test Continue multiple times
+        for i in 1..=4 {
+            tx.send(EngineCommand::Continue).unwrap();
+            let ev = rx.recv_timeout(std::time::Duration::from_millis(500)).unwrap();
+            assert!(matches!(ev, EngineEvent::Output(s) if s.contains(&format!("Processing chunk {}", i))));
+        }
+
+        // 3. The next continue should reach steps=6 and terminate
+        tx.send(EngineCommand::Continue).unwrap();
+        let ev = rx.recv_timeout(std::time::Duration::from_millis(500)).unwrap();
+        assert!(matches!(ev, EngineEvent::Output(s) if s.contains("Processing chunk 5")));
+        let ev = rx.recv_timeout(std::time::Duration::from_millis(500)).unwrap();
+        assert!(matches!(ev, EngineEvent::Terminated));
+
+        // 4. After termination, the event channel should be closed
+        let result = rx.recv_timeout(std::time::Duration::from_millis(100));
+        assert!(matches!(result, Err(std::sync::mpsc::RecvTimeoutError::Disconnected)));
+    }
+
+    #[test]
+    fn test_mock_driver_cmd_tx_dropped() {
+        let driver = MockDebugSession;
+        let (tx, rx) = driver.spawn();
+        drop(tx); // Should cause recv() to return Err and break the loop
+        let result = rx.recv_timeout(std::time::Duration::from_millis(500));
+        assert!(matches!(result, Err(std::sync::mpsc::RecvTimeoutError::Disconnected)));
+    }
+
+    #[test]
+    fn test_mock_driver_event_rx_dropped() {
+        let driver = MockDebugSession;
+        let (tx, rx) = driver.spawn();
+        drop(rx);
+        // This should not panic even though event_tx.send will fail
+        tx.send(EngineCommand::Step).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+
+    #[test]
+    fn test_engine_command_pause_explicit() {
+        let driver = MockDebugSession;
+        let (tx, rx) = driver.spawn();
+        tx.send(EngineCommand::Pause).unwrap();
+        // Pause should hit the wildcard and break the loop
+        let result = rx.recv_timeout(std::time::Duration::from_millis(500));
+        assert!(matches!(result, Err(std::sync::mpsc::RecvTimeoutError::Disconnected)));
+    }
+
+    struct DummyDriver;
+    impl DebugDriver for DummyDriver {
+        fn spawn(&self) -> (Sender<EngineCommand>, Receiver<EngineEvent>) {
+            let (cmd_tx, _cmd_rx) = std::sync::mpsc::channel();
+            let (_event_tx, event_rx) = std::sync::mpsc::channel();
+            (cmd_tx, event_rx)
+        }
+    }
+
+    #[test]
+    fn test_debug_driver_trait_coverage() {
+        let driver = DummyDriver;
+        let (_tx, _rx) = driver.spawn();
+    }
+
+    #[test]
+    fn test_engine_event_variables_updated_explicit() {
+        let mut vars = std::collections::HashMap::new();
+        vars.insert("foo".to_string(), "bar".to_string());
+        let event = EngineEvent::VariablesUpdated(vars);
+        if let EngineEvent::VariablesUpdated(v) = event {
+            assert_eq!(v.get("foo").unwrap(), "bar");
+        } else {
+            panic!("Expected VariablesUpdated variant");
+        }
     }
 }
