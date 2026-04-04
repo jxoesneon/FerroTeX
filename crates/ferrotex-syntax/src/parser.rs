@@ -572,5 +572,81 @@ mod tests {
         // This should probably be an error, although some parsers might just close the current env.
         // Let's see what our current implementation does.
         assert!(!result.errors.is_empty());
+        assert!(result.errors.iter().any(|e| e.message.contains("Mismatched environment")));
+    }
+
+    #[test]
+    fn test_parser_missing_args() {
+        let inputs = vec![
+            (r"\section", "Expected '{' after \\section"),
+            (r"\begin", "Expected '{' after \\begin"),
+            (r"\label", "Expected '{' after \\label"),
+            (r"\ref", "Expected '{' after \\ref"),
+            (r"\cite", "Expected '{' after \\cite"),
+            (r"\bibliography", "Expected '{' after bibliography command"),
+            (r"\input", "Expected '{' after include command"),
+        ];
+
+        for (input, expected_err) in inputs {
+            let res = parse(input);
+            assert!(
+                res.errors.iter().any(|e| e.message.contains(expected_err)),
+                "Input '{}' should produce error '{}' but got: {:?}",
+                input,
+                expected_err,
+                res.errors
+            );
+        }
+    }
+
+    #[test]
+    fn test_parser_unmatched_brace_root() {
+        let input = "text } more text";
+        let res = parse(input);
+        assert!(!res.errors.is_empty());
+        assert!(res.errors.iter().any(|e| e.message.contains("Unmatched '}'")));
+    }
+
+    #[test]
+    fn test_parser_env_missing_end_brace() {
+        let input = r"\begin{itemize \item A \end{itemize}";
+        let res = parse(input);
+        // \begin expects {name}, if { is there, it calls parse_group.
+        // parse_group expects { ... }
+        assert!(!res.errors.is_empty());
+    }
+
+    #[test]
+    fn test_parser_nested_same_env() {
+        let input = r"\begin{center} \begin{center} inner \end{center} outer \end{center}";
+        let res = parse(input);
+        assert!(res.errors.is_empty(), "Nested same-name envs should parse: {:?}", res.errors);
+    }
+
+    #[test]
+    fn test_parser_deep_recovery() {
+        let input = r"\section{One} \invalid{ \begin{itemize} \item Two \end{itemize} } \section{Three}";
+        let res = parse(input);
+        let node = res.syntax();
+        // Should find two sections despite the \invalid{...} part
+        let sections: Vec<_> = node.descendants().filter(|n| n.kind() == SyntaxKind::Section).collect();
+        assert!(sections.len() >= 2);
+    }
+
+    #[test]
+    fn test_parser_unclosed_env_at_eof() {
+        let input = r"\begin{env} some text";
+        let res = parse(input);
+        assert!(!res.errors.is_empty());
+        assert!(res.errors.iter().any(|e| e.message.contains("Unclosed environment")));
+    }
+
+    #[test]
+    fn test_parser_begin_whitespace() {
+        let input = r"\begin {itemize} \end {itemize}";
+        let res = parse(input);
+        // Current implementation expects { immediately after \begin.
+        // Let's see if it produces errors.
+        assert!(!res.errors.is_empty());
     }
 }

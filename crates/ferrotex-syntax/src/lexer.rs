@@ -389,4 +389,67 @@ mod tests {
         let tokens = tokenize(input);
         assert_eq!(tokens, vec![(SyntaxKind::Command, r"\é")]);
     }
+
+    #[test]
+    fn test_lexer_trailing_backslash() {
+        let input = r"\";
+        let tokens = tokenize(input);
+        assert_eq!(tokens, vec![(SyntaxKind::Command, r"\")]);
+    }
+
+    #[test]
+    fn test_lexer_multiple_backslashes() {
+        let input = r"\\";
+        let tokens = tokenize(input);
+        // First \ followed by \ makes it a single-symbol command
+        assert_eq!(tokens, vec![(SyntaxKind::Command, r"\\")]);
+    }
+
+    #[test]
+    fn test_lexer_command_followed_by_digit() {
+        let input = r"\1";
+        let tokens = tokenize(input);
+        assert_eq!(tokens, vec![(SyntaxKind::Command, r"\1")]);
+    }
+
+    #[test]
+    fn test_lexer_crlf_line_endings() {
+        let input = "line1%\r\nline2";
+        let tokens = tokenize(input);
+        assert_eq!(
+            tokens,
+            vec![
+                (SyntaxKind::Text, "line1"),
+                (SyntaxKind::Comment, "%"),
+                (SyntaxKind::Whitespace, "\r\n"),
+                (SyntaxKind::Text, "line2"),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_lexer_comment_only_cr() {
+        let input = "%comment\rnext";
+        let tokens = tokenize(input);
+        assert_eq!(tokens[0], (SyntaxKind::Comment, "%comment"));
+        assert_eq!(tokens[1], (SyntaxKind::Whitespace, "\r"));
+    }
+
+    #[test]
+    fn test_lexer_math_mode_complex() {
+        let input = r"$x^2 + \alpha$";
+        let tokens = tokenize(input);
+        assert_eq!(
+            tokens,
+            vec![
+                (SyntaxKind::Dollar, "$"),
+                (SyntaxKind::Text, "x^2"),
+                (SyntaxKind::Whitespace, " "),
+                (SyntaxKind::Text, "+"),
+                (SyntaxKind::Whitespace, " "),
+                (SyntaxKind::Command, r"\alpha"),
+                (SyntaxKind::Dollar, "$"),
+            ]
+        );
+    }
 }
