@@ -135,6 +135,7 @@ mod additional_tests;
 #[cfg(test)]
 mod coverage_tests;
 
+pub use ferrotex_build::error::{FerroTeXError, FerroTeXResult, SourceLocation};
 pub use parser::parse;
 use rowan::Language;
 pub use rowan::{TextRange, TextSize};
