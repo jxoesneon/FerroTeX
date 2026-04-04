@@ -464,11 +464,14 @@
     "@vscode/vsce": "^2.22.0",
     "esbuild": "^0.27.2",
     "glob": "^10.0.0",
-    "mocha": "^10.2.0",
+    "mocha": "^11.3.0",
     "typescript": "^4.9.0"
   },
   "dependencies": {
     "pdfjs-dist": "^5.4.449",
     "vscode-languageclient": "^8.1.0"
+  },
+  "overrides": {
+    "serialize-javascript": "^7.0.5"
   }
 }
