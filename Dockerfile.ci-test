@@ -1,0 +1,38 @@
+# CI Testing Dockerfile for FerroTeX
+# Based on Ubuntu 22.04 to match GitHub Actions CI environment
+
+FROM ubuntu:22.04
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install system dependencies matching GitHub Actions CI
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    pkg-config \
+    cmake \
+    nasm \
+    libicu-dev \
+    libharfbuzz-dev \
+    libfontconfig1-dev \
+    libssl-dev \
+    libgraphite2-dev \
+    libfreetype6-dev \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Rust stable toolchain
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Install cargo tools for CI
+RUN cargo install cargo-nextest --locked
+
+# Install mold linker for faster builds
+RUN apt-get update && apt-get install -y mold && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+
+# Default command
+CMD ["bash"]

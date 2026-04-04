@@ -956,6 +956,7 @@ checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 name = "ferrotex-analysis"
 version = "0.22.0"
 dependencies = [
+ "ferrotex-build",
  "ferrotex-syntax",
  "serde",
  "thiserror 2.0.18",
@@ -1069,6 +1070,7 @@ name = "ferrotex-syntax"
 version = "0.22.0"
 dependencies = [
  "criterion",
+ "ferrotex-build",
  "rowan",
 ]
 
