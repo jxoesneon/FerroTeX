@@ -1,6 +1,6 @@
 [package]
 name = "ferrotex-dap"
-version = "0.22.0"
+version = "0.23.0"
 edition = "2024"
 
 [dependencies]
@@ -12,7 +12,7 @@ sha2 = "0.11"
 hex = "0.4"
 # crossbeam-channel = "0.5" # Likely needed for message passing
 # dap-types? Writing raw for now to avoid bulky deps
-ferrotex-build = { path = "../ferrotex-build", version = "0.22.0" }
+ferrotex-build = { path = "../ferrotex-build", version = "0.23.0" }
 
 # [features]
 # default = []
