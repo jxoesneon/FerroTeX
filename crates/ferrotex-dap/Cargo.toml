@@ -14,9 +14,9 @@ hex = "0.4"
 # dap-types? Writing raw for now to avoid bulky deps
 ferrotex-build = { path = "../ferrotex-build", version = "0.22.0" }
 
-[features]
-default = []
-jxoesneon-tectonic-engine = ["jxoesneon-tectonic", "jxoesneon-tectonic-status_base", "jxoesneon-tectonic-io_base", "jxoesneon-tectonic-bridge_core"]
+# [features]
+# default = []
+# jxoesneon-tectonic-engine = ["jxoesneon-tectonic", "jxoesneon-tectonic-status_base", "jxoesneon-tectonic-io_base", "jxoesneon-tectonic-bridge_core"]
 
 [dependencies.jxoesneon-tectonic]
 package = "tectonic"
