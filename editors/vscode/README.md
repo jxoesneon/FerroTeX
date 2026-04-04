@@ -23,8 +23,8 @@ FerroTeX is strictly tested on **Windows**, ensuring a professional experience f
 
 ## 💎 The FerroTeX Advantage
 
-| Indexing Speed | Semantic Precision | Zero-Config Portability |
-| :--- | :--- | :--- |
+| Indexing Speed                                                                    | Semantic Precision                                                                    | Zero-Config Portability                                                       |
+| :-------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------ | :---------------------------------------------------------------------------- |
 | **Instant Startup**: Hand-written Rust parser indexes 100+ files in milliseconds. | **Math Awareness**: We don't just find text; we understand matrices and environments. | **Bundled Runtime**: No 5GB TeX Live required. We bundle everything you need. |
 
 ---
@@ -32,12 +32,16 @@ FerroTeX is strictly tested on **Windows**, ensuring a professional experience f
 ## 🚀 Key Features
 
 ### 1. Scientific Reproducibility (`ferrotex.lock`)
+
 The first LaTeX environment with built-in hermeticity. FerroTeX generates a SHA256 content-addressable lockfile for every build.
+
 - **Guarantee**: If it builds on your machine, it builds on your co-author's machine.
 - **Security**: Verify the integrity of your package dependencies automatically.
 
 ### 2. Semantic Math Analysis
+
 FerroTeX goes beyond regex. Our engine understands the structural properties of math.
+
 - **Jagged Matrix Detection**: Instantly flags row/column dimension mismatches.
 - **Delimiter Balancing**: Real-time diagnostics for unclosed or mismatched math brackets.
 - **Multicolumn Intelligence**: Correctly handles spanning cells in complex tables.
@@ -47,7 +51,9 @@ FerroTeX goes beyond regex. Our engine understands the structural properties of 
 </p>
 
 ### 3. Unified Error Architecture
+
 Stop deciphering cryptic `.log` files. FerroTeX translates low-level TeX errors into actionable advice with "actionable fixes" suggested for over 50 common patterns.
+
 - **Structured Truth**: All errors are machine-readable and precisely mapped to source spans.
 
 <p align="center">
@@ -55,6 +61,7 @@ Stop deciphering cryptic `.log` files. FerroTeX translates low-level TeX errors 
 </p>
 
 ### 4. Integrated Professional Toolchain
+
 - **Zero-Config Build**: Automatically sets up **Tectonic** if no local distribution is found.
 - **Integrated PDF Preview**: Powered by PDF.js with full **SyncTeX** bidirectional search.
 - **Image Paste Wizard**: Seamlessly paste images from clipboard with automatic snippet insertion.
@@ -64,7 +71,9 @@ Stop deciphering cryptic `.log` files. FerroTeX translates low-level TeX errors 
 </p>
 
 ### 5. Interactive Debugging (DAP)
+
 Debug your LaTeX source like actual code.
+
 - **Variables View**: Inspect real-time values of TeX registers (\`\\count\`, \`\\dimen\`, \`\\skip\`).
 - **Stepping**: Step-in/Step-over macro expansions.
 
@@ -87,4 +96,5 @@ FerroTeX is open source and built with ❤️ in Rust. We welcome contributions 
 - **Issues**: [Report a Bug or Feature Request](https://github.com/jxoesneon/FerroTeX/issues)
 
 ---
+
 _Powered by the FerroTeX Language Server and the speed of Rust._
