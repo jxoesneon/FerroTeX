@@ -15,6 +15,10 @@
 
 FerroTeX v0.22.0 introduces the **Tectonic Debug Driver**, allowing you to inspect TeX internals (`\count`, `\dimen`) and step through macros like code. This release also marks a major milestone in stability with **>95% Semantic Engine Test Coverage**.
 
+### 🪟 Now on Windows!
+
+FerroTeX is strictly tested on **Windows**, ensuring a first-class experience for all developers. No WSL required.
+
 ## 💎 The FerroTeX Advantage
 
 | Indexing Speed                                                                    | Semantic Precision                                                                    | Zero-Config Portability                                                       |
