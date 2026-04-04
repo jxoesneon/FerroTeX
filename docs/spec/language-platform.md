@@ -140,6 +140,14 @@ Source diagnostics are produced from:
 
 Diagnostics MUST use stable codes (see `diagnostic-codes.md`).
 
+### Keystroke-level Feedback Loop
+
+FerroTeX provides immediate diagnostic feedback as the user types, moving beyond manual build triggers or "on-save" analysis.
+
+- **Non-blocking**: Analysis happens in the background, ensuring no input lag.
+- **Reactive**: Only the affected regions of the document and its dependencies are re-analyzed.
+- **Persistent**: Diagnostic state is maintained within the reactive dependency graph (see `incremental-analysis.md`).
+
 ## Interactions with Build Observability
 
 Build diagnostics can be enhanced by source analysis:

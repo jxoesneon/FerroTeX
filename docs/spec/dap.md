@@ -27,6 +27,10 @@ FerroTeX considers the following debugging primitives:
   - show token lists / expansion traces
   - show selected counters and registers
 
+- **Advanced Debugging: Time-Travel**
+  - **Step-Backward**: Revert the engine state to the previous expansion step by restoring a snapshot from the Reversible Expansion log.
+  - **Ghost Expansion**: Provide a side-effect-free "preview" of macro expansion on hover. This is implemented by forking the Abstract Machine at the current cursor position and executing it until a fixed depth or stable state is reached.
+
 ## Feasibility Notes
 
 - LuaTeX is the primary candidate for meaningful introspection.

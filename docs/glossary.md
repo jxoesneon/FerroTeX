@@ -44,6 +44,30 @@ Language Server Protocol. FerroTeX uses LSP to publish diagnostics and editor fe
 
 Debug Adapter Protocol. FerroTeX may use DAP for exploratory “debugging” semantics for TeX.
 
-### Golden Test
+### Concrete Syntax Tree (CST)
 
-A test in which the expected output (e.g., JSON event stream) is stored and compared for regression detection.
+A lossless, fault-tolerant tree representation of the source code. Unlike an AST, it preserves all tokens, including whitespace and comments, ensuring that formatting is maintained during refactoring.
+
+### Abstract Machine
+
+A specialized engine (`ferrotex-analysis`) that performs abstract interpretation of TeX macros. It models the "stomach" of TeX to predict macro expansion behavior without requiring a full engine run.
+
+### Virtual File System (VFS)
+
+An abstraction layer that intercepts file I/O to isolate the TeX engine within the project root, preventing unauthorized filesystem access.
+
+### Capabilities-Based Security
+
+A security model where permissions (e.g., read, write, execute) are explicitly granted as "capabilities" to a build context, rather than being determined by the user's global system permissions.
+
+### Incremental Analysis
+
+The process of re-analyzing only the portions of a document affected by a specific change, enabling keystroke-level feedback by minimizing re-computation.
+
+### Time-Travel Debugging
+
+The ability to step backward through the macro expansion process. Enabled by snapshotting the state of the Abstract Machine at every expansion step.
+
+### Symbolic Execution
+
+A method of analyzing mathematical environments by treating variables as symbols rather than concrete values, allowing for the detection of structural inconsistencies like matrix dimension mismatches.
