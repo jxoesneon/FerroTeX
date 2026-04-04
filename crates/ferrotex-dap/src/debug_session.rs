@@ -1,3 +1,5 @@
+#![allow(unexpected_cfgs)]
+
 use std::sync::mpsc::{Receiver, Sender};
 
 #[derive(Debug, Clone)]
