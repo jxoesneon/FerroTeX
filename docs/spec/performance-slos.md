@@ -22,6 +22,14 @@ On representative medium projects:
 
 These targets are advisory until implementation benchmarks exist.
 
+## The "Speed" Aspiration
+
+To achieve "Incremental Everything," FerroTeX aims for:
+
+- **50ms re-analysis** for documents up to **500 pages**.
+
+This ensures that keystroke-level diagnostic feedback is indistinguishable from local editing latency, even in large monographs or theses.
+
 ## Parsing and Indexing
 
 - incremental parse update: proportional to change size

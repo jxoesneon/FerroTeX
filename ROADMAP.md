@@ -14,6 +14,15 @@ FerroTeX targets two pillars:
 - **Engine/toolchain adapters at the edge**: keep parsing/reconstruction core independent from latexmk/tectonic specifics.
 - **Measure everything**: performance and correctness claims require benchmarks and labeled datasets.
 
+## Pillars of Technical Excellence
+
+To provide a highly refined and thoughtful experience for the research community, FerroTeX focuses on four key pillars of technical excellence:
+
+1. **Incremental Everything (The "Speed" Aspiration)**: Moving from manual triggers to keystroke-level feedback. Aims for 50ms re-analysis for 500-page documents using persistent incremental state.
+2. **"Time-Travel" Debugging (The "Observability" Aspiration)**: A mindful approach to macro expansion that supports stepping backward through the TeX stomach to understand exactly which token guided a state change.
+3. **Formal Verification of Math (The "Trust" Aspiration)**: Moving from "it looks right" to "it is mathematically sound." Provides automated checks for matrix dimensions and variable consistency via symbolic execution.
+4. **The "Safe-TeX" Sandbox (The "Security" Aspiration)**: A secure foundation for sensitive research environments using a global Virtual File System (VFS) and capabilities-based permissions.
+
 ## Release Plan (Semantic Versioning)
 
 Until `1.0.0`, breaking changes are allowed but MUST be documented in `CHANGELOG.md`.
@@ -398,6 +407,54 @@ Each release below includes:
 
 - BO-9
 - LP-5
+
+### v0.18.0 — The "Speed" Update (Incremental Analysis)
+
+**Scope**
+
+- **Reactive Abstract Machine**: Refactor `ferrotex-analysis` to use a reactive dependency graph (e.g., `salsa`).
+- **Incremental CST**: Sub-50ms re-parsing of large documents on `didChange` events.
+- **Keystroke-level Diagnostics**: Real-time feedback loop without manual build triggers.
+
+**Acceptance criteria**
+
+- Re-analysis of a 100,000-token document completes in <100ms.
+
+### v0.19.0 — The "Observability" Update (Time-Travel Debugging)
+
+**Scope**
+
+- **Reversible DAP**: Snapshot-based reversible macro expansion in `ferrotex-dap`.
+- **Ghost Expansion**: Hover-based macro preview showing fully expanded token streams.
+- **Breakpoint persistency**: Debug state preserved across incremental edits.
+
+**Acceptance criteria**
+
+- Step-backward functionality in VS Code debugger.
+
+### v0.20.0 — The "Trust" Update (Formal Math Verification)
+
+**Scope**
+
+- **Symbolic Math Execution**: Detect dimensional and structural inconsistencies in math environments.
+- **Formal Backend**: Experimental integration with Lean/Coq for proof-checking.
+- **Global CI CLI**: `ferrotex ci verify` for automated, reproducible document certification.
+
+**Acceptance criteria**
+
+- Automatically detect and flag mismatched matrix multiplication dimensions in LaTeX source.
+
+### v0.21.0 — The "Security" Update (Safe-TeX Sandbox)
+
+**Scope**
+
+- **VFS Enforcement**: Global Virtual File System wrapping all file I/O.
+- **Capabilities System**: Granular permission prompts for `shell-escape` and network access.
+- **Zero-Trust Defaults**: Deny all external side-effects by default.
+
+**Acceptance criteria**
+
+- Document compilation cannot read files outside the project root without explicit capability grant.
 
 ### v1.0.0 — The "Gold" Release (Ceremonial)
 

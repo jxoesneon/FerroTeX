@@ -70,7 +70,7 @@ pub fn execute(cli: Cli) -> FerroTeXResult<()> {
             }
             #[cfg(not(feature = "jxoesneon-tectonic-engine"))]
             {
-                ferrotex_dap::run_mock_session().map_err(anyhow::Error::from)?;
+                ferrotex_dap::run_mock_session()?;
             }
         }
         Commands::Build { path, output_dir } => {
@@ -244,7 +244,7 @@ mod tests {
         let mut pos = 0;
 
         // 1. Initial write
-        write!(file, "Initial content\n").unwrap();
+        writeln!(file, "Initial content").unwrap();
         let mut read_file = File::open(&log_path).unwrap();
 
         let _changes = process_log_change(&mut read_file, &mut pos, &mut parser).unwrap();
@@ -252,7 +252,7 @@ mod tests {
         assert!(pos > 0);
 
         // 2. Append
-        write!(file, "! LaTeX Error: Something wrong.\n").unwrap();
+        writeln!(file, "! LaTeX Error: Something wrong.").unwrap();
         let changes = process_log_change(&mut read_file, &mut pos, &mut parser).unwrap();
         assert!(!changes.is_empty());
         assert!(changes.iter().any(|s| s.contains("Error")));
@@ -260,7 +260,7 @@ mod tests {
         // 3. Truncate
         file.set_len(0).unwrap();
         file.seek(SeekFrom::Start(0)).unwrap();
-        write!(file, "New content\n").unwrap();
+        writeln!(file, "New content").unwrap();
 
         // This should reset and succeed
         assert!(process_log_change(&mut read_file, &mut pos, &mut parser).is_ok());

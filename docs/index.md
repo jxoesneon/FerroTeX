@@ -9,19 +9,65 @@ nav_order: 1
 # FerroTeX
 
 <p class="tagline">
-A high-performance, type-safe LaTeX language platform written in Rust. Industry-standard IDE features meet structured build observability.
+A high-performance, type-safe LaTeX language platform written in Rust. Industry-standard IDE features meet structured build observability and formal verification.
 </p>
 
 <div class="badges">
   <img src="https://img.shields.io/badge/rust-stable-orange?style=flat-square&logo=rust" alt="Rust">
   <img src="https://img.shields.io/badge/LSP-3.17-blue?style=flat-square" alt="LSP 3.17">
+  <img src="https://img.shields.io/badge/security-Safe--TeX%20Sandbox-success?style=flat-square" alt="Safe-TeX Sandbox">
   <img src="https://img.shields.io/badge/license-Apache--2.0%20%2F%20MIT-green?style=flat-square" alt="License">
-  <img src="https://img.shields.io/github/stars/jxoesneon/FerroTeX?style=flat-square" alt="Stars">
 </div>
 
 <div style="margin-top: 2rem;">
   <a href="development/setup.md" class="btn btn-primary">Get Started →</a>
   <a href="https://github.com/jxoesneon/FerroTeX" class="btn btn-secondary">View on GitHub</a>
+</div>
+
+</div>
+
+---
+
+## Pillars of Technical Excellence
+
+FerroTeX is built on four core aspirations that define its commitment to the research community:
+
+<div class="features" markdown="1">
+
+<div class="feature-card" markdown="1">
+<div class="icon">⚡</div>
+
+### Incremental Everything
+
+Keystroke-level feedback with a sub-50ms aspiration for 500-page documents.
+
+</div>
+
+<div class="feature-card" markdown="1">
+<div class="icon">⏪</div>
+
+### Time-Travel Debugging
+
+Reversible macro expansion. Step backward through the TeX stomach to understand state changes.
+
+</div>
+
+<div class="feature-card" markdown="1">
+<div class="icon">📐</div>
+
+### Formal Math Verification
+
+Moving beyond rendering to logical soundness. Automated structural and dimensional checks for math.
+
+</div>
+
+<div class="feature-card" markdown="1">
+<div class="icon">🛡️</div>
+
+### Safe-TeX Sandbox
+
+A capabilities-based security model with global VFS enforcement for sensitive research environments.
+
 </div>
 
 </div>

@@ -26,6 +26,9 @@ This directory contains the normative specifications and research-grade methodol
 - `spec/log-grammar.md`
 - `spec/diagnostic-mapping.md`
 - `spec/lsp.md`
+- `spec/engine-adapters.md`
+- `spec/security-sandbox.md`
+- `spec/vfs.md`
 - `development/setup.md`
 - `research/evaluation-plan.md`
 
@@ -63,6 +66,9 @@ This directory contains the normative specifications and research-grade methodol
 - `spec/diagnostic-mapping.md` — mapping from events to source locations + confidence
 - `spec/configuration.md` — configuration schema and resolution
 - `spec/lsp.md` — LSP behaviors and custom extensions
+- `spec/engine-adapters.md` — external engine invocation and normalization
+- `spec/security-sandbox.md` — capabilities-based security and granular `shell-escape`
+- `spec/vfs.md` — virtual file system and project root isolation
 - `spec/dap.md` — DAP exploration scope and semantics
 
 ## Extension

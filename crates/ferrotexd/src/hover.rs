@@ -678,7 +678,7 @@ mod tests {
             if expected_desc.is_empty() {
                 assert!(hover.is_none(), "Expected no hover for {}", cmd);
             } else {
-                let h = hover.expect(&format!("No hover found for command {}", cmd));
+                let h = hover.unwrap_or_else(|| panic!("No hover found for command {}", cmd));
                 match h.contents {
                     HoverContents::Markup(m) => {
                         assert!(
@@ -705,11 +705,8 @@ mod tests {
         let hover = find_hover(&p.syntax(), offset, &workspace);
 
         if let Some(h) = hover {
-            match h.contents {
-                HoverContents::Markup(m) => {
-                    assert!(m.value.contains("missingref"));
-                }
-                _ => {}
+            if let HoverContents::Markup(m) = h.contents {
+                assert!(m.value.contains("missingref"));
             }
         }
     }
