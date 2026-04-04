@@ -268,7 +268,7 @@ impl DebugDriver for TectonicDebugSession {
                     hidden_paths,
                 );
                 let tex_name = tex_path.file_name().unwrap().to_str().unwrap().to_string();
-                let stepping_io = stepping_io::SteppingIoProvider::new(
+                let _stepping_io = stepping_io::SteppingIoProvider::new(
                     base_io,
                     event_tx.clone(),
                     control_clone.clone(),
