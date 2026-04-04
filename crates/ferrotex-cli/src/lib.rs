@@ -1,3 +1,5 @@
+#![allow(unexpected_cfgs)]
+
 use clap::{Parser, Subcommand};
 pub use ferrotex_build::error::{FerroTeXError, FerroTeXResult, SourceLocation};
 use ferrotex_log::LogParser;

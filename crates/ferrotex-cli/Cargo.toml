@@ -7,7 +7,7 @@ license = "Apache-2.0 OR MIT"
 
 [features]
 default = []
-jxoesneon-tectonic-engine = ["ferrotex-dap/jxoesneon-tectonic-engine"]
+# jxoesneon-tectonic-engine = ["ferrotex-dap/jxoesneon-tectonic-engine"]
 
 [dependencies]
 ferrotex-log = { path = "../ferrotex-log", version = "0.22.0" }

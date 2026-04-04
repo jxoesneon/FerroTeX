@@ -1,3 +1,5 @@
+#![allow(unexpected_cfgs)]
+
 use anyhow::Result;
 
 fn main() -> Result<()> {
