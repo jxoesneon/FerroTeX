@@ -74,7 +74,7 @@ impl SourceLocation {
     /// # Example
     ///
     /// ```
-    /// use ferrotex_core::error::SourceLocation;
+    /// use ferrotex_build::error::SourceLocation;
     ///
     /// let loc = SourceLocation::new(5, 12);
     /// assert_eq!(loc.line, 5);
@@ -250,7 +250,7 @@ impl FerroTeXError {
     /// # Example
     ///
     /// ```
-    /// use ferrotex_core::error::{FerroTeXError, SourceLocation};
+    /// use ferrotex_build::error::{FerroTeXError, SourceLocation};
     ///
     /// let err = FerroTeXError::parse_error("Unexpected token", SourceLocation::new(5, 3));
     /// ```
@@ -280,7 +280,7 @@ impl FerroTeXError {
     /// # Example
     ///
     /// ```
-    /// use ferrotex_core::error::{FerroTeXError, AnalysisContext};
+    /// use ferrotex_build::error::{FerroTeXError, AnalysisContext};
     ///
     /// let ctx = AnalysisContext::new("type_check", "checking equation on line 5");
     /// let err = FerroTeXError::analysis_error("Type mismatch", ctx);
@@ -311,7 +311,7 @@ impl FerroTeXError {
     /// # Example
     ///
     /// ```
-    /// use ferrotex_core::error::FerroTeXError;
+    /// use ferrotex_build::error::FerroTeXError;
     ///
     /// let err = FerroTeXError::io_error("Failed to read file").with_path("/path/to/file.tex");
     /// ```
@@ -335,7 +335,7 @@ impl FerroTeXError {
     /// # Example
     ///
     /// ```
-    /// use ferrotex_core::error::{FerroTeXError, ConfigurationErrorDetails};
+    /// use ferrotex_build::error::{FerroTeXError, ConfigurationErrorDetails};
     ///
     /// let details = ConfigurationErrorDetails::new("output_format", "pdf or dvi");
     /// let err = FerroTeXError::configuration_error("Invalid output format", details);
@@ -355,7 +355,7 @@ impl FerroTeXError {
     /// # Example
     ///
     /// ```
-    /// use ferrotex_core::error::FerroTeXError;
+    /// use ferrotex_build::error::FerroTeXError;
     ///
     /// let err = FerroTeXError::generic_error("Internal invariant violated");
     /// ```
@@ -555,7 +555,7 @@ impl From<anyhow::Error> for FerroTeXError {
 /// # Example
 ///
 /// ```rust
-/// use ferrotex_core::error::{FerroTeXResult, FerroTeXError};
+/// use ferrotex_build::error::{FerroTeXResult, FerroTeXError};
 ///
 /// fn may_fail(input: &str) -> FerroTeXResult<i32> {
 ///     if input.is_empty() {

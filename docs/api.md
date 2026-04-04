@@ -34,7 +34,7 @@ FerroTeX is a modular, research-grade LaTeX platform built with Rust. The archit
 
 ## Crate Dependency Graph
 
-```
+```text
                           ┌─────────────────┐
                           │   ferrotex-cli  │
                           └────────┬────────┘
@@ -69,16 +69,16 @@ FerroTeX is a modular, research-grade LaTeX platform built with Rust. The archit
 
 **Dependency Summary:**
 
-| Crate | Dependencies |
-|-------|-------------|
-| `ferrotex-syntax` | `rowan` |
-| `ferrotex-log` | `serde`, `serde_json`, `thiserror`, `regex` |
-| `ferrotex-analysis` | `ferrotex-syntax`, `serde`, `thiserror` |
-| `ferrotex-math-semantics` | `ferrotex-syntax`, `serde`, `thiserror`, `rowan` |
-| `ferrotex-build` | `serde`, `anyhow`, `sha2`, `hex` |
-| `ferrotex-package` | `serde`, `regex`, `walkdir`, `dirs`, `log`, `anyhow` |
-| `ferrotex-core` | `ferrotex-build`, `tokio`, `anyhow`, `serde`, `which`, `once_cell`, `async-trait` |
-| `ferrotex-dap` | `ferrotex-build`, `serde`, `anyhow`, `log` (optional: `tectonic`) |
+| Crate                     | Dependencies                                                                      |
+| ------------------------- | --------------------------------------------------------------------------------- |
+| `ferrotex-syntax`         | `rowan`                                                                           |
+| `ferrotex-log`            | `serde`, `serde_json`, `thiserror`, `regex`                                       |
+| `ferrotex-analysis`       | `ferrotex-syntax`, `serde`, `thiserror`                                           |
+| `ferrotex-math-semantics` | `ferrotex-syntax`, `serde`, `thiserror`, `rowan`                                  |
+| `ferrotex-build`          | `serde`, `anyhow`, `sha2`, `hex`                                                  |
+| `ferrotex-package`        | `serde`, `regex`, `walkdir`, `dirs`, `log`, `anyhow`                              |
+| `ferrotex-core`           | `ferrotex-build`, `tokio`, `anyhow`, `serde`, `which`, `once_cell`, `async-trait` |
+| `ferrotex-dap`            | `ferrotex-build`, `serde`, `anyhow`, `log` (optional: `tectonic`)                 |
 
 ---
 
@@ -176,6 +176,7 @@ pub type SyntaxElement = rowan::SyntaxElement<FerroTexLanguage>;
 ### Error Types
 
 Parse errors are collected in `ParseResult::errors` as `SyntaxError` structs containing:
+
 - `message`: Error description
 - `range`: `TextRange` where the error occurred
 
@@ -223,6 +224,7 @@ pub enum AbstractValue {
 ```
 
 **Example:**
+
 ```rust
 use ferrotex_analysis::AbstractValue;
 
@@ -260,6 +262,7 @@ impl AbstractMachine {
 ```
 
 **Example:**
+
 ```rust
 use ferrotex_analysis::{AbstractMachine, AbstractValue};
 
@@ -332,6 +335,7 @@ pub trait PackageBackend: Debug + Send + Sync {
 ```
 
 **Implementations:**
+
 - `TlmgrBackend`: TeX Live Manager backend
 - `MiktexBackend`: MiKTeX Package Manager backend
 - `NoOpBackend`: Fallback when no package manager is available
@@ -411,7 +415,7 @@ pub enum DelimiterKind {
 
 Represents a delimiter occurrence in source code.
 
-```rust
+````rust
 pub struct Delimiter {
     pub kind: DelimiterKind,
     pub position: usize,
@@ -429,7 +433,7 @@ pub enum MathError {
     UnmatchedClosing { pos, kind },
     IncorrectArgumentCount { command, position, expected, actual },
 }
-```
+````
 
 #### Unified Error System
 
@@ -442,7 +446,7 @@ The core crate re-exports the unified error types from `ferrotex-build` for conv
 
 ---
 
-## ferrotex-dap
+#### Function: `get_expected_args`
 
 Returns expected argument count for common math commands.
 
@@ -504,6 +508,7 @@ pub enum ProtocolMessage {
 ```
 
 **Example:**
+
 ```rust
 use ferrotex_dap::ProtocolMessage;
 use serde_json::json;
@@ -737,7 +742,6 @@ All build operations return `FerroTeXResult<T>`, where `FerroTeXError` provides 
 
 ### Modules
 
-
 ## ferrotex-package
 
 LaTeX package indexing and metadata management.
@@ -779,6 +783,7 @@ impl PackageIndex {
 ```
 
 **Example:**
+
 ```rust
 use ferrotex_package::PackageIndex;
 
@@ -919,6 +924,7 @@ impl Shape {
 ```
 
 **Example:**
+
 ```rust
 use ferrotex_math_semantics::{Shape, Dimension};
 

@@ -19,17 +19,17 @@ This document describes a development environment suitable for implementing Ferr
 
 FerroTeX depends on several system libraries for text shaping, font rendering, and Unicode support. These are required to build the project.
 
-| Library | Minimum Version | Purpose |
-|---------|-----------------|---------|
-| **HarfBuzz** | >= 2.7.4 | OpenType text shaping engine |
-| **ICU** | >= 70.1 | International Components for Unicode |
-| **FreeType** | >= 2.11.0 | Font rendering engine |
-| **Fontconfig** | >= 2.13.0 | Font configuration and discovery |
-| **OpenSSL** | >= 3.0 | Cryptography and SSL/TLS |
-| **Graphite2** | >= 1.3.0 | Font rendering for complex scripts |
-| **CMake** | >= 3.16 | Build system generator |
-| **pkg-config** | any | Compilation flags helper |
-| **nasm** | any | Netwide Assembler (for optimized builds) |
+| Library        | Minimum Version | Purpose                                  |
+| -------------- | --------------- | ---------------------------------------- |
+| **HarfBuzz**   | >= 2.7.4        | OpenType text shaping engine             |
+| **ICU**        | >= 70.1         | International Components for Unicode     |
+| **FreeType**   | >= 2.11.0       | Font rendering engine                    |
+| **Fontconfig** | >= 2.13.0       | Font configuration and discovery         |
+| **OpenSSL**    | >= 3.0          | Cryptography and SSL/TLS                 |
+| **Graphite2**  | >= 1.3.0        | Font rendering for complex scripts       |
+| **CMake**      | >= 3.16         | Build system generator                   |
+| **pkg-config** | any             | Compilation flags helper                 |
+| **nasm**       | any             | Netwide Assembler (for optimized builds) |
 
 ### Installation by Platform
 
@@ -80,6 +80,7 @@ vcpkg install icu:x64-windows harfbuzz[graphite2]:x64-windows fontconfig:x64-win
 ```
 
 Set environment variables:
+
 ```powershell
 $env:TECTONIC_DEP_BACKEND = "vcpkg"
 $env:VCPKG_ROOT = "C:/vcpkg"
