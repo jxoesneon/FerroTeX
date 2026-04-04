@@ -714,4 +714,94 @@ mod tests {
         let details = ConfigurationErrorDetails::new("key", "expected").with_actual("actual");
         assert_eq!(details.actual, Some("actual".to_string()));
     }
+
+    #[test]
+    fn test_source_location_start() {
+        let loc = SourceLocation::start();
+        assert_eq!(loc.line, 1);
+        assert_eq!(loc.column, 1);
+    }
+
+    #[test]
+    fn test_error_message_variants() {
+        let parse_err = FerroTeXError::parse_error("parse", SourceLocation::start());
+        let analysis_err = FerroTeXError::analysis_error("analysis", AnalysisContext::new("p", "c"));
+        let io_err = FerroTeXError::io_error("io");
+        let config_err = FerroTeXError::configuration_error("config", ConfigurationErrorDetails::new("k", "e"));
+        let generic_err = FerroTeXError::generic_error("generic");
+
+        assert_eq!(parse_err.message(), "parse");
+        assert_eq!(analysis_err.message(), "analysis");
+        assert_eq!(io_err.message(), "io");
+        assert_eq!(config_err.message(), "config");
+        assert_eq!(generic_err.message(), "generic");
+    }
+
+    #[test]
+    fn test_error_location_none() {
+        let io_err = FerroTeXError::io_error("io");
+        let config_err = FerroTeXError::configuration_error("config", ConfigurationErrorDetails::new("k", "e"));
+        assert_eq!(io_err.location(), None);
+        assert_eq!(config_err.location(), None);
+    }
+
+    #[test]
+    fn test_analysis_error_display_no_location() {
+        let ctx = AnalysisContext::new("pass_name", "some_context");
+        let err = FerroTeXError::analysis_error("error_msg", ctx);
+        let msg = format!("{}", err);
+        assert!(msg.contains("Analysis error in pass_name"));
+        assert!(msg.contains("error_msg"));
+        assert!(msg.contains("context: some_context"));
+    }
+
+    #[test]
+    fn test_io_error_display_no_path() {
+        let err = FerroTeXError::io_error("no_path_error");
+        let msg = format!("{}", err);
+        assert_eq!(msg, "I/O error: no_path_error");
+    }
+
+    #[test]
+    fn test_generic_error_display_no_location() {
+        let err = FerroTeXError::generic_error("no_loc_generic");
+        let msg = format!("{}", err);
+        assert_eq!(msg, "Error: no_loc_generic");
+    }
+
+    #[test]
+    fn test_error_predicates() {
+        let parse_err = FerroTeXError::parse_error("p", SourceLocation::start());
+        assert!(parse_err.is_parse_error());
+        assert!(!parse_err.is_analysis_error());
+
+        let analysis_err = FerroTeXError::analysis_error("a", AnalysisContext::new("p", "c"));
+        assert!(analysis_err.is_analysis_error());
+        assert!(!analysis_err.is_io_error());
+
+        let io_err = FerroTeXError::io_error("i");
+        assert!(io_err.is_io_error());
+        assert!(!io_err.is_configuration_error());
+
+        let config_err = FerroTeXError::configuration_error("c", ConfigurationErrorDetails::new("k", "e"));
+        assert!(config_err.is_configuration_error());
+        assert!(!config_err.is_generic_error());
+
+        let generic_err = FerroTeXError::generic_error("g");
+        assert!(generic_err.is_generic_error());
+        assert!(!generic_err.is_parse_error());
+    }
+
+    #[test]
+    fn test_builder_methods_on_wrong_variants() {
+        let parse_err = FerroTeXError::parse_error("p", SourceLocation::start());
+        
+        // with_path should be a no-op on non-IoError
+        let still_parse_err = parse_err.clone().with_path("foo");
+        assert_eq!(parse_err, still_parse_err);
+
+        // with_location should be a no-op on non-GenericError
+        let still_parse_err_2 = parse_err.clone().with_location(SourceLocation::new(10, 10));
+        assert_eq!(parse_err, still_parse_err_2);
+    }
 }

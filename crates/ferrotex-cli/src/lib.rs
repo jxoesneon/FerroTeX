@@ -383,4 +383,80 @@ mod tests {
         // Should error because file doesn't exist (File::open fails)
         assert!(execute(cli).is_err());
     }
+
+    #[test]
+    fn test_parse_non_existent_file() {
+        let cli = Cli {
+            command: Commands::Parse {
+                path: PathBuf::from("non_existent_file.log"),
+            },
+        };
+        assert!(execute(cli).is_err());
+    }
+
+    #[test]
+    fn test_verify_non_existent_lockfile() {
+        let cli = Cli {
+            command: Commands::Verify {
+                path: PathBuf::from("non_existent.lock"),
+            },
+        };
+        assert!(execute(cli).is_err());
+    }
+
+    #[test]
+    fn test_process_log_change_no_change() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let log_path = temp_dir.path().join("test.log");
+        let mut file = File::create(&log_path).unwrap();
+        writeln!(file, "some content").unwrap();
+
+        let mut read_file = File::open(&log_path).unwrap();
+        let mut parser = LogParser::new();
+        let mut pos = read_file.metadata().unwrap().len();
+
+        let changes = process_log_change(&mut read_file, &mut pos, &mut parser).unwrap();
+        assert!(changes.is_empty());
+    }
+
+    #[test]
+    fn test_process_log_change_truncation_reset() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let log_path = temp_dir.path().join("test.log");
+        let mut file = File::create(&log_path).unwrap();
+        writeln!(file, "new content").unwrap();
+
+        let mut read_file = File::open(&log_path).unwrap();
+        let mut parser = LogParser::new();
+        let mut pos = 1000; // Force truncation branch
+
+        let result = process_log_change(&mut read_file, &mut pos, &mut parser);
+        assert!(result.is_ok());
+        assert_eq!(pos, read_file.metadata().unwrap().len());
+    }
+
+    #[test]
+    fn test_execute_verify_invalid_lock() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let lock_path = temp_dir.path().join("invalid.lock");
+        {
+            let mut file = File::create(&lock_path).unwrap();
+            writeln!(file, "not valid json").unwrap();
+        }
+
+        let cli = Cli {
+            command: Commands::Verify { path: lock_path },
+        };
+        assert!(execute(cli).is_err());
+    }
+
+    #[test]
+    fn test_build_tex_direct() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let tex_path = temp_dir.path().join("main.tex");
+        File::create(&tex_path).unwrap();
+        let output_dir = temp_dir.path().to_path_buf();
+
+        assert!(build_tex(&tex_path, &output_dir).is_ok());
+    }
 }
