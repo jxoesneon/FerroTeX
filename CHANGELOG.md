@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-04-04
+
+> "Institutional Excellence" Update
+
+This major minor release marks FerroTeX's transition to an institutional-grade platform, featuring a unified error architecture, hardened security models, and a robust local CI infrastructure.
+
+### Added
+
+- **Unified Error System**:
+  - Introduced `FerroTeXError` in `ferrotex-build` as the workspace-wide diagnostic standard.
+  - Migrated `syntax`, `analysis`, `cli`, and `core` to the new structured error system.
+- **Local CI Infrastructure**:
+  - New `scripts/ci-run.sh` script for running the full CI pipeline locally via Docker.
+  - Static `Dockerfile.ci-test` ensures 100% environment parity between local and remote builds.
+- **Security & Hardening**:
+  - Implemented **CodeQL Advanced Security** scanning for Rust, JavaScript, and GitHub Actions.
+  - Established a formal **Security Model** with threat analysis and VFS isolation specifications.
+- **Institutional Documentation**:
+  - Comprehensive **API Reference** (`docs/api.md`) for all core crates.
+  - Detailed **Troubleshooting Guide** for enterprise/academic support.
+  - Expanded **Glossary** and technical specifications for all core pillars.
+
+### Changed
+
+- **Test Coverage**: Achieved a foundational milestone of **>90% code coverage** across the entire workspace.
+- **Repository Health**: Consolidated 5 stale branches and deleted 20+ redundant remote branches for a leaner development experience.
+
+### Fixed
+
+- **Security Remediation**: Massively updated dependencies to resolve dozens of known vulnerabilities in both Rust and Node.js ecosystems.
+- **Link Integrity**: Patched the link checker to correctly ignore build artifacts and system directories.
+
 ## [0.22.0] - 2026-01-16
 
 > "The Debug & Reliability Update"
@@ -289,7 +321,8 @@ Transforms FerroTeX into a high-fidelity "Scientific Compiler" platform, introdu
 
 - Initial repository structure.
 
-[Unreleased]: https://github.com/jxoesneon/FerroTeX/compare/v0.22.0...HEAD
+[Unreleased]: https://github.com/jxoesneon/FerroTeX/compare/v0.23.0...HEAD
+[0.23.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.22.0...v0.23.0
 [0.22.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.21.0...v0.22.0
 [0.21.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.20.1...v0.21.0
 [0.20.1]: https://github.com/jxoesneon/FerroTeX/compare/v0.20.0...v0.20.1
