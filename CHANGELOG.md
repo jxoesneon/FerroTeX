@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 > "The Debug & Reliability Update"
 
-This minor release introduces the fully validated Tectonic Debug Driver alongside massive semantic engine reliability improvements.
+This minor release introduces the fully validated Tectonic Debug Driver alongside massive semantic engine reliability improvements and registry-based dependency management.
 
 ### Added
 
@@ -33,22 +33,13 @@ This minor release introduces the fully validated Tectonic Debug Driver alongsid
 - **Code Quality**:
   - Enforced strict `cargo clippy` compliance across the entire workspace.
   - Verified compilation of optimized release artifacts with `lto = true`.
-- **Testing**:
-  - Achieved >95% code coverage across the Language Server Semantic Engine.
-  - Reached 100% coverage in critical components including `completer.rs`.
-
-## [0.21.1] - 2026-01-04
-
-> "Registry Sovereignty" Patch
-
-### Changed
-
 - **Tectonic Integration**:
   - Shifted from path-based patches to registry dependencies for all `jxoesneon-tectonic-*` crates.
   - Standardized dependency constraints to `>= 0.16.0` to leverage the published [`jxoesneon-tectonic`](https://crates.io/crates/jxoesneon-tectonic) ecosystem.
   - Unified the engine feature flag to `jxoesneon-tectonic-engine` across the workspace for consistent configuration.
-- **Project Portability**:
-  - Removed requirement for a local `upstream/tectonic` clone for standard builds, enabling faster CI/CD and developer onboarding.
+- **Testing**:
+  - Achieved >95% code coverage across the Language Server Semantic Engine.
+  - Reached 100% coverage in critical components including `completer.rs`.
 
 ## [0.21.0] - 2026-01-03
 
@@ -299,8 +290,7 @@ Transforms FerroTeX into a high-fidelity "Scientific Compiler" platform, introdu
 - Initial repository structure.
 
 [Unreleased]: https://github.com/jxoesneon/FerroTeX/compare/v0.22.0...HEAD
-[0.22.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.21.1...v0.22.0
-[0.21.1]: https://github.com/jxoesneon/FerroTeX/compare/v0.21.0...v0.21.1
+[0.22.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.21.0...v0.22.0
 [0.21.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.20.1...v0.21.0
 [0.20.1]: https://github.com/jxoesneon/FerroTeX/compare/v0.20.0...v0.20.1
 [0.20.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.19.2...v0.20.0

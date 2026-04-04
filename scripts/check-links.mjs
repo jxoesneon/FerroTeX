@@ -12,7 +12,11 @@ async function* walk(dir) {
       entry.name === "_site" ||
       entry.name === "build" ||
       entry.name === "wiki" ||
-      entry.name === "design"
+      entry.name === "design" ||
+      entry.name === "target" ||
+      entry.name === ".cargo-docker" ||
+      entry.name === ".agent" ||
+      entry.name === ".vscode-test"
     )
       continue;
     const fullPath = path.join(dir, entry.name);
