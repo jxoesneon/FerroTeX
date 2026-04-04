@@ -8,6 +8,7 @@ repository = "https://github.com/jxoesneon/FerroTeX"
 
 [dependencies]
 rowan = "0.16"
+ferrotex-build = { path = "../ferrotex-build" }
 
 
 [dev-dependencies]

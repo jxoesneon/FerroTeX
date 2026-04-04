@@ -67,3 +67,9 @@
 
 pub mod math_validator;
 pub mod package_manager;
+
+// Re-export error types from ferrotex-build for convenience
+pub use ferrotex_build::error::{
+    AnalysisContext, ConfigurationErrorDetails, FerroTeXError, FerroTeXResult, SourceLocation,
+    SourceSpan,
+};

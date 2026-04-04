@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand};
+pub use ferrotex_build::error::{FerroTeXError, FerroTeXResult, SourceLocation};
 use ferrotex_log::LogParser;
 use notify::{EventKind, RecursiveMode, Watcher};
 use std::fs::{self, File};
@@ -51,13 +52,13 @@ pub enum Commands {
     },
 }
 
-pub fn execute(cli: Cli) -> anyhow::Result<()> {
+pub fn execute(cli: Cli) -> FerroTeXResult<()> {
     match &cli.command {
         Commands::Parse { path } => {
             let content = fs::read_to_string(path)?;
             let parser = LogParser::new();
             let events = parser.parse(&content);
-            println!("{}", serde_json::to_string_pretty(&events)?);
+            println!("{}", serde_json::to_string_pretty(&events).map_err(anyhow::Error::from)?);
         }
         Commands::Watch { path } => {
             watch_log(path)?;
@@ -65,11 +66,11 @@ pub fn execute(cli: Cli) -> anyhow::Result<()> {
         Commands::Debug => {
             #[cfg(feature = "jxoesneon-tectonic-engine")]
             {
-                ferrotex_dap::run_jxoesneon_tectonic_session()?;
+                ferrotex_dap::run_jxoesneon_tectonic_session().map_err(anyhow::Error::from)?;
             }
             #[cfg(not(feature = "jxoesneon-tectonic-engine"))]
             {
-                ferrotex_dap::run_mock_session()?;
+                ferrotex_dap::run_mock_session().map_err(anyhow::Error::from)?;
             }
         }
         Commands::Build { path, output_dir } => {
@@ -82,7 +83,7 @@ pub fn execute(cli: Cli) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn build_tex(tex_path: &Path, output_dir: &Path) -> anyhow::Result<()> {
+fn build_tex(tex_path: &Path, output_dir: &Path) -> FerroTeXResult<()> {
     use ferrotex_build::{ArtifactId, PdfLatexTransform, Transform};
 
     let input_id = ArtifactId(tex_path.to_string_lossy().to_string());
@@ -111,7 +112,7 @@ fn build_tex(tex_path: &Path, output_dir: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn verify_lock(lock_path: &Path) -> anyhow::Result<()> {
+fn verify_lock(lock_path: &Path) -> FerroTeXResult<()> {
     use ferrotex_build::Lockfile;
     use sha2::{Digest, Sha256};
 
@@ -150,7 +151,7 @@ fn verify_lock(lock_path: &Path) -> anyhow::Result<()> {
         Ok(())
     } else {
         println!("\n⚠️ Build integrity verification failed!");
-        Err(anyhow::anyhow!("Verification failed"))
+        Err(FerroTeXError::generic_error("Verification failed"))
     }
 }
 
@@ -158,7 +159,7 @@ fn process_log_change(
     file: &mut File,
     pos: &mut u64,
     parser: &mut LogParser,
-) -> anyhow::Result<Vec<String>> {
+) -> FerroTeXResult<Vec<String>> {
     let current_len = file.metadata()?.len();
     let mut results = Vec::new();
 
@@ -168,7 +169,7 @@ fn process_log_change(
         file.read_to_string(&mut buffer)?;
         let events = parser.update(&buffer);
         for event in events {
-            results.push(serde_json::to_string(&event)?);
+            results.push(serde_json::to_string(&event).map_err(anyhow::Error::from)?);
         }
         *pos = current_len;
     } else if current_len < *pos {
@@ -181,13 +182,13 @@ fn process_log_change(
         *pos = file.metadata()?.len();
         let events = parser.update(&buffer);
         for event in events {
-            results.push(serde_json::to_string(&event)?);
+            results.push(serde_json::to_string(&event).map_err(anyhow::Error::from)?);
         }
     }
     Ok(results)
 }
 
-fn watch_log(path: &Path) -> anyhow::Result<()> {
+fn watch_log(path: &Path) -> FerroTeXResult<()> {
     let mut parser = LogParser::new();
     let mut file = File::open(path)?;
     let mut pos = 0;
@@ -201,13 +202,13 @@ fn watch_log(path: &Path) -> anyhow::Result<()> {
         pos = len;
         let events = parser.update(&buffer);
         for event in events {
-            println!("{}", serde_json::to_string(&event)?);
+            println!("{}", serde_json::to_string(&event).map_err(anyhow::Error::from)?);
         }
     }
 
     let (tx, rx) = channel();
-    let mut watcher = notify::recommended_watcher(tx)?;
-    watcher.watch(path, RecursiveMode::NonRecursive)?;
+    let mut watcher = notify::recommended_watcher(tx).map_err(anyhow::Error::from)?;
+    watcher.watch(path, RecursiveMode::NonRecursive).map_err(anyhow::Error::from)?;
 
     eprintln!("Watching {}...", path.display());
 

@@ -1,3 +1,4 @@
+use ferrotex_build::error::{AnalysisContext, FerroTeXError};
 use serde::{Deserialize, Serialize};
 
 /// An abstract value representing a set of possible concrete TeX values.
@@ -18,7 +19,7 @@ pub enum AbstractValue {
     /// Represents a simpler token
     Token(String),
     /// Represents an error detected during analysis.
-    AnalysisError(String),
+    AnalysisError(FerroTeXError),
 }
 
 /// The state of the abstract machine.
@@ -58,8 +59,9 @@ impl AbstractMachine {
     /// Steps the abstract machine one abstract instruction.
     pub fn step(&mut self) -> Option<AbstractValue> {
         if self.expansion_depth > self.max_depth {
+            let ctx = AnalysisContext::new("abstract_machine", "recursion depth check");
             return Some(AbstractValue::AnalysisError(
-                "Maximum recursion depth exceeded".to_string(),
+                FerroTeXError::analysis_error("Maximum recursion depth exceeded", ctx),
             ));
         }
 
@@ -68,10 +70,13 @@ impl AbstractMachine {
             match &token {
                 AbstractValue::ControlSequence(name) => {
                     if self.call_stack.contains(name) {
-                        return Some(AbstractValue::AnalysisError(format!(
-                            "Infinite recursion detected in control sequence: {}",
-                            name
-                        )));
+                        let ctx = AnalysisContext::new("abstract_machine", format!("expanding {}", name));
+                        return Some(AbstractValue::AnalysisError(
+                            FerroTeXError::analysis_error(
+                                format!("Infinite recursion detected in control sequence: {}", name),
+                                ctx,
+                            ),
+                        ));
                     }
                     self.call_stack.push(name.clone());
                     self.expansion_depth += 1;
@@ -166,8 +171,8 @@ mod tests {
         machine.call_stack.push("\\foo".to_string());
         let result = machine.step();
 
-        if let Some(AbstractValue::AnalysisError(msg)) = result {
-            assert!(msg.contains("Infinite recursion"));
+        if let Some(AbstractValue::AnalysisError(err)) = result {
+            assert!(err.message().contains("Infinite recursion"));
         } else {
             panic!("Should have detected infinite recursion");
         }

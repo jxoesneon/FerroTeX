@@ -1,7 +1,7 @@
 use clap::Parser;
-use ferrotex_cli::{execute, Cli};
+use ferrotex_cli::{execute, Cli, FerroTeXResult};
 
-fn main() -> anyhow::Result<()> {
+fn main() -> FerroTeXResult<()> {
     let cli = Cli::parse();
     execute(cli)
 }

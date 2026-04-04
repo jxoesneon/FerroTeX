@@ -53,9 +53,12 @@ impl Lockfile {
 
 pub mod artifacts;
 pub mod compiler;
+pub mod error;
 
 pub use artifacts::FileArtifact;
 pub use compiler::{Compiler, PdfLatexTransform, ShellTransform};
+// Re-export error types for convenience
+pub use error::{AnalysisContext, ConfigurationErrorDetails, FerroTeXError, FerroTeXResult, SourceLocation, SourceSpan};
 
 /// Represents a unique identifier for an artifact (content-addressed or path-based).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
