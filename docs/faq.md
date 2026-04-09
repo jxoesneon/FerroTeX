@@ -33,6 +33,14 @@ No. Some ambiguity is intrinsic to TeX logs and macro execution. FerroTeX makes 
 
 The intent is to support pdfTeX, XeTeX, and LuaTeX. Some advanced introspection features may be LuaTeX-first.
 
-## What is the MVP?
+## What version is current?
 
-An offline log parser that outputs a stable JSON schema for events and diagnostics, backed by golden tests.
+v0.24.0 — "Diagnostic Completeness". See the [CHANGELOG](https://github.com/jxoesneon/FerroTeX/blob/main/CHANGELOG.md) for full history.
+
+## Does FerroTeX warn about outdated LaTeX commands?
+
+Yes, as of v0.24.0. LaTeX 2.09 font commands (`\bf`, `\it`, `\rm`, etc.), `$$...$$` display math, and obsolete packages (`times`, `a4wide`, `epsfig`, `psfig`) produce `warning` diagnostics on every `didOpen`/`didChange`. Each warning includes a one-click quick-fix code action.
+
+## Does FerroTeX support BibLaTeX?
+
+At the IDE layer, yes. `\addbibresource{refs.bib}` is indexed for citation key completion and cross-file validation, identical to `\bibliography`. `\RequirePackage` is scanned alongside `\usepackage`. The compile-time bibliography backend (Biber vs BibTeX) is determined by your build runner, not FerroTeX.

@@ -112,7 +112,7 @@ Latexmk integration with real-time progress feedback, magic comment support, and
 
 ### Smart Diagnostics
 
-Real-time syntax errors, missing package detection with one-click installation, and structured log parsing.
+Real-time syntax errors, missing package detection with one-click installation, deprecated LaTeX 2.09 command warnings with quick-fix code actions, and structured log parsing.
 
 </div>
 

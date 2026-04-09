@@ -69,6 +69,29 @@ jobs:
           run: |
             latexmk -pdf -interaction=nonstopmode -halt-on-error -file-line-error -output-directory=build tests/tex/smoke/main.tex
 
+  clippy:
+    name: Clippy (zero warnings)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config cmake nasm libicu-dev libharfbuzz-dev libfontconfig1-dev libssl-dev libgraphite2-dev libfreetype6-dev
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
   rust:
     name: Rust Build & Test
     runs-on: ubuntu-latest

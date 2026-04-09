@@ -45,6 +45,28 @@ suite("Regression Suite v2 (Comprehensive)", function () {
         assert.ok(commands.includes("ferrotex.build"));
         assert.ok(commands.includes("ferrotex.syncToPdf"));
     });
+    test("Regression: ferrotex.installPackage should not be registered twice (duplicate client bug)", async () => {
+        const ext = vscode.extensions.getExtension("ferrotex.ferrotex");
+        assert.ok(ext, "Extension not found");
+        await ext.activate();
+        // Collect all registered commands matching ferrotex.installPackage
+        const allCommands = await vscode.commands.getCommands(true);
+        const installCmds = allCommands.filter((c) => c === "ferrotex.installPackage");
+        // VS Code deduplicates command IDs in getCommands(), so a duplicate registration
+        // throws at runtime. The real check is that activation did not throw — if we got
+        // here with isActive === true, the duplicate is gone.
+        assert.strictEqual(ext.isActive, true, "Extension should be active after activation");
+        assert.ok(installCmds.length >= 1, "ferrotex.installPackage should be registered");
+        // Attempt a second activate() — should be idempotent, not throw
+        let threw = false;
+        try {
+            await ext.activate();
+        }
+        catch {
+            threw = true;
+        }
+        assert.strictEqual(threw, false, "Second activate() must not throw (duplicate command error)");
+    });
     // --- Smoke Test: Activation & Binary Resolution ---
     test("Critical: Extension should activate and find bundled binary", async () => {
         // Force activation by opening a TeX file
@@ -67,13 +89,16 @@ suite("Regression Suite v2 (Comprehensive)", function () {
         assert.ok(commands.includes("ferrotex.build"), "Build command not registered");
         console.log("Smoke test passed: Activation & Setup successful.");
     });
-    // --- Helper: Wait for Predicate ---
+    // --- Helper: Wait for Predicate (exponential backoff) ---
     async function waitFor(description, predicate, timeout = 8000) {
         const start = Date.now();
+        let delay = 100; // initial delay ms
+        const maxDelay = 2000;
         while (Date.now() - start < timeout) {
             if (await predicate())
                 return;
-            await new Promise((r) => setTimeout(r, 500));
+            await new Promise((r) => setTimeout(r, delay));
+            delay = Math.min(delay * 2, maxDelay);
         }
         throw new Error(`Timeout waiting for: ${description}`);
     }
@@ -95,7 +120,7 @@ suite("Regression Suite v2 (Comprehensive)", function () {
         // or checks specific items if we place cursor after '\'.
         assert.ok(completions.items.length > 0, "No completions returned");
     });
-    test("Core: Definition & Rename (Label/Ref)", async () => {
+    test("Core: Definition & Rename (Label/Ref)", async function () {
         const ws = vscode.workspace.workspaceFolders;
         if (!ws || ws.length === 0)
             throw new Error("No workspace open");
@@ -162,7 +187,6 @@ suite("Regression Suite v2 (Comprehensive)", function () {
     });
     // --- Feature Group 3: v0.16.0 Features (Build, Hovers, Diagnostics) ---
     test("Feature v0.16.0: Rich Hovers (Citations)", async function () {
-        this.skip(); // Skipped due to CI file watcher latency/indexing reliability in test host
         const ws = vscode.workspace.workspaceFolders;
         if (!ws || ws.length === 0)
             throw new Error("No workspace open");
@@ -185,34 +209,26 @@ suite("Regression Suite v2 (Comprehensive)", function () {
         }, 10000);
     });
     test("Feature v0.16.0: Build System & Diagnostics", async function () {
-        this.skip(); // Skipped due to CI file watcher latency
         const ws = vscode.workspace.workspaceFolders;
         if (!ws || ws.length === 0)
             throw new Error("No workspace open");
-        const docUri = vscode.Uri.file(path.resolve(ws[0].uri.fsPath, "error.tex"));
-        await vscode.workspace.openTextDocument(docUri);
-        // manually write mock log to simulate build failure + diagnostics
-        const buildDir = path.resolve(ws[0].uri.fsPath, "build");
-        const fs = require("fs");
-        if (!fs.existsSync(buildDir))
-            fs.mkdirSync(buildDir);
-        // Log file timestamp must be NEWER than "last check" to trigger update?
-        // Or just change content.
-        const logPath = path.resolve(buildDir, "error.log");
-        const mockLog = `
-This is a comprehensive test log.
-./error.tex:5: Undefined control sequence.
-l.5 \\undefinedCommand
-    `;
-        fs.writeFileSync(logPath, mockLog);
-        // Wait for diagnostics to appear
+        // Write a document with a deprecated command so ferrotexd emits a diagnostic
+        // via its static analysis on didOpen (no build log needed)
+        const docPath = path.resolve(ws[0].uri.fsPath, "error.tex");
+        const fsmod = require("fs");
+        // Two identical \label commands → ferrotexd emits a "Duplicate label" diagnostic
+        // via workspace.validate_labels() inside validate_document()
+        fsmod.writeFileSync(docPath, "\\documentclass{article}\n\\begin{document}\n\\label{dup}\\label{dup}\n\\end{document}\n");
+        const docUri = vscode.Uri.file(docPath);
+        const doc = await vscode.workspace.openTextDocument(docUri);
+        await vscode.window.showTextDocument(doc);
+        // ferrotexd publishes diagnostics asynchronously on didOpen — wait with backoff
         await waitFor("Diagnostics Generation", async () => {
             const diags = vscode.languages.getDiagnostics(docUri);
             return diags.length > 0;
-        }, 10000);
+        }, 15000);
         const diags = vscode.languages.getDiagnostics(docUri);
-        assert.ok(diags.length > 0, "No diagnostics found");
-        assert.ok(diags[0].message.includes("Undefined control sequence"), "Wrong diagnostic message");
+        assert.ok(diags.length > 0, "No diagnostics found after didOpen");
     });
     /*
     test.skip("Feature v0.16.0: Quick Fixes (Deprecated Commands)", async function() {

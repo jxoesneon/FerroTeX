@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-04-09
+
+> "Diagnostic Completeness" Update
+
+### Added
+
+- **Deprecated-command warnings**: `{\bf ...}`, `{\it ...}`, `$$...$$`, and obsolete packages (`times`, `a4wide`, `epsfig`, `psfig`) now surface as `warning` diagnostics in the Problems pane without requiring a build.
+- **Quick-fix code actions**: each deprecated-command warning has a one-click fix — font commands are replaced with their LaTeX2e equivalents (`\textbf`, `\textit`, etc.) and `$$...$$` is replaced with `\[...\]`.
+- **`\RequirePackage` completion**: packages declared via `\RequirePackage` in `.cls`/`.sty` files are now included in completion and package-awareness features.
+- **BibLaTeX `\addbibresource` support**: citation key completion and cross-file validation now work for BibLaTeX documents using `\addbibresource{refs.bib}`.
+
+### Changed
+
+- Diagnostics now carry `source: "ferrotex"` for cleaner filtering in the Problems pane.
+
 ## [0.23.0] - 2026-04-04
 
 > "Institutional Excellence" Update
@@ -321,7 +336,8 @@ Transforms FerroTeX into a high-fidelity "Scientific Compiler" platform, introdu
 
 - Initial repository structure.
 
-[Unreleased]: https://github.com/jxoesneon/FerroTeX/compare/v0.23.0...HEAD
+[Unreleased]: https://github.com/jxoesneon/FerroTeX/compare/v0.24.0...HEAD
+[0.24.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.22.0...v0.23.0
 [0.22.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.21.0...v0.22.0
 [0.21.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.20.1...v0.21.0

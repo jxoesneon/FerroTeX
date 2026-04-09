@@ -1,12 +1,20 @@
 [package]
 name = "ferrotex-analysis"
-version = "0.23.1"
+version = "0.24.0"
 edition = "2024"
 description = "Abstract interpretation framework for TeX macros"
 license = "Apache-2.0 OR MIT"
+repository = "https://github.com/jxoesneon/FerroTeX"
+homepage = "https://jxoesneon.github.io/FerroTeX/"
+rust-version = "1.85"
+keywords = ["latex", "analysis", "tex", "macro"]
+categories = ["development-tools", "compilers"]
+
+[lints]
+workspace = true
 
 [dependencies]
-ferrotex-syntax = { path = "../ferrotex-syntax", version = "0.23.1" }
+ferrotex-syntax = { path = "../ferrotex-syntax", version = "0.24.0" }
 ferrotex-build = { path = "../ferrotex-build" }
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "2.0"
