@@ -34,20 +34,22 @@ function getArchiveExtension(): string {
 function httpsGet(url: string): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const request = (u: string) => {
-      https.get(u, { headers: { "User-Agent": "ferrotex-vscode" } }, (res) => {
-        if (res.statusCode === 301 || res.statusCode === 302) {
-          request(res.headers.location!);
-          return;
-        }
-        if (res.statusCode !== 200) {
-          reject(new Error(`HTTP ${res.statusCode} for ${u}`));
-          return;
-        }
-        const chunks: Buffer[] = [];
-        res.on("data", (chunk) => chunks.push(chunk));
-        res.on("end", () => resolve(Buffer.concat(chunks)));
-        res.on("error", reject);
-      }).on("error", reject);
+      https
+        .get(u, { headers: { "User-Agent": "ferrotex-vscode" } }, (res) => {
+          if (res.statusCode === 301 || res.statusCode === 302) {
+            request(res.headers.location!);
+            return;
+          }
+          if (res.statusCode !== 200) {
+            reject(new Error(`HTTP ${res.statusCode} for ${u}`));
+            return;
+          }
+          const chunks: Buffer[] = [];
+          res.on("data", (chunk) => chunks.push(chunk));
+          res.on("end", () => resolve(Buffer.concat(chunks)));
+          res.on("error", reject);
+        })
+        .on("error", reject);
     };
     request(url);
   });
@@ -64,7 +66,9 @@ function extractTarGz(archivePath: string, destDir: string): void {
 }
 
 function extractZip(archivePath: string, destDir: string): void {
-  execSync(`powershell -Command "Expand-Archive -Path '${archivePath}' -DestinationPath '${destDir}' -Force"`);
+  execSync(
+    `powershell -Command "Expand-Archive -Path '${archivePath}' -DestinationPath '${destDir}' -Force"`,
+  );
 }
 
 /**
@@ -78,7 +82,11 @@ export async function ensureFerrotexdBinary(
   const bundledPath = path.join(context.extensionPath, "bin", BINARY_NAME);
   if (fs.existsSync(bundledPath)) {
     if (process.platform !== "win32") {
-      try { fs.chmodSync(bundledPath, "755"); } catch { /* ignore */ }
+      try {
+        fs.chmodSync(bundledPath, "755");
+      } catch {
+        /* ignore */
+      }
     }
     console.log("[FerroTeX] Using bundled ferrotexd:", bundledPath);
     return bundledPath;
@@ -89,7 +97,11 @@ export async function ensureFerrotexdBinary(
   const storedPath = path.join(storageDir, BINARY_NAME);
   if (fs.existsSync(storedPath)) {
     if (process.platform !== "win32") {
-      try { fs.chmodSync(storedPath, "755"); } catch { /* ignore */ }
+      try {
+        fs.chmodSync(storedPath, "755");
+      } catch {
+        /* ignore */
+      }
     }
     console.log("[FerroTeX] Using cached ferrotexd:", storedPath);
     return storedPath;
@@ -110,7 +122,7 @@ export async function ensureFerrotexdBinary(
   if (!target) {
     vscode.window.showErrorMessage(
       `FerroTeX: Unsupported platform (${process.platform}/${process.arch}). ` +
-      "Please install ferrotexd manually and set ferrotex.serverPath.",
+        "Please install ferrotexd manually and set ferrotex.serverPath.",
     );
     return undefined;
   }
@@ -142,7 +154,7 @@ export async function ensureFerrotexdBinary(
         if (!asset) {
           throw new Error(
             `No release asset found for your platform (${assetName}). ` +
-            "Please install ferrotexd manually.",
+              "Please install ferrotexd manually.",
           );
         }
 
@@ -168,7 +180,7 @@ export async function ensureFerrotexdBinary(
         if (!fs.existsSync(storedPath)) {
           throw new Error(
             `Extraction succeeded but ${BINARY_NAME} not found in ${storageDir}. ` +
-            "Archive layout may have changed.",
+              "Archive layout may have changed.",
           );
         }
 

@@ -27,28 +27,28 @@ To provide a highly refined and thoughtful experience for the research community
 
 **Version**: v0.24.0 — all features through v0.24.0 shipped.
 
-| Pillar | Status |
-| --- | --- |
-| Fault-tolerant CST (`ferrotex-syntax`, `rowan`) | ✅ Shipped |
-| Multi-file workspace index + include graph | ✅ Shipped |
-| Label/ref goto-definition, references, rename | ✅ Shipped (v0.23.1) |
-| Citation index + `.bib` parser | ✅ Shipped |
-| Completion, semantic tokens, folding, symbols | ✅ Shipped |
-| Formatting + code actions | ✅ Shipped |
-| Engine adapters (latexmk, Tectonic) | ✅ Shipped |
-| PDF viewer + bidirectional SyncTeX | ✅ Shipped |
-| Rich hovers + human-readable error index | ✅ Shipped |
-| Snippet pack + magic comments | ✅ Shipped |
-| Image paste wizard | ✅ Shipped |
-| DAP — step-in/over, register inspection | ✅ Shipped |
-| `ferrotex.lock` hermetic builds | ✅ Shipped |
-| Semantic math analysis (matrix/delimiter) | ✅ Shipped |
-| Multi-platform distribution (Linux/macOS/Windows) | ✅ Shipped |
-| Security hardening + CodeQL | ✅ Shipped |
-| VS Code test suite (53 passing, 0 failing) | ✅ Shipped (v0.23.1) |
-| Deprecated-command diagnostics + code actions | ✅ Shipped (v0.24.0) |
-| `\RequirePackage` package scanning | ✅ Shipped (v0.24.0) |
-| `\addbibresource` BibLaTeX indexing | ✅ Shipped (v0.24.0) |
+| Pillar                                            | Status               |
+| ------------------------------------------------- | -------------------- |
+| Fault-tolerant CST (`ferrotex-syntax`, `rowan`)   | ✅ Shipped           |
+| Multi-file workspace index + include graph        | ✅ Shipped           |
+| Label/ref goto-definition, references, rename     | ✅ Shipped (v0.23.1) |
+| Citation index + `.bib` parser                    | ✅ Shipped           |
+| Completion, semantic tokens, folding, symbols     | ✅ Shipped           |
+| Formatting + code actions                         | ✅ Shipped           |
+| Engine adapters (latexmk, Tectonic)               | ✅ Shipped           |
+| PDF viewer + bidirectional SyncTeX                | ✅ Shipped           |
+| Rich hovers + human-readable error index          | ✅ Shipped           |
+| Snippet pack + magic comments                     | ✅ Shipped           |
+| Image paste wizard                                | ✅ Shipped           |
+| DAP — step-in/over, register inspection           | ✅ Shipped           |
+| `ferrotex.lock` hermetic builds                   | ✅ Shipped           |
+| Semantic math analysis (matrix/delimiter)         | ✅ Shipped           |
+| Multi-platform distribution (Linux/macOS/Windows) | ✅ Shipped           |
+| Security hardening + CodeQL                       | ✅ Shipped           |
+| VS Code test suite (53 passing, 0 failing)        | ✅ Shipped (v0.23.1) |
+| Deprecated-command diagnostics + code actions     | ✅ Shipped (v0.24.0) |
+| `\RequirePackage` package scanning                | ✅ Shipped (v0.24.0) |
+| `\addbibresource` BibLaTeX indexing               | ✅ Shipped (v0.24.0) |
 
 ---
 
@@ -143,7 +143,7 @@ Each release below includes **Scope**, **Acceptance criteria**, and **Priority**
 - **Symbolic dimension checking**: track matrix column counts across `&`-separated cells and `\\`-terminated rows. Flag mismatches as `error` diagnostics before compilation.
 - **Variable consistency**: detect when a math variable is used with inconsistent dimensions across equations in the same document (e.g., `A` used as both scalar and matrix).
 - **`ferrotex ci verify` CLI command**: wrap `ferrotex-build` in a CI-oriented subcommand that exits non-zero on any semantic math error, enabling pre-commit hooks.
-- **Experimental Lean/Coq bridge** *(stretch)*: export the symbolic math model as a Lean 4 proof obligation for external verification. Gated behind a feature flag.
+- **Experimental Lean/Coq bridge** _(stretch)_: export the symbolic math model as a Lean 4 proof obligation for external verification. Gated behind a feature flag.
 
 **Acceptance criteria**
 
