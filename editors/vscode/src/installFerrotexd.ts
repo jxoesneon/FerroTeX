@@ -3,7 +3,7 @@ import * as path from "path";
 import * as fs from "fs";
 import * as https from "https";
 import * as os from "os";
-import { execSync } from "child_process";
+import { spawnSync } from "child_process";
 
 const GITHUB_REPO = "jxoesneon/FerroTeX";
 const BINARY_NAME = process.platform === "win32" ? "ferrotexd.exe" : "ferrotexd";
@@ -62,13 +62,21 @@ async function fetchLatestRelease(): Promise<GitHubRelease> {
 }
 
 function extractTarGz(archivePath: string, destDir: string): void {
-  execSync(`tar -xzf "${archivePath}" -C "${destDir}"`);
+  const result = spawnSync("tar", ["-xzf", archivePath, "-C", destDir], { encoding: "utf8" });
+  if (result.status !== 0) {
+    throw new Error(`tar extraction failed: ${result.stderr ?? result.error?.message ?? ""}`);
+  }
 }
 
 function extractZip(archivePath: string, destDir: string): void {
-  execSync(
-    `powershell -Command "Expand-Archive -Path '${archivePath}' -DestinationPath '${destDir}' -Force"`,
+  const result = spawnSync(
+    "powershell",
+    ["-Command", "Expand-Archive", "-Path", archivePath, "-DestinationPath", destDir, "-Force"],
+    { encoding: "utf8" },
   );
+  if (result.status !== 0) {
+    throw new Error(`Expand-Archive failed: ${result.stderr ?? result.error?.message ?? ""}`);
+  }
 }
 
 /**
@@ -109,8 +117,10 @@ export async function ensureFerrotexdBinary(
 
   // 3. Check system PATH
   try {
-    const checkCmd = process.platform === "win32" ? "where ferrotexd" : "which ferrotexd";
-    execSync(checkCmd, { stdio: "ignore" });
+    const checkArgs =
+      process.platform === "win32" ? ["where", ["ferrotexd"]] : ["which", ["ferrotexd"]];
+    const r = spawnSync(checkArgs[0] as string, checkArgs[1] as string[], { stdio: "ignore" });
+    if (r.status !== 0) throw new Error("not found");
     console.log("[FerroTeX] Using ferrotexd from PATH");
     return "ferrotexd";
   } catch {
