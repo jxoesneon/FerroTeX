@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-04-09
+
+> "Diagnostic Completeness" Update
+
+Closes the gap between the static analysis capabilities already present in the workspace index and what was actually surfaced through LSP diagnostics and code actions.
+
+### Added
+
+- **Deprecated-command diagnostics**: `{\bf ...}`, `{\it ...}`, `{\rm ...}`, `$$...$$` (display math), and obsolete packages (`times`, `a4wide`, `epsfig`, `psfig`) now produce `warning` diagnostics via `textDocument/publishDiagnostics` on every `didOpen`/`didChange`. Previously `Workspace::validate_deprecated()` existed but was never called from `validate_document()`.
+- **Code actions for deprecated commands**: each deprecated diagnostic is paired with a `quickfix` code action:
+  - Font commands (`\bf`, `\it`, `\rm`, `\sf`, `\tt`, `\sc`, `\sl`) → `\textbf{...}` etc.
+  - Display math `$$...$$` → `\[...\]`
+- **`\RequirePackage` support**: the package scanner now recognises `\RequirePackage` in addition to `\usepackage`, ensuring packages declared in `.cls`/`.sty` files are included in completion and package-awareness features.
+- **`\addbibresource` indexing**: BibLaTeX documents using `\addbibresource{refs.bib}` now have their `.bib` files indexed for citation key completion and cross-file validation, identical to `\bibliography{refs}`.
+
+### Changed
+
+- `code_action_provider` capability advertised in `InitializeResult`.
+- Label and duplicate-label diagnostics now carry `source: "ferrotex"` for better client-side filtering.
+
+### Fixed
+
+- Three regression tests added covering the new diagnostic pipeline, deprecated helper functions, and `\addbibresource` indexing. All 419 workspace tests pass.
+
 ## [0.23.0] - 2026-04-04
 
 > "Institutional Excellence" Update
@@ -321,7 +345,8 @@ Transforms FerroTeX into a high-fidelity "Scientific Compiler" platform, introdu
 
 - Initial repository structure.
 
-[Unreleased]: https://github.com/jxoesneon/FerroTeX/compare/v0.23.0...HEAD
+[Unreleased]: https://github.com/jxoesneon/FerroTeX/compare/v0.24.0...HEAD
+[0.24.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.22.0...v0.23.0
 [0.22.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.21.0...v0.22.0
 [0.21.0]: https://github.com/jxoesneon/FerroTeX/compare/v0.20.1...v0.21.0

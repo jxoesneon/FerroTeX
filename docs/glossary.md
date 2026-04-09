@@ -71,3 +71,7 @@ The ability to step backward through the macro expansion process. Enabled by sna
 ### Symbolic Execution
 
 A method of analyzing mathematical environments by treating variables as symbols rather than concrete values, allowing for the detection of structural inconsistencies like matrix dimension mismatches.
+
+### Deprecated Command Diagnostic
+
+A `warning`-severity LSP diagnostic emitted by `ferrotexd` when it detects a LaTeX 2.09 font command (`\bf`, `\it`, `\rm`, etc.), obsolete display math syntax (`$$...$$`), or a known-obsolete package (`times`, `a4wide`). Each diagnostic is paired with a `quickfix` code action that performs the mechanical replacement (e.g., `{\bf text}` → `\textbf{text}`).

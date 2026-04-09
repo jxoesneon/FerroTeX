@@ -803,6 +803,7 @@ fn scan_file(text: &str) -> ScanResult {
                         "\\ref",
                         "\\cite",
                         "\\bibliography",
+                        "\\addbibresource",
                         "\\include",
                         "\\input",
                     ];
@@ -833,10 +834,11 @@ fn scan_file(text: &str) -> ScanResult {
                             match cmd_name {
                                 "\\label" => defs.push(LabelDef { name: arg, range }),
                                 "\\ref" => refs.push(LabelRef { name: arg, range }),
-                                "\\bibliography" => {
+                                "\\bibliography" | "\\addbibresource" => {
                                     for path in arg.split(',') {
+                                        let p = path.trim().trim_end_matches(".bib");
                                         bibs.push(BibRef {
-                                            path: path.trim().to_string(),
+                                            path: p.to_string(),
                                             range,
                                         });
                                     }
@@ -889,10 +891,11 @@ fn scan_file(text: &str) -> ScanResult {
                                         name: arg,
                                         range: cmd_range,
                                     }),
-                                    "\\bibliography" => {
+                                    "\\bibliography" | "\\addbibresource" => {
                                         for path in arg.split(',') {
+                                            let p = path.trim().trim_end_matches(".bib");
                                             bibs.push(BibRef {
-                                                path: path.trim().to_string(),
+                                                path: p.to_string(),
                                                 range: cmd_range,
                                             });
                                         }
@@ -936,7 +939,7 @@ fn scan_file(text: &str) -> ScanResult {
     // We ignore options for now.
     // Scan for packages
     let text_str = root.text().to_string();
-    let re = Regex::new(r"\\usepackage(?:\[[^\]]*\])?\{([^}]+)\}").unwrap();
+    let re = Regex::new(r"\\(?:usepackage|RequirePackage)(?:\[[^\]]*\])?\{([^}]+)\}").unwrap();
     let mut packages = Vec::new();
 
     for cap in re.captures_iter(&text_str) {
@@ -1116,14 +1119,10 @@ mod tests {
     #[test]
     fn test_scan_file_complex_packages() {
         let text = r"\usepackage[opt=1]{pkg1, pkg2} \RequirePackage{pkg3}";
-        // Note: scan_file implementation regex only matches \usepackage currently?
-        // Let's check regex: r"\\usepackage(?:\[[^\]]*\])?\{([^}]+)\}"
-        // It does NOT match RequirePackage.
-
         let res = scan_file(text);
         assert!(res.6.contains(&"pkg1".to_string()));
         assert!(res.6.contains(&"pkg2".to_string()));
-        assert!(!res.6.contains(&"pkg3".to_string()));
+        assert!(res.6.contains(&"pkg3".to_string()), "\\RequirePackage should now be scanned");
     }
 
     #[test]
