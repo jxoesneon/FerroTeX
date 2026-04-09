@@ -1,3 +1,4 @@
+#![allow(unsafe_code)] // env::set_var is unsafe in Rust 2024; needed for PATH-isolation tests.
 use ferrotex_core::package_manager::{InstallState, PackageManager};
 use std::env;
 

@@ -115,7 +115,6 @@ fn handle_environment_hover(node: &SyntaxNode) -> Option<Hover> {
             "Typically used after `\\maketitle`",
         ),
         _ => {
-            let _desc = format!("LaTeX environment: {}", env_name);
             return Some(Hover {
                 contents: HoverContents::Markup(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -657,11 +656,7 @@ mod tests {
 
             // Find start of command (handle * properly)
             // search for the base command part
-            let search_term = if cmd.starts_with('\\') {
-                &cmd[1..]
-            } else {
-                cmd
-            };
+            let search_term = cmd.strip_prefix('\\').unwrap_or(cmd);
             // If cmd has *, search term includes it? find() works.
 
             let offset_pos = input.find(search_term).unwrap_or(0);

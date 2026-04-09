@@ -3,12 +3,13 @@ import * as vscode from "vscode";
 import { LanguageClient, LanguageClientOptions, ServerOptions } from "vscode-languageclient/node";
 import { PdfPreviewProvider } from "./pdfPreview";
 import { checkAndInstallTectonic } from "./installTectonic";
+import { ensureFerrotexdBinary } from "./installFerrotexd";
 import { validateBuildEngine, validateSyncTeX } from "./engineValidator";
 import { ImagePasteProvider } from "./imagePaste";
 
 let client: LanguageClient;
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
   const config = vscode.workspace.getConfiguration("ferrotex");
   let serverPath = config.get<string>("serverPath");
 
@@ -31,32 +32,10 @@ export function activate(context: vscode.ExtensionContext) {
   validateBuildEngine();
   validateSyncTeX();
 
-  // If no path is configured, check for grouped/bundled binary first
+  // Resolve ferrotexd: bundled → globalStorage cache → PATH → auto-download
   if (!serverPath || serverPath === "ferrotexd") {
-    // Check bundled path: extensions/ferrotex/bin/ferrotexd
-    const bundledPath = path.join(
-      context.extensionPath,
-      "bin",
-      process.platform === "win32" ? "ferrotexd.exe" : "ferrotexd",
-    );
-    const fs = require("fs");
-
-    console.log("[FerroTeX] Checking bundled binary at:", bundledPath);
-
-    if (fs.existsSync(bundledPath)) {
-      serverPath = bundledPath;
-      // UX-Upgrade: Ensure executable permissions on Linux/macOS
-      if (process.platform !== "win32") {
-        try {
-          fs.chmodSync(bundledPath, "755");
-          console.log("[FerroTeX] Set executable permissions for bundled binary.");
-        } catch (err) {
-          console.error("[FerroTeX] Failed to set permissions:", err);
-        }
-      }
-    } else {
-      serverPath = "ferrotexd"; // Fallback to PATH
-    }
+    const resolved = await ensureFerrotexdBinary(context);
+    serverPath = resolved ?? "ferrotexd";
   }
 
   console.log("[FerroTeX] Server Path:", serverPath);
@@ -140,7 +119,7 @@ export function activate(context: vscode.ExtensionContext) {
           async (progress) => {
             try {
               const result: any = await client.sendRequest("workspace/executeCommand", {
-                command: "ferrotex.installPackage",
+                command: "ferrotex.internal.installPackage",
                 arguments: [packageName],
               });
 
@@ -300,8 +279,6 @@ export function activate(context: vscode.ExtensionContext) {
       }
     }),
   );
-
-  client = new LanguageClient("ferrotex", "FerroTeX Language Server", serverOptions, clientOptions);
 
   // BO-2: Real-time Log Streaming
   const outputChannel = vscode.window.createOutputChannel("FerroTeX Build");

@@ -28,6 +28,7 @@ Core logic belongs in the Rust server.
 
 - **Language feature UX**
   - enable and surface LSP-backed features (completion, outline, navigation, formatting)
+  - surface code actions (quick-fixes) for deprecated-command diagnostics
   - present confidence/uncertainty where provided by the server
 
 - **Presentation**

@@ -1,9 +1,17 @@
 [package]
 name = "ferrotex-log"
-version = "0.23.1"
+version = "0.24.0"
 edition = "2024"
 description = "FerroTeX build log parser and event model"
 license = "Apache-2.0 OR MIT"
+repository = "https://github.com/jxoesneon/FerroTeX"
+homepage = "https://jxoesneon.github.io/FerroTeX/"
+rust-version = "1.85"
+keywords = ["latex", "log-parser", "tex"]
+categories = ["parser-implementations", "development-tools"]
+
+[lints]
+workspace = true
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
