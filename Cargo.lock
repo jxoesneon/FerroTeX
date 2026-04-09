@@ -998,7 +998,7 @@ checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 
 [[package]]
 name = "ferrotex-analysis"
-version = "0.22.0"
+version = "0.24.0"
 dependencies = [
  "ferrotex-build",
  "ferrotex-syntax",
@@ -1008,7 +1008,7 @@ dependencies = [
 
 [[package]]
 name = "ferrotex-build"
-version = "0.22.0"
+version = "0.24.0"
 dependencies = [
  "anyhow",
  "hex",
@@ -1019,7 +1019,7 @@ dependencies = [
 
 [[package]]
 name = "ferrotex-cli"
-version = "0.22.0"
+version = "0.24.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -1037,7 +1037,7 @@ dependencies = [
 
 [[package]]
 name = "ferrotex-core"
-version = "0.22.0"
+version = "0.24.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1052,7 +1052,7 @@ dependencies = [
 
 [[package]]
 name = "ferrotex-dap"
-version = "0.22.0"
+version = "0.24.0"
 dependencies = [
  "anyhow",
  "ferrotex-build",
@@ -1078,7 +1078,7 @@ dependencies = [
 
 [[package]]
 name = "ferrotex-log"
-version = "0.22.0"
+version = "0.24.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -1087,7 +1087,7 @@ dependencies = [
 
 [[package]]
 name = "ferrotex-math-semantics"
-version = "0.22.0"
+version = "0.24.0"
 dependencies = [
  "expect-test",
  "ferrotex-syntax",
@@ -1098,7 +1098,7 @@ dependencies = [
 
 [[package]]
 name = "ferrotex-package"
-version = "0.22.0"
+version = "0.24.0"
 dependencies = [
  "anyhow",
  "dirs",
@@ -1111,7 +1111,7 @@ dependencies = [
 
 [[package]]
 name = "ferrotex-syntax"
-version = "0.22.0"
+version = "0.24.0"
 dependencies = [
  "criterion",
  "ferrotex-build",
@@ -1120,7 +1120,7 @@ dependencies = [
 
 [[package]]
 name = "ferrotexd"
-version = "0.22.0"
+version = "0.24.0"
 dependencies = [
  "anyhow",
  "async-trait",

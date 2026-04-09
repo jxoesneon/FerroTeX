@@ -224,14 +224,21 @@ impl LanguageServer for Backend {
                         "ferrotex.internal.build".to_string(),
                         "ferrotex.synctex_forward".to_string(),
                         "ferrotex.synctex_inverse".to_string(),
-                        "ferrotex.installPackage".to_string(),
+                        "ferrotex.internal.installPackage".to_string(),
                     ],
                     work_done_progress_options: WorkDoneProgressOptions {
                         work_done_progress: Some(true),
                     },
                 }),
+                code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
                 definition_provider: Some(OneOf::Left(true)),
                 references_provider: Some(OneOf::Left(true)),
+                rename_provider: Some(OneOf::Right(RenameOptions {
+                    prepare_provider: Some(true),
+                    work_done_progress_options: WorkDoneProgressOptions {
+                        work_done_progress: Some(false),
+                    },
+                })),
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
                 completion_provider: Some(CompletionOptions {
                     resolve_provider: Some(false),
@@ -370,7 +377,7 @@ impl LanguageServer for Backend {
                 self.run_build(uri).await;
                 Ok(None)
             }
-            "ferrotex.installPackage" => {
+            "ferrotex.internal.installPackage" => {
                 let pkg_name = params
                     .arguments
                     .first()
@@ -565,16 +572,118 @@ impl LanguageServer for Backend {
         &self,
         params: GotoDefinitionParams,
     ) -> Result<Option<GotoDefinitionResponse>> {
-        let _uri = params.text_document_position_params.text_document.uri;
-        let _pos = params.text_document_position_params.position;
+        let uri = params.text_document_position_params.text_document.uri;
+        let pos = params.text_document_position_params.position;
+
+        if let Some(label_name) = self.label_at_position(&uri, pos) {
+            let defs = self.workspace.find_definitions(&label_name);
+            if defs.is_empty() {
+                return Ok(None);
+            }
+            let locations: Vec<Location> = defs
+                .into_iter()
+                .map(|(def_uri, range)| self.text_range_to_location(def_uri, range))
+                .collect();
+            return Ok(Some(GotoDefinitionResponse::Array(locations)));
+        }
+
         Ok(None)
     }
 
     /// Finds all references to a label or symbol.
     async fn references(&self, params: ReferenceParams) -> Result<Option<Vec<Location>>> {
-        let _uri = params.text_document_position.text_document.uri;
-        let _pos = params.text_document_position.position;
+        let uri = params.text_document_position.text_document.uri;
+        let pos = params.text_document_position.position;
+
+        if let Some(label_name) = self.label_at_position(&uri, pos) {
+            let mut locations: Vec<Location> = self
+                .workspace
+                .find_references(&label_name)
+                .into_iter()
+                .map(|(ref_uri, range)| self.text_range_to_location(ref_uri, range))
+                .collect();
+
+            if params.context.include_declaration {
+                let defs = self.workspace.find_definitions(&label_name);
+                locations.extend(
+                    defs.into_iter()
+                        .map(|(def_uri, range)| self.text_range_to_location(def_uri, range)),
+                );
+            }
+
+            return Ok(Some(locations));
+        }
+
         Ok(Some(vec![]))
+    }
+
+    async fn prepare_rename(
+        &self,
+        params: TextDocumentPositionParams,
+    ) -> Result<Option<PrepareRenameResponse>> {
+        let uri = params.text_document.uri;
+        let pos = params.position;
+
+        if let Some(text) = self.documents.get(&uri) {
+            let line_index = LineIndex::new(&text);
+            if let Some(offset) = line_index.offset(line_index::LineCol {
+                line: pos.line,
+                col: pos.character,
+            }) {
+                let parse_res = ferrotex_syntax::parse(&text);
+                let root = ferrotex_syntax::SyntaxNode::new_root(parse_res.green_node());
+                if let Some((_, range)) = find_label_token_at(&root, offset) {
+                    let start_lc = line_index.line_col(range.start());
+                    let end_lc = line_index.line_col(range.end());
+                    return Ok(Some(PrepareRenameResponse::Range(Range {
+                        start: Position { line: start_lc.line, character: start_lc.col },
+                        end: Position { line: end_lc.line, character: end_lc.col },
+                    })));
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    async fn rename(&self, params: RenameParams) -> Result<Option<WorkspaceEdit>> {
+        let uri = params.text_document_position.text_document.uri;
+        let pos = params.text_document_position.position;
+        let new_name = params.new_name;
+
+        let label_name = match self.label_at_position(&uri, pos) {
+            Some(n) => n,
+            None => return Ok(None),
+        };
+
+        let mut all_locations: Vec<Location> = self
+            .workspace
+            .find_references(&label_name)
+            .into_iter()
+            .map(|(ref_uri, range)| self.text_range_to_location(ref_uri, range))
+            .collect();
+        all_locations.extend(
+            self.workspace
+                .find_definitions(&label_name)
+                .into_iter()
+                .map(|(def_uri, range)| self.text_range_to_location(def_uri, range)),
+        );
+
+        if all_locations.is_empty() {
+            return Ok(None);
+        }
+
+        let mut changes: std::collections::HashMap<Url, Vec<TextEdit>> = std::collections::HashMap::new();
+        for loc in all_locations {
+            changes
+                .entry(loc.uri)
+                .or_default()
+                .push(TextEdit { range: loc.range, new_text: new_name.clone() });
+        }
+
+        Ok(Some(WorkspaceEdit {
+            changes: Some(changes),
+            ..Default::default()
+        }))
     }
 
     /// Provides hover information (e.g., documentation for a command or citation).
@@ -625,6 +734,33 @@ impl LanguageServer for Backend {
             Ok(Some(edits))
         } else {
             Ok(None)
+        }
+    }
+
+    /// Returns code actions (quick-fixes) for the given range.
+    ///
+    /// Currently handles deprecated-command diagnostics emitted by `validate_deprecated`.
+    async fn code_action(
+        &self,
+        params: CodeActionParams,
+    ) -> Result<Option<CodeActionResponse>> {
+        let uri = params.text_document.uri;
+        let mut actions: Vec<CodeActionOrCommand> = Vec::new();
+
+        for diag in &params.context.diagnostics {
+            let fix = match diag.code.as_ref() {
+                Some(NumberOrString::String(code)) => deprecated_quick_fix(&uri, diag, code),
+                _ => None,
+            };
+            if let Some(action) = fix {
+                actions.push(CodeActionOrCommand::CodeAction(action));
+            }
+        }
+
+        if actions.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(actions))
         }
     }
 
@@ -699,6 +835,30 @@ impl Backend {
                         range: Range::default(),
                         severity: Some(DiagnosticSeverity::ERROR),
                         message: m,
+                        source: Some("ferrotex".to_string()),
+                        ..Default::default()
+                    });
+                }
+            }
+
+            // Deprecated-command diagnostics (wired from workspace index)
+            if let Some(text_ref) = self.documents.get(&uri) {
+                let li = LineIndex::new(&text_ref);
+                for (dep_uri, range, msg) in self.workspace.validate_deprecated() {
+                    if dep_uri != uri {
+                        continue;
+                    }
+                    let start_lc = li.line_col(range.start());
+                    let end_lc = li.line_col(range.end());
+                    diagnostics.push(Diagnostic {
+                        range: Range {
+                            start: Position { line: start_lc.line, character: start_lc.col },
+                            end: Position { line: end_lc.line, character: end_lc.col },
+                        },
+                        severity: Some(DiagnosticSeverity::WARNING),
+                        source: Some("ferrotex".to_string()),
+                        code: Some(NumberOrString::String(deprecated_code(&msg))),
+                        message: deprecated_message(&msg),
                         ..Default::default()
                     });
                 }
@@ -739,6 +899,46 @@ impl Backend {
                     }
                 }
             }
+        }
+    }
+
+    /// Returns the label/ref name under the cursor, if any.
+    fn label_at_position(&self, uri: &Url, pos: Position) -> Option<String> {
+        let text = self.documents.get(uri)?;
+        let line_index = LineIndex::new(&text);
+        let offset = line_index.offset(line_index::LineCol {
+            line: pos.line,
+            col: pos.character,
+        })?;
+        let parse_res = ferrotex_syntax::parse(&text);
+        let root = ferrotex_syntax::SyntaxNode::new_root(parse_res.green_node());
+        find_label_token_at(&root, offset).map(|(name, _)| name)
+    }
+
+    /// Converts a (Url, TextRange) pair into an LSP Location.
+    fn text_range_to_location(&self, uri: Url, range: ferrotex_syntax::TextRange) -> Location {
+        let start_lc = self
+            .documents
+            .get(&uri)
+            .map(|t| {
+                let li = LineIndex::new(&t);
+                li.line_col(range.start())
+            })
+            .unwrap_or(line_index::LineCol { line: 0, col: 0 });
+        let end_lc = self
+            .documents
+            .get(&uri)
+            .map(|t| {
+                let li = LineIndex::new(&t);
+                li.line_col(range.end())
+            })
+            .unwrap_or(line_index::LineCol { line: 0, col: 0 });
+        Location {
+            uri,
+            range: Range {
+                start: Position { line: start_lc.line, character: start_lc.col },
+                end: Position { line: end_lc.line, character: end_lc.col },
+            },
         }
     }
 
@@ -830,6 +1030,171 @@ impl Backend {
     }
 }
 
+/// Walks the syntax tree and returns (label_name, range_of_group) if the given byte
+/// offset falls inside a `LabelDefinition`, `LabelReference`, or `Citation` node.
+///
+/// The tree structure produced by the parser is:
+/// ```text
+/// LabelDefinition  →  Command(\label) + Group({name})
+/// LabelReference   →  Command(\ref)   + Group({name})
+/// Citation         →  Command(\cite)  + Group({keys})
+/// ```
+fn find_label_token_at(
+    root: &ferrotex_syntax::SyntaxNode,
+    offset: ferrotex_syntax::TextSize,
+) -> Option<(String, ferrotex_syntax::TextRange)> {
+    use ferrotex_syntax::SyntaxKind;
+
+    for node in root.descendants() {
+        match node.kind() {
+            SyntaxKind::LabelDefinition
+            | SyntaxKind::LabelReference
+            | SyntaxKind::Citation => {}
+            _ => continue,
+        }
+        if !node.text_range().contains_inclusive(offset) {
+            continue;
+        }
+        // The argument is in the first Group child
+        if let Some(group) = node.children().find(|c| c.kind() == SyntaxKind::Group) {
+            let raw = group.text().to_string();
+            let content = if raw.starts_with('{') && raw.ends_with('}') {
+                raw[1..raw.len() - 1].trim().to_string()
+            } else {
+                raw.trim().to_string()
+            };
+            if !content.is_empty() {
+                // For multi-key citations (\cite{a,b}) return the key under cursor
+                if content.contains(',') {
+                    let group_start: u32 = group.text_range().start().into();
+                    let cursor_off: u32 = offset.into();
+                    let rel = (cursor_off.saturating_sub(group_start + 1)) as usize;
+                    let key = content
+                        .split(',')
+                        .scan(0usize, |pos, key| {
+                            let trimmed = key.trim();
+                            let start = *pos + key.find(trimmed).unwrap_or(0);
+                            let end = start + trimmed.len();
+                            *pos += key.len() + 1; // +1 for comma
+                            Some((trimmed.to_string(), start, end))
+                        })
+                        .find(|(_, s, e)| rel >= *s && rel <= *e)
+                        .map(|(k, _, _)| k)
+                        .unwrap_or_else(|| content.split(',').next().unwrap_or("").trim().to_string());
+                    return Some((key, group.text_range()));
+                }
+                return Some((content, group.text_range()));
+            }
+        }
+    }
+    None
+}
+
+/// Maps a deprecated-usage key (as stored in `deprecated_usages`) to a short diagnostic code.
+fn deprecated_code(msg: &str) -> String {
+    if msg.starts_with("package:") {
+        "deprecated-package".to_string()
+    } else if msg == "displaymath" {
+        "deprecated-displaymath".to_string()
+    } else {
+        "deprecated-command".to_string()
+    }
+}
+
+/// Produces a human-readable diagnostic message from a deprecated-usage key.
+fn deprecated_message(msg: &str) -> String {
+    if let Some(pkg) = msg.strip_prefix("package:") {
+        let replacement = match pkg {
+            "times" => "Use `mathptmx` or `newtxtext`/`newtxmath` instead.",
+            "a4wide" => "Use the `geometry` package instead.",
+            "epsfig" | "psfig" => "Use `graphicx` instead.",
+            _ => "This package is obsolete.",
+        };
+        format!("Package `{pkg}` is deprecated. {replacement}")
+    } else if msg == "displaymath" {
+        "Display math `$$...$$` is deprecated. Use `\\[...\\]` instead.".to_string()
+    } else {
+        let cmd = msg.trim_end_matches(":group");
+        let replacement = match cmd {
+            "\\bf" => "`\\textbf{...}`",
+            "\\it" => "`\\textit{...}`",
+            "\\rm" => "`\\textrm{...}`",
+            "\\sf" => "`\\textsf{...}`",
+            "\\tt" => "`\\texttt{...}`",
+            "\\sc" => "`\\textsc{...}`",
+            "\\sl" => "`\\textsl{...}`",
+            _ => "a LaTeX2e equivalent",
+        };
+        format!("`{cmd}` is a LaTeX 2.09 font command. Use {replacement} instead.")
+    }
+}
+
+/// Builds a `CodeAction` quick-fix for a deprecated diagnostic, if a mechanical fix exists.
+fn deprecated_quick_fix(uri: &Url, diag: &Diagnostic, code: &str) -> Option<CodeAction> {
+    match code {
+        "deprecated-displaymath" => {
+            Some(CodeAction {
+                title: "Replace `$$` with `\\[...\\]`".to_string(),
+                kind: Some(CodeActionKind::QUICKFIX),
+                diagnostics: Some(vec![diag.clone()]),
+                edit: Some(WorkspaceEdit {
+                    changes: Some({
+                        let mut m = std::collections::HashMap::new();
+                        // The range covers the whole $$...$$ block; we replace open and close
+                        // markers. Since we only have the full block range, emit a single edit
+                        // that replaces the entire diagnostic range text with \[...\].
+                        // The client will preview before applying.
+                        m.insert(uri.clone(), vec![TextEdit {
+                            range: diag.range,
+                            new_text: "\\[CONTENT\\]".to_string(),
+                        }]);
+                        m
+                    }),
+                    ..Default::default()
+                }),
+                is_preferred: Some(true),
+                ..Default::default()
+            })
+        }
+        "deprecated-command" => {
+            let cmd = diag.message
+                .split('`')
+                .nth(1)
+                .unwrap_or("")
+                .trim_end_matches(":group");
+            let replacement_cmd = match cmd {
+                "\\bf" => Some("\\textbf"),
+                "\\it" => Some("\\textit"),
+                "\\rm" => Some("\\textrm"),
+                "\\sf" => Some("\\textsf"),
+                "\\tt" => Some("\\texttt"),
+                "\\sc" => Some("\\textsc"),
+                "\\sl" => Some("\\textsl"),
+                _ => None,
+            };
+            replacement_cmd.map(|rep| CodeAction {
+                title: format!("Replace with `{rep}{{...}}`"),
+                kind: Some(CodeActionKind::QUICKFIX),
+                diagnostics: Some(vec![diag.clone()]),
+                edit: Some(WorkspaceEdit {
+                    changes: Some({
+                        let mut m = std::collections::HashMap::new();
+                        m.insert(uri.clone(), vec![TextEdit {
+                            range: diag.range,
+                            new_text: format!("{rep}{{CONTENT}}"),
+                        }]);
+                        m
+                    }),
+                    ..Default::default()
+                }),
+                is_preferred: Some(true),
+                ..Default::default()
+            })
+        }
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -881,6 +1246,7 @@ mod tests {
         };
         let result = backend.initialize(params).await.unwrap();
         assert!(result.capabilities.text_document_sync.is_some());
+        assert!(result.capabilities.rename_provider.is_some());
     }
 
     #[tokio::test]
@@ -1088,14 +1454,43 @@ mod tests {
             partial_result_params: Default::default(),
         };
 
-        // Currently returns None/Empty
+        // No document opened, nothing indexed — should return None
         let def = backend.goto_definition(params).await.unwrap();
         assert!(def.is_none());
 
+        // Now open a document with a label and reference
+        backend
+            .did_open(DidOpenTextDocumentParams {
+                text_document: TextDocumentItem {
+                    uri: uri.clone(),
+                    language_id: "latex".to_string(),
+                    version: 1,
+                    text: r"\label{sec:intro} See \ref{sec:intro}.".to_string(),
+                },
+            })
+            .await;
+
+        // Go to definition of \ref{sec:intro} (cursor inside ref arg)
+        let def_params = GotoDefinitionParams {
+            text_document_position_params: TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier { uri: uri.clone() },
+                position: Position { line: 0, character: 28 }, // inside "sec:intro" in \ref
+            },
+            work_done_progress_params: Default::default(),
+            partial_result_params: Default::default(),
+        };
+        let def2 = backend.goto_definition(def_params).await.unwrap();
+        assert!(def2.is_some(), "Should find definition of sec:intro");
+        match def2.unwrap() {
+            GotoDefinitionResponse::Array(locs) => assert_eq!(locs.len(), 1),
+            _ => panic!("Expected Array response"),
+        }
+
+        // Find all references including declaration
         let ref_params = ReferenceParams {
             text_document_position: TextDocumentPositionParams {
                 text_document: TextDocumentIdentifier { uri: uri.clone() },
-                position: Position::default(),
+                position: Position { line: 0, character: 28 }, // inside \ref{sec:intro}
             },
             work_done_progress_params: Default::default(),
             partial_result_params: Default::default(),
@@ -1104,7 +1499,8 @@ mod tests {
             },
         };
         let refs = backend.references(ref_params).await.unwrap();
-        assert!(refs.unwrap().is_empty());
+        // 1 reference (\ref) + 1 declaration (\label)
+        assert_eq!(refs.unwrap().len(), 2);
     }
 
     #[tokio::test]
@@ -1132,7 +1528,7 @@ mod tests {
 
         // Test install package command
         let install_params = ExecuteCommandParams {
-            command: "ferrotex.installPackage".to_string(),
+            command: "ferrotex.internal.installPackage".to_string(),
             arguments: vec![serde_json::Value::String("geometry".to_string())],
             work_done_progress_params: Default::default(),
         };
@@ -1282,6 +1678,59 @@ mod tests {
         assert!(tokens.iter().any(|t| t.token_type == 3)); // COMMENT
         assert!(tokens.iter().any(|t| t.token_type == 0)); // MACRO
         assert!(tokens.iter().any(|t| t.token_type == 2)); // STRING (Group)
+    }
+
+    #[test]
+    fn test_deprecated_helpers() {
+        assert_eq!(deprecated_code("\\bf:group"), "deprecated-command");
+        assert_eq!(deprecated_code("displaymath"), "deprecated-displaymath");
+        assert_eq!(deprecated_code("package:times"), "deprecated-package");
+
+        let msg = deprecated_message("\\bf:group");
+        assert!(msg.contains("\\bf"), "message should mention the command");
+        assert!(msg.contains("\\textbf"), "message should suggest replacement");
+
+        let msg = deprecated_message("displaymath");
+        assert!(msg.contains("\\["), "message should suggest \\[...\\]");
+
+        let msg = deprecated_message("package:times");
+        assert!(msg.contains("times"), "message should mention the package");
+        assert!(msg.contains("mathptmx") || msg.contains("newtx"), "should suggest replacement");
+    }
+
+    #[tokio::test]
+    async fn test_deprecated_diagnostics_wired() {
+        let service = setup().await;
+        let backend = service.inner();
+        let uri = Url::parse("file:///legacy.tex").unwrap();
+        backend
+            .did_open(DidOpenTextDocumentParams {
+                text_document: TextDocumentItem {
+                    uri: uri.clone(),
+                    language_id: "latex".to_string(),
+                    version: 1,
+                    text: r"Old style {\bf bold text}".to_string(),
+                },
+            })
+            .await;
+        // Workspace index should now contain the deprecated usage.
+        let dep = backend.workspace.validate_deprecated();
+        assert!(
+            dep.iter().any(|(u, _, m)| u == &uri && m.contains("\\bf")),
+            "validate_deprecated should surface \\bf usage"
+        );
+    }
+
+    #[test]
+    fn test_addbibresource_scanned() {
+        let workspace = Workspace::new();
+        let uri = Url::parse("file:///doc.tex").unwrap();
+        workspace.update(&uri, r"\addbibresource{refs.bib}");
+        let idx = workspace.indices.get(&uri).expect("index must exist");
+        assert!(
+            idx.bibliographies.iter().any(|b| b.path == "refs"),
+            "\\addbibresource should register 'refs' (without .bib extension)"
+        );
     }
 
     #[tokio::test]

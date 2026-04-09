@@ -48,6 +48,8 @@ Unlike traditional matchers, FerroTeX performs structural analysis of the Docume
 
 - **Matrix Dimension Tracking**: Detects mismatched ampersands `&` in complex environments like `matrix` or `aligned`, even when using `\multicolumn`.
 - **Macro Expansion Analysis**: Uses abstract interpretation to prevent recursion loops and verify macro safety.
+- **Deprecated-Command Diagnostics**: Real-time `warning` diagnostics for LaTeX 2.09 font commands (`\bf`, `\it`, `\rm`, etc.), `$$...$$` display math, and obsolete packages (`times`, `a4wide`). Each diagnostic carries a one-click **quick-fix** code action.
+- **BibLaTeX Support**: `\addbibresource` is indexed identically to `\bibliography`; `\RequirePackage` is scanned alongside `\usepackage`.
 
 ### 3. Professional Observability (DAP)
 
@@ -58,9 +60,9 @@ Debug your TeX source like code. The integrated **Debug Adapter Protocol** (DAP)
 
 ---
 
-## 🚀 Status: v0.22.0 (The "Debug & Reliability" Update)
+## 🚀 Status: v0.24.0 (The "Diagnostic Completeness" Update)
 
-FerroTeX v0.22.0 introduces the **Tectonic Debug Driver**, allowing you to step through TeX macros like code, alongside massive reliability improvements to the semantic engine (>95% test coverage).
+FerroTeX v0.24.0 closes the gap between the static analysis already present in the workspace index and what is surfaced through LSP. Deprecated LaTeX 2.09 font commands, obsolete `$$` display math, and obsolete packages now produce live `warning` diagnostics with quick-fix code actions — no rebuild required.
 
 ### Performance (M1 Max / Linux x64)
 

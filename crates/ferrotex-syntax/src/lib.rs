@@ -208,7 +208,12 @@ impl Language for FerroTexLanguage {
 
     fn kind_from_raw(raw: rowan::SyntaxKind) -> Self::Kind {
         assert!(raw.0 <= SyntaxKind::Eof as u16);
-        unsafe { std::mem::transmute::<u16, SyntaxKind>(raw.0) }
+        // SAFETY: The assert above guarantees `raw.0` is a valid `SyntaxKind` discriminant.
+        // This transmute is the canonical rowan pattern for implementing `Language`.
+        #[allow(unsafe_code)]
+        unsafe {
+            std::mem::transmute::<u16, SyntaxKind>(raw.0)
+        }
     }
 
     fn kind_to_raw(kind: Self::Kind) -> rowan::SyntaxKind {

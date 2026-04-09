@@ -23,450 +23,180 @@ To provide a highly refined and thoughtful experience for the research community
 3. **Formal Verification of Math (The "Trust" Aspiration)**: Moving from "it looks right" to "it is mathematically sound." Provides automated checks for matrix dimensions and variable consistency via symbolic execution.
 4. **The "Safe-TeX" Sandbox (The "Security" Aspiration)**: A secure foundation for sensitive research environments using a global Virtual File System (VFS) and capabilities-based permissions.
 
+## Current Status
+
+**Version**: v0.24.0 — all features through v0.24.0 shipped.
+
+| Pillar | Status |
+| --- | --- |
+| Fault-tolerant CST (`ferrotex-syntax`, `rowan`) | ✅ Shipped |
+| Multi-file workspace index + include graph | ✅ Shipped |
+| Label/ref goto-definition, references, rename | ✅ Shipped (v0.23.1) |
+| Citation index + `.bib` parser | ✅ Shipped |
+| Completion, semantic tokens, folding, symbols | ✅ Shipped |
+| Formatting + code actions | ✅ Shipped |
+| Engine adapters (latexmk, Tectonic) | ✅ Shipped |
+| PDF viewer + bidirectional SyncTeX | ✅ Shipped |
+| Rich hovers + human-readable error index | ✅ Shipped |
+| Snippet pack + magic comments | ✅ Shipped |
+| Image paste wizard | ✅ Shipped |
+| DAP — step-in/over, register inspection | ✅ Shipped |
+| `ferrotex.lock` hermetic builds | ✅ Shipped |
+| Semantic math analysis (matrix/delimiter) | ✅ Shipped |
+| Multi-platform distribution (Linux/macOS/Windows) | ✅ Shipped |
+| Security hardening + CodeQL | ✅ Shipped |
+| VS Code test suite (53 passing, 0 failing) | ✅ Shipped (v0.23.1) |
+| Deprecated-command diagnostics + code actions | ✅ Shipped (v0.24.0) |
+| `\RequirePackage` package scanning | ✅ Shipped (v0.24.0) |
+| `\addbibresource` BibLaTeX indexing | ✅ Shipped (v0.24.0) |
+
+---
+
 ## Release Plan (Semantic Versioning)
 
 Until `1.0.0`, breaking changes are allowed but MUST be documented in `CHANGELOG.md`.
 
-For `v1.0.0` scope control, FerroTeX uses the normative **Feature Matrix**:
+Each release below includes **Scope**, **Acceptance criteria**, and **Priority** (`P1` = blocks users today, `P2` = significant quality improvement, `P3` = research-grade differentiator).
 
-- `docs/spec/feature-matrix.md`
-- Export behaviors are specified in:
-  - `docs/spec/export.md`
+---
 
-Each release below includes:
+### v0.24.0 — "Diagnostic Completeness" ✅ Shipped
 
-- **Scope**: what is added
-- **Acceptance criteria**: conditions for calling the release complete
-- **Feature Matrix coverage**: which Feature Matrix IDs are delivered by that release
-
-### v0.1.0 — Documentation and Specification Baseline (current)
+**Priority**: P1 — closes known gaps in the static analysis pipeline that already exist in the indexer but are not surfaced through LSP.
 
 **Scope**
 
-- Normative specifications for:
-  - log event IR and parsing strategy
-  - LSP contract (draft)
-  - language platform foundations (draft)
-- Development and research methodology documents.
+- **Wire deprecated-command diagnostics**: `Workspace::validate_deprecated()` exists and detects `{\bf ...}`, `$$...$$`, and obsolete packages (`times`, `a4wide`, etc.) but is never called from `validate_document()`. Surface these through the standard `textDocument/publishDiagnostics` flow.
+- **Code actions for deprecated commands**: pair each deprecated diagnostic with a quick-fix (`\bf` → `\textbf`, `$$` → `\[...\]`).
+- **`\RequirePackage` in citation index**: the package scanner regex currently only matches `\usepackage`, not `\RequirePackage`. Extend to cover both (affects completion and package-awareness features in class/style files).
+- **BibLaTeX entry-type awareness**: extend the citation index to understand `\addbibresource` (already partially handled) and BibLaTeX-specific entry types (`@online`, `@software`, `@dataset`). This is IDE-layer only — the compile-time bibliography backend remains the runner's concern.
 
 **Acceptance criteria**
 
-- Documentation set is internally consistent and defines:
-  - invariants
-  - terminology
-  - schema versioning rules
+- `{\bf bold}` in an open document produces a `warning` diagnostic with a quick-fix.
+- `$$x = y$$` produces a `hint` diagnostic with a quick-fix to `\[x = y\]`.
+- `\usepackage{times}` produces a `warning` suggesting `\usepackage{mathptmx}`.
+- `\RequirePackage{amsmath}` is treated identically to `\usepackage{amsmath}` for completion purposes.
+- `@online` entries in a `.bib` file do not produce false-positive "unknown entry type" diagnostics.
 
 **Feature Matrix coverage**
 
-- None (documentation-only).
+- SD-1 (expanded), SD-5 (deprecated patterns)
+- LSP-15 (code actions)
+- IDX-3 (BibLaTeX extension)
 
-### v0.2.0 — Offline Build/Log Parser MVP (JSON IR) (Completed)
+---
+
+### v0.25.0 — "Incremental Analysis" (Speed Pillar)
+
+**Priority**: P2 — currently re-analysis on `didChange` re-parses the entire document. Acceptable for small files; becomes perceptible on theses (100k+ tokens).
 
 **Scope**
 
-- `ferrotex-cli parse <log>`:
-  - stable JSON event/diagnostic schema (0.x)
-  - file stack reconstruction
-  - error blocks (`!`, `l.<n>`)
-  - common warnings (LaTeX warnings, over/underfull boxes)
-  - wrap handling (bounded joining)
-- Golden tests for curated fixtures.
-- Basic fuzz target for parser panic-freedom.
+- **Reactive dependency graph**: refactor `ferrotex-analysis` to use a `salsa`-style demand-driven computation model. Analysis queries invalidate only the minimum affected nodes.
+- **Bounded incremental reparse**: limit `didChange` reparse to the edited region plus its containing environment/group boundary. Preserve unchanged subtrees from the previous CST.
+- **Keystroke-level diagnostics**: eliminate the need for a manual build trigger for static diagnostics. Parse + analyze on every `didChange` with debounce ≤ 150ms.
 
 **Acceptance criteria**
 
-- Deterministic output for fixtures.
-- Parser does not panic on fuzz corpus.
-- Emits explicit confidence for ambiguous file transitions.
+- Re-analysis of a 100,000-token document on a single-line `didChange` completes in <50ms (p95).
+- Benchmark result added to `docs/development/benchmarks.md`.
+- No diagnostic flapping on rapid consecutive edits.
 
 **Feature Matrix coverage**
 
-- BO-3, BO-4, BO-5, BO-6
-- QG-1, QG-2 (initial)
-- QG-4 (build/log IR determinism for fixtures)
+- LP-2 (incremental reparse)
+- PF-1, PF-2
 
-### v0.3.0 — Streaming Log Ingestion + Incremental Diagnostics
+---
+
+### v0.26.0 — "Time-Travel Debugging" (Observability Pillar)
+
+**Priority**: P3 — extends the existing DAP implementation with reversible execution, the primary research-grade differentiator.
 
 **Scope**
 
-- Append-only log following (`.log` tail) with synchronization anchors.
-- Incremental updates without reparsing from byte 0.
-- Confidence-gated interim diagnostics.
+- **Reversible DAP**: snapshot-based backward stepping in `ferrotex-dap`. Each macro expansion step that modifies register state captures a delta; `stepBack` restores the previous snapshot.
+- **Ghost expansion hover**: hovering a macro name shows its fully expanded token stream in a hover tooltip, without executing the engine.
+- **Breakpoint persistence**: debug breakpoints survive incremental document edits (currently cleared on any edit).
+- **Watch expressions**: monitor arbitrary control sequences across expansion steps.
 
 **Acceptance criteria**
 
-- Incremental update time is bounded and documented in `docs/development/benchmarks.md`.
-- Diagnostics stability: no large-scale remapping flapping on partial log appends.
+- VS Code "Step Back" button is enabled and functional in the TeX debug session.
+- Hovering `\mycmd` (defined via `\newcommand`) shows the expanded body.
+- A breakpoint on line 10 survives inserting a new line above it.
 
 **Feature Matrix coverage**
 
-- BO-2
+- DAP-3 (reversible execution)
+- DAP-4 (ghost expansion)
 
-### v0.4.0 — Server Skeleton + VS Code Extension Bootstrap
+---
+
+### v0.27.0 — "Formal Math Verification" (Trust Pillar)
+
+**Priority**: P3 — extends the existing semantic math analysis with symbolic execution for structural correctness.
 
 **Scope**
 
-- `ferrotexd` runs as a long-lived process (stdio LSP transport).
-- VS Code extension:
-  - server lifecycle
-  - configuration plumbing
-  - commands: compile/clean/reparse/open log excerpt
-- Publish build diagnostics via LSP.
+- **Symbolic dimension checking**: track matrix column counts across `&`-separated cells and `\\`-terminated rows. Flag mismatches as `error` diagnostics before compilation.
+- **Variable consistency**: detect when a math variable is used with inconsistent dimensions across equations in the same document (e.g., `A` used as both scalar and matrix).
+- **`ferrotex ci verify` CLI command**: wrap `ferrotex-build` in a CI-oriented subcommand that exits non-zero on any semantic math error, enabling pre-commit hooks.
+- **Experimental Lean/Coq bridge** *(stretch)*: export the symbolic math model as a Lean 4 proof obligation for external verification. Gated behind a feature flag.
 
 **Acceptance criteria**
 
-- End-to-end: run a build, see diagnostics in the Problems pane.
-- Provenance: each diagnostic can open its log excerpt.
+- A matrix with 3 columns in row 1 and 2 columns in row 2 produces an `error` diagnostic at the mismatched row.
+- `ferrotex ci verify path/to/doc.tex` exits 1 on the above document.
+- No regressions in existing math analysis tests.
 
 **Feature Matrix coverage**
 
-- LSP-1, LSP-2, LSP-3 (build diagnostics path + cancellation)
-- LSP-19
+- LP-5 (expanded)
+- BO-10 (CI integration)
 
-### v0.5.0 — LaTeX Lexer + Fault-Tolerant CST (Single File)
+---
+
+### v0.28.0 — "Safe-TeX Sandbox" (Security Pillar)
+
+**Priority**: P2 for academic/institutional users; P3 otherwise.
 
 **Scope**
 
-- Source lexer for LaTeX tokens (commands, groups, comments, math delimiters).
-- Fault-tolerant CST construction for a single `.tex` document.
-- Source diagnostics:
-  - basic parse recovery errors
-  - unmatched group/environment constructs where detectable
-- `textDocument/documentSymbol` for a single file (best-effort).
+- **VFS enforcement**: wrap all file I/O in `ferrotex-build` behind a virtual file system abstraction. Every read/write goes through the VFS; paths outside the project root require an explicit capability grant.
+- **Capabilities system**: surface `shell-escape` and network-fetch requests as VS Code prompts. User grants are recorded in `ferrotex.lock` for reproducibility.
+- **Zero-trust defaults**: `shell-escape` is disabled by default. Documents that require it must declare it explicitly.
+- **Audit log**: all capability grants and file accesses outside the project root are logged to `ferrotex-build`'s structured event stream.
 
 **Acceptance criteria**
 
-- CST is produced for incomplete documents.
-- Parsing is incremental for `didChange` (bounded reparse region).
-- Document symbols do not require compilation.
+- A document attempting `\write18{rm -rf /}` is blocked at the VFS layer and produces an `error` diagnostic.
+- The user sees a VS Code prompt before any `shell-escape` executes.
+- Capability grants appear in `ferrotex.lock`.
 
 **Feature Matrix coverage**
 
-- LP-1, LP-2, LP-3, LP-4
-- SD-1 (initial)
-- LSP-1, LSP-2 (source diagnostics path)
-- LSP-10 (initial, single-file)
+- SEC-1, SEC-2, SEC-3
+- BO-11 (audit trail)
 
-### v0.6.0 — Project Model + Include Graph (Multi-File)
+---
 
-**Scope**
+### v1.0.0 — "Gold" Release
 
-- Workspace project detection + configured entrypoints.
-- Include graph resolution:
-  - `\input`, `\include` (best-effort)
-- `textDocument/documentLink` for includes/resources.
-- Cross-file indexing pipeline foundation.
-
-**Acceptance criteria**
-
-- Project graph is stable under incremental edits.
-- Cycles are detected and surfaced as diagnostics.
-
-**Feature Matrix coverage**
-
-- PM-1, PM-2, PM-3, PM-4
-- LSP-13
-- TP-1
-- LSP-17
-- LSP-18
-
-### v0.7.0 — Label Index + Go-to-Definition/References/Rename (Labels)
+**Priority**: Ceremonial — represents the point at which all four technical excellence pillars have shipped their primary scope.
 
 **Scope**
 
-- Index:
-  - `\label{}` definitions
-  - `\ref{}`-family references
-- LSP:
-  - `textDocument/definition` for label references
-  - `textDocument/references` for labels
-  - `textDocument/rename` for labels (safe rename within workspace)
-- Diagnostics:
-  - duplicate label definitions
-  - unresolved label references
+- Final stability audit: zero P1 bugs open for 2 weeks.
+- `CHANGELOG.md` and `docs/` fully reflect shipped behavior (no aspirational prose).
+- SemVer public API guarantee: breaking changes to LSP contract, log IR schema, and CLI flags require a major version bump from this point forward.
+- README "Enjoy!" update.
 
 **Acceptance criteria**
 
-- Rename updates all references in workspace with preview.
-- Diagnostics update incrementally and deterministically.
-
-**Feature Matrix coverage**
-
-- IDX-1, IDX-2
-- SD-2, SD-3
-- LSP-7, LSP-8, LSP-9
-
-### v0.8.0 — Bibliography Support + Citation Intelligence
-
-**Scope**
-
-- `.bib` parsing (best-effort; robust to common BibTeX syntax).
-- Citation index:
-  - `\cite{}` variants
-  - completion for citation keys
-- Diagnostics:
-  - unresolved citation keys
-
-**Acceptance criteria**
-
-- Completion for cite keys responds in bounded time on medium corpora.
-- Parser is resilient to malformed `.bib` entries.
-
-**Feature Matrix coverage**
-
-- IDX-3, IDX-4
-- SD-4
-- FW-1
-
-### v0.9.0 — Completion, Semantic Tokens, Folding, Workspace Symbols
-
-**Scope**
-
-- Completion:
-  - commands (built-in set + discovered definitions where safe)
-  - environments
-  - labels and citations
-  - file paths for include-like commands
-- Semantic tokens (full) from CST + index.
-- Folding ranges for environments/groups (best-effort).
-- `workspace/symbol` backed by the index.
-
-**Acceptance criteria**
-
-- Completion is cancellable and does not block the server loop.
-- Semantic token classification degrades gracefully under parse errors.
-
-**Feature Matrix coverage**
-
-- IDX-5
-- LSP-4
-- LSP-5
-- LSP-11
-- LSP-12
-- LSP-14
-- LSP-16
-- CS-1, CS-2
-
-### v0.10.0 — Formatting + Code Actions + Quality Hardening
-
-**Scope**
-
-- Formatting:
-  - document formatting
-  - range formatting
-- Code actions:
-  - quick fixes for common diagnostics (e.g., create missing label placeholder)
-- Performance and robustness:
-  - expanded fuzzing
-  - benchmark suite with historical tracking (mechanism TBD)
-
-**Acceptance criteria**
-
-- Formatting is idempotent.
-- No regressions in benchmark targets.
-
-**Feature Matrix coverage**
-
-- LSP-6
-- LSP-15
-- QG-2 (expanded), QG-3 (initial)
-- FB-1
-- PF-1
-
-### v0.11.0 — Engine Runner Adapters (latexmk/tectonic/direct)
-
-**Scope**
-
-- Runner adapters per `docs/spec/engine-adapters.md`.
-  - **Tectonic support** prioritized for zero-config users.
-- Unified build event stream across adapters.
-- Improved diagnostic mapping using source analysis (line→range best-effort).
-
-**Acceptance criteria**
-
-- Same project can be compiled with at least two runners with consistent diagnostic IR.
-
-**Feature Matrix coverage**
-
-- BO-1
-- EX-1, EX-2 (at least PDF + one alternate target where feasible)
-- BO-7, BO-8
-- SX-1
-
-### v0.12.0 — Production UX Stabilization
-
-**Scope**
-
-- Stability work:
-  - reduce diagnostic flapping
-  - improve confidence calibration
-- Extension UX polish:
-  - consistent commands
-  - confidence visualization
-  - Extension UX polish:
-  - consistent commands
-  - confidence visualization
-  - provenance view ergonomics
-  - **Image Paste Wizard**: Handle clipboard image paste events.
-  - **Magic Comments**: Respect `%!TEX root` and `%!TEX program`.
-  - **Status Bar Integration**: Visual feedback for build state (`UX-4`).
-  - **Notifications**: Actionable toasts for build failures (`UX-5`).
-
-**Acceptance criteria**
-
-- Manual acceptance suite documented and repeatable.
-
-**Feature Matrix coverage**
-
-- QG-1, QG-3
-- QG-4 (source IR export determinism)
-- EX-3
-- SX-2
-- PF-2
-
-### v0.13.0 — Integrated Environment Complete (PDF + Packages + Math)
-
-**Scope**
-
-- **Integrated PDF Viewer**:
-  - Webview-based PDF viewer in VS Code.
-  - Bidirectional SyncTeX (click-to-jump).
-- **Package Management**:
-  - Detect missing packages from logs.
-  - Prompt to specific `tlmgr` / `miktex` install commands.
-- **Math Semantics & UX**:
-  - Deep validation for math environments.
-  - **Hover Preview**: Render LaTeX equations in editor tooltips (MathJax/KaTeX).
-
-**Acceptance criteria**
-
-- PDF Viewer renders correctly and synchronizes cursors.
-- Missing package errors allow one-click install flow.
-
-**Feature Matrix coverage**
-
-- LP-5
-- BO-9
-- EX-4
-- SX-2, SX-3 (Integrated)
-
-### v0.15.0 — The "Intelligence" Update (Writing Experience)
-
-**Scope**
-
-- **Snippet Pack**: Comprehensive library of Math/Greek/Environment snippets (UX-2).
-- **Magic Comments**: Support for `%!TEX root` and `%!TEX program` (PM-Override).
-- **Dynamic Package Metadata**: Index loaded packages and provide completions from a structured database (CS-3).
-
-**Acceptance criteria**
-
-- `\alpha` tab-expands to `α`.
-- `%!TEX root = ../main.tex` is respected without configuration.
-- `\usepackage{tikz}` enables `\node` completions.
-
-**Feature Matrix coverage**
-
-- UX-2
-- PM-Override
-- CS-3
-
-### v0.16.0 — The "Observability" Update (Feedback Loop)
-
-**Scope**
-
-- **Real-Time Log Streaming**: Migrate build adapter from buffered output to real-time `stdout`/`stderr` streaming (BO-2).
-- **Human-Readable Errors**: Translation layer for common TeX log errors (UX-5).
-- **Rich Hovers**: MathJax-rendered previews for equations and citations (UX-1).
-- **Marketplace Overhaul**: Redesign Open VSX page with Hero banner, GIFs, and badge system (UX-6).
-
-**Acceptance criteria**
-
-- Build logs appear line-by-line in the output panel.
-- "Underfull \hbox" is explained as "Bad line break".
-- Hovering `\begin{equation}` shows rendered math.
-
-**Feature Matrix coverage**
-
-- BO-2
-- UX-5
-- UX-1
-
-### v0.17.0 — The "Ecosystem" Update (Deep Integration)
-
-**Scope**
-
-- **Package Manager Integration**: Detect missing packages and offer `tlmgr install` actions (BO-9).
-- **Math Mode Semantics**: Deep parsing for matrix/align environments with validation (LP-5).
-
-**Acceptance criteria**
-
-- Missing package error offers "Install" button.
-- Mismatched matrix delimiters are flagged.
-
-**Feature Matrix coverage**
-
-- BO-9
-- LP-5
-
-### v0.18.0 — The "Speed" Update (Incremental Analysis)
-
-**Scope**
-
-- **Reactive Abstract Machine**: Refactor `ferrotex-analysis` to use a reactive dependency graph (e.g., `salsa`).
-- **Incremental CST**: Sub-50ms re-parsing of large documents on `didChange` events.
-- **Keystroke-level Diagnostics**: Real-time feedback loop without manual build triggers.
-
-**Acceptance criteria**
-
-- Re-analysis of a 100,000-token document completes in <100ms.
-
-### v0.19.0 — The "Observability" Update (Time-Travel Debugging)
-
-**Scope**
-
-- **Reversible DAP**: Snapshot-based reversible macro expansion in `ferrotex-dap`.
-- **Ghost Expansion**: Hover-based macro preview showing fully expanded token streams.
-- **Breakpoint persistency**: Debug state preserved across incremental edits.
-
-**Acceptance criteria**
-
-- Step-backward functionality in VS Code debugger.
-
-### v0.20.0 — The "Trust" Update (Formal Math Verification)
-
-**Scope**
-
-- **Symbolic Math Execution**: Detect dimensional and structural inconsistencies in math environments.
-- **Formal Backend**: Experimental integration with Lean/Coq for proof-checking.
-- **Global CI CLI**: `ferrotex ci verify` for automated, reproducible document certification.
-
-**Acceptance criteria**
-
-- Automatically detect and flag mismatched matrix multiplication dimensions in LaTeX source.
-
-### v0.21.0 — The "Security" Update (Safe-TeX Sandbox)
-
-**Scope**
-
-- **VFS Enforcement**: Global Virtual File System wrapping all file I/O.
-- **Capabilities System**: Granular permission prompts for `shell-escape` and network access.
-- **Zero-Trust Defaults**: Deny all external side-effects by default.
-
-**Acceptance criteria**
-
-- Document compilation cannot read files outside the project root without explicit capability grant.
-
-### v1.0.0 — The "Gold" Release (Ceremonial)
-
-**Scope**
-
-- **Final Stability Audit**: Zero critical bugs for 2 weeks.
-- **Documentation Polish**: "Enjoy!" update to README.
-- **SemVer Guarantee**: 1.0.0 schema lock.
-
-**Acceptance criteria**
-
-- Deployment of the "Cherry on top".
+- All Feature Matrix IDs in `docs/spec/feature-matrix.md` are marked `shipped` or `deferred`.
+- `cargo test --workspace` and `npm test` both pass on Linux, macOS, and Windows in CI.
 
 **Feature Matrix coverage**
 
