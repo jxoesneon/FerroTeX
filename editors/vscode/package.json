@@ -56,7 +56,7 @@
   ],
   "qna": "https://github.com/jxoesneon/FerroTeX/discussions",
   "engines": {
-    "vscode": "^1.75.0"
+    "vscode": "^1.115.0"
   },
   "categories": [
     "Programming Languages",
