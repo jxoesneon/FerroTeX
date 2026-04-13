@@ -6,6 +6,7 @@ use tokio::io::AsyncBufReadExt;
 use tokio::process::Command;
 
 /// Implementation of `BuildEngine` using the `tectonic` command-line tool.
+#[derive(Debug)]
 pub struct TectonicAdapter;
 
 #[async_trait]

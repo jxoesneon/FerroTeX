@@ -44,5 +44,4 @@ pub trait BuildEngine: std::fmt::Debug + Send + Sync {
 }
 
 pub mod latexmk;
-#[cfg(feature = "use-jxoesneon-tectonic")]
 pub mod tectonic;

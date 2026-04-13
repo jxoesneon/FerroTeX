@@ -56,7 +56,7 @@
   ],
   "qna": "https://github.com/jxoesneon/FerroTeX/discussions",
   "engines": {
-    "vscode": "^1.115.0"
+    "vscode": "^1.107.0"
   },
   "categories": [
     "Programming Languages",
@@ -91,14 +91,14 @@
             "verbose"
           ],
           "default": "off",
-          "markdownDescription": "Ã¢Å¡â„¢Ã¯Â¸Â **Advanced**: Traces communication between VS Code and the language server for debugging.",
+          "markdownDescription": "⚙️ **Advanced**: Traces communication between VS Code and the language server for debugging.",
           "scope": "window",
           "order": 99
         },
         "ferrotex.build.autoBuildOnSave": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Ã¢Å¡Â¡ Automatically rebuild PDF when saving LaTeX files (enables live preview).",
+          "markdownDescription": "⚡ Automatically rebuild PDF when saving LaTeX files (enables live preview).",
           "scope": "resource",
           "order": 10
         },
@@ -116,7 +116,7 @@
             "Automatically select best available engine (tries Tectonic first)",
             "Use Tectonic (modern, self-contained LaTeX engine)",
             "Use latexmk (handles multiple passes automatically)",
-            "Use pdflatex (traditional LaTeX Ã¢â€ â€™ PDF)",
+            "Use pdflatex (traditional LaTeX → PDF)",
             "Use XeLaTeX (Unicode and system fonts)",
             "Use LuaLaTeX (Lua scripting support)"
           ],
@@ -128,14 +128,14 @@
         "ferrotex.build.outputDirectory": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Ã¢Å¡â„¢Ã¯Â¸Â **Advanced**: Custom output directory for build artifacts (relative to source file). Leave empty to use source directory.",
+          "markdownDescription": "⚙️ **Advanced**: Custom output directory for build artifacts (relative to source file). Leave empty to use source directory.",
           "scope": "resource",
           "order": 12
         },
         "ferrotex.build.cleanAuxiliaryFiles": {
           "type": "boolean",
           "default": false,
-          "markdownDescription": "Ã¢Å¡â„¢Ã¯Â¸Â **Advanced**: Clean auxiliary files (.aux, .log, etc.) after successful build.",
+          "markdownDescription": "⚙️ **Advanced**: Clean auxiliary files (.aux, .log, etc.) after successful build.",
           "scope": "resource",
           "order": 13
         },
@@ -156,45 +156,52 @@
           "scope": "window",
           "order": 14
         },
+        "ferrotex.build.autoInstallTectonic": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "⚡ Automatically download and install the custom Tectonic fork if not found on system PATH.",
+          "scope": "machine-overridable",
+          "order": 13
+        },
         "ferrotex.build.tectonicPath": {
           "type": "string",
           "default": "tectonic",
-          "markdownDescription": "Ã¢Å¡â„¢Ã¯Â¸Â **Advanced**: Custom path to Tectonic executable. Leave as `tectonic` to use bundled or system PATH.",
+          "markdownDescription": "⚙️ **Advanced**: Custom path to Tectonic executable. Leave as `tectonic` to use bundled, auto-installed, or system PATH.",
           "scope": "machine-overridable",
           "order": 15
         },
         "ferrotex.build.latexmkPath": {
           "type": "string",
           "default": "latexmk",
-          "markdownDescription": "Ã¢Å¡â„¢Ã¯Â¸Â **Advanced**: Custom path to latexmk executable. Leave as `latexmk` to use system PATH.",
+          "markdownDescription": "⚙️ **Advanced**: Custom path to latexmk executable. Leave as `latexmk` to use system PATH.",
           "scope": "machine-overridable",
           "order": 16
         },
         "ferrotex.build.pdflatexPath": {
           "type": "string",
           "default": "pdflatex",
-          "markdownDescription": "Ã¢Å¡â„¢Ã¯Â¸Â **Advanced**: Custom path to pdflatex executable. Leave as `pdflatex` to use system PATH.",
+          "markdownDescription": "⚙️ **Advanced**: Custom path to pdflatex executable. Leave as `pdflatex` to use system PATH.",
           "scope": "machine-overridable",
           "order": 17
         },
         "ferrotex.build.xelatexPath": {
           "type": "string",
           "default": "xelatex",
-          "markdownDescription": "Ã¢Å¡â„¢Ã¯Â¸Â **Advanced**: Custom path to XeLaTeX executable. Leave as `xelatex` to use system PATH.",
+          "markdownDescription": "⚙️ **Advanced**: Custom path to XeLaTeX executable. Leave as `xelatex` to use system PATH.",
           "scope": "machine-overridable",
           "order": 18
         },
         "ferrotex.build.lualatexPath": {
           "type": "string",
           "default": "lualatex",
-          "markdownDescription": "Ã¢Å¡â„¢Ã¯Â¸Â **Advanced**: Custom path to LuaLaTeX executable. Leave as `lualatex` to use system PATH.",
+          "markdownDescription": "⚙️ **Advanced**: Custom path to LuaLaTeX executable. Leave as `lualatex` to use system PATH.",
           "scope": "machine-overridable",
           "order": 19
         },
         "ferrotex.lint.enabled": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Ã°Å¸â€Â Enable live LaTeX linting and diagnostics.",
+          "markdownDescription": "🔍 Enable live LaTeX linting and diagnostics.",
           "scope": "resource",
           "order": 20
         },
@@ -229,7 +236,7 @@
         "ferrotex.preview.syncToSource": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Ã°Å¸â€œâ€ž Enable SyncTeX integration for bidirectional source Ã¢â€ â€ PDF navigation.",
+          "markdownDescription": "🔄 Enable SyncTeX integration for bidirectional source ↔ PDF navigation.",
           "scope": "resource",
           "order": 30
         },
@@ -262,7 +269,7 @@
         "ferrotex.completion.enabled": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Ã°Å¸â€™Â¡ Enable LaTeX command and environment autocompletion.",
+          "markdownDescription": "💡 Enable LaTeX command and environment autocompletion.",
           "scope": "resource",
           "order": 40
         },
@@ -283,7 +290,7 @@
         "ferrotex.format.enabled": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Ã¢Å“Â¨ Enable automatic LaTeX code formatting.",
+          "markdownDescription": "✨ Enable automatic LaTeX code formatting.",
           "scope": "resource",
           "order": 50
         },
@@ -306,7 +313,7 @@
         "ferrotex.imagePaste.enabled": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Ã°Å¸â€“Â¼Ã¯Â¸Â Enable image paste wizard for clipboard images.",
+          "markdownDescription": "🖼️ Enable image paste wizard for clipboard images.",
           "scope": "resource",
           "order": 60
         },
@@ -320,14 +327,14 @@
         "ferrotex.imagePaste.filenamePattern": {
           "type": "string",
           "default": "image-{timestamp}",
-          "markdownDescription": "Ã¢Å¡â„¢Ã¯Â¸Â **Advanced**: Filename pattern for pasted images. Available variables: `{timestamp}`, `{uuid}`, `{counter}`.",
+          "markdownDescription": "⚙️ **Advanced**: Filename pattern for pasted images. Available variables: `{timestamp}`, `{uuid}`, `{counter}`.",
           "scope": "resource",
           "order": 62
         },
         "ferrotex.hover.enabled": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Ã°Å¸â€œÅ¡ Show hover information for LaTeX commands and packages.",
+          "markdownDescription": "📜 Show hover information for LaTeX commands and packages.",
           "scope": "resource",
           "order": 70
         },
@@ -341,14 +348,14 @@
         "ferrotex.hover.previewMath": {
           "type": "boolean",
           "default": false,
-          "markdownDescription": "Ã°Å¸â€Â® **Experimental**: Show rendered math in hover tooltips (requires KaTeX).",
+          "markdownDescription": "🧪 **Experimental**: Show rendered math in hover tooltips (requires KaTeX).",
           "scope": "resource",
           "order": 72
         },
         "ferrotex.workspace.scanOnStartup": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Ã°Å¸â€â€ž Scan workspace for LaTeX files on startup for comprehensive linting.",
+          "markdownDescription": "📋 Scan workspace for LaTeX files on startup for comprehensive linting.",
           "scope": "window",
           "order": 80
         },
@@ -357,7 +364,7 @@
           "default": 10,
           "minimum": 1,
           "maximum": 100,
-          "markdownDescription": "Ã¢Å¡â„¢Ã¯Â¸Â **Advanced**: Maximum file size for indexing (MB). Larger files are skipped.",
+          "markdownDescription": "⚙️ **Advanced**: Maximum file size for indexing (MB). Larger files are skipped.",
           "scope": "window",
           "order": 81
         },
@@ -372,14 +379,14 @@
             "**/.git/**",
             "**/node_modules/**"
           ],
-          "markdownDescription": "Ã¢Å¡â„¢Ã¯Â¸Â **Advanced**: Glob patterns to exclude from workspace indexing.",
+          "markdownDescription": "⚙️ **Advanced**: Glob patterns to exclude from workspace indexing.",
           "scope": "resource",
           "order": 82
         },
         "ferrotex.diagnostics.humanReadableErrors": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Ã°Å¸Å½Â¯ Show human-readable error explanations for common LaTeX errors.",
+          "markdownDescription": "🎯 Show human-readable error explanations for common LaTeX errors.",
           "scope": "resource",
           "order": 90
         },
@@ -459,7 +466,7 @@
     "@types/glob": "^8.0.0",
     "@types/mocha": "^10.0.0",
     "@types/node": "^25.6.0",
-    "@types/vscode": "^1.115.0",
+    "@types/vscode": "^1.107.0",
     "@vscode/test-electron": "^2.3.0",
     "@vscode/vsce": "^3.7.1",
     "esbuild": "^0.28.0",

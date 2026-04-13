@@ -372,9 +372,14 @@ impl LanguageServer for Backend {
                     .first()
                     .and_then(|v| v.as_str())
                     .unwrap_or("");
+                let engine_str = params
+                    .arguments
+                    .get(1)
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("auto");
                 let uri = Url::parse(uri_str)
                     .map_err(|_| tower_lsp::jsonrpc::Error::invalid_params("Invalid URI"))?;
-                self.run_build(uri).await;
+                self.run_build(uri, engine_str.to_string()).await;
                 Ok(None)
             }
             "ferrotex.internal.installPackage" => {
@@ -944,11 +949,26 @@ impl Backend {
 
     /// Triggers a LaTeX build process for the given document.
     ///
-    /// Spawns a background task that uses the `LatexmkAdapter` to build the document.
+    /// Spawns a background task that uses the selected `BuildEngine` to build the document.
     /// Build progress and results are sent to the client via `log_message` notifications.
-    pub async fn run_build(&self, uri: Url) {
+    pub async fn run_build(&self, uri: Url, engine_str: String) {
         let client = self.client.clone();
-        let engine = self.build_engine.clone();
+        
+        let engine: Arc<dyn BuildEngine> = match engine_str.as_str() {
+            "tectonic" => Arc::new(crate::build::tectonic::TectonicAdapter),
+            "latexmk" => Arc::new(crate::build::latexmk::LatexmkAdapter::new()),
+            "pdflatex" => Arc::new(crate::build::latexmk::LatexmkAdapter::with_binary("pdflatex")),
+            "xelatex" => Arc::new(crate::build::latexmk::LatexmkAdapter::with_binary("xelatex")),
+            "lualatex" => Arc::new(crate::build::latexmk::LatexmkAdapter::with_binary("lualatex")),
+            "auto" => {
+                if which::which("tectonic").is_ok() {
+                    Arc::new(crate::build::tectonic::TectonicAdapter)
+                } else {
+                    Arc::new(crate::build::latexmk::LatexmkAdapter::new())
+                }
+            }
+            _ => self.build_engine.clone(), // fallback to backend default (e.g. tests)
+        };
 
         tokio::spawn(async move {
             let request = BuildRequest {
@@ -1650,7 +1670,7 @@ mod tests {
         // Since we mock the client in setup() with LspService::new, we can't easily inspect messages sent back
         // unless we intercept the stream or use a custom Client.
         // However, this at least exercises the code path.
-        backend.run_build(uri).await;
+        backend.run_build(uri, "auto".to_string()).await;
 
         // Allow some time for the spawn to run
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;

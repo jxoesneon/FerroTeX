@@ -2,7 +2,7 @@ import * as path from "path";
 import * as vscode from "vscode";
 import { LanguageClient, LanguageClientOptions, ServerOptions } from "vscode-languageclient/node";
 import { PdfPreviewProvider } from "./pdfPreview";
-import { checkAndInstallTectonic } from "./installTectonic";
+import { checkAndInstallTectonic, ensureTectonicBinary } from "./installTectonic";
 import { ensureFerrotexdBinary } from "./installFerrotexd";
 import { validateBuildEngine, validateSyncTeX } from "./engineValidator";
 import { ImagePasteProvider } from "./imagePaste";
@@ -14,6 +14,10 @@ export async function activate(context: vscode.ExtensionContext) {
   let serverPath = config.get<string>("serverPath");
 
   // UX-Upgrade: Frictionless Install
+  // Ensure custom Tectonic fork is available (bundled → cache → download)
+  const tectonicDir = await ensureTectonicBinary(context);
+
+  // Also run legacy check for other engines or fallback guidance
   checkAndInstallTectonic(context);
 
   // Validate build engine when configuration changes
@@ -40,9 +44,20 @@ export async function activate(context: vscode.ExtensionContext) {
 
   console.log("[FerroTeX] Server Path:", serverPath);
 
+  // Prepare environment with custom Tectonic path if available
+  const serverEnv: NodeJS.ProcessEnv = { ...process.env };
+  if (tectonicDir) {
+    // Inject custom Tectonic binary directory into PATH for ferrotexd to use
+    const separator = process.platform === "win32" ? ";" : ":";
+    const tectonicBinary = process.platform === "win32" ? "tectonic.exe" : "tectonic";
+    serverEnv.FERROTEX_TECTONIC_PATH = path.join(tectonicDir, tectonicBinary);
+    serverEnv.PATH = `${tectonicDir}${separator}${process.env.PATH ?? ""}`;
+    console.log("[FerroTeX] Injecting custom Tectonic path:", tectonicDir);
+  }
+
   const serverOptions: ServerOptions = {
-    run: { command: serverPath },
-    debug: { command: serverPath },
+    run: { command: serverPath, options: { env: serverEnv } },
+    debug: { command: serverPath, options: { env: serverEnv } },
   };
 
   const clientOptions: LanguageClientOptions = {
@@ -89,10 +104,13 @@ export async function activate(context: vscode.ExtensionContext) {
       await editor.document.save();
 
       const uri = editor.document.uri.toString();
+      const config = vscode.workspace.getConfiguration("ferrotex");
+      const engine = config.get<string>("build.engine", "auto");
+      
       try {
         await client.sendRequest("workspace/executeCommand", {
           command: "ferrotex.internal.build",
-          arguments: [uri],
+          arguments: [uri, engine],
         });
       } catch (e) {
         vscode.window.showErrorMessage(`Build request failed: ${e}`);

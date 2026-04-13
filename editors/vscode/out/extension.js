@@ -94,10 +94,12 @@ async function activate(context) {
         // Auto-save before build
         await editor.document.save();
         const uri = editor.document.uri.toString();
+        const config = vscode.workspace.getConfiguration("ferrotex");
+        const engine = config.get("build.engine", "auto");
         try {
             await client.sendRequest("workspace/executeCommand", {
                 command: "ferrotex.internal.build",
-                arguments: [uri],
+                arguments: [uri, engine],
             });
         }
         catch (e) {

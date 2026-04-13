@@ -1,5 +1,30 @@
 import * as vscode from "vscode";
 import * as child_process from "child_process";
+import * as fs from "fs";
+import * as path from "path";
+
+/**
+ * Gets the effective Tectonic path, checking:
+ * 1. Custom setting (ferrotex.build.tectonicPath)
+ * 2. Auto-installed binary from environment (FERROTEX_TECTONIC_PATH)
+ * 3. System PATH
+ */
+function getTectonicPath(config: vscode.WorkspaceConfiguration): string {
+  // 1. Check custom setting first
+  const customPath = config.get<string>("build.tectonicPath", "");
+  if (customPath && customPath !== "tectonic") {
+    return customPath;
+  }
+
+  // 2. Check environment variable from auto-installed binary
+  const envPath = process.env.FERROTEX_TECTONIC_PATH;
+  if (envPath && fs.existsSync(envPath)) {
+    return envPath;
+  }
+
+  // 3. Default to system PATH
+  return "tectonic";
+}
 
 /**
  * Validates that the selected build engine is available
@@ -10,13 +35,13 @@ export async function validateBuildEngine() {
   const selectedEngine = config.get<string>("build.engine", "auto");
 
   if (selectedEngine === "auto") {
-    // Auto mode will try Tectonic first, then fallback
+    // Auto mode will try Tectonic first (including auto-installed), then fallback
     return;
   }
 
   // Map engines to their path settings
   const enginePaths: { [key: string]: string } = {
-    tectonic: config.get<string>("build.tectonicPath", "tectonic"),
+    tectonic: getTectonicPath(config),
     latexmk: config.get<string>("build.latexmkPath", "latexmk"),
     pdflatex: config.get<string>("build.pdflatexPath", "pdflatex"),
     xelatex: config.get<string>("build.xelatexPath", "xelatex"),
@@ -51,6 +76,7 @@ export async function validateBuildEngine() {
         pdflatex: "https://www.tug.org/texlive/",
         xelatex: "https://www.tug.org/texlive/",
         lualatex: "https://www.tug.org/texlive/",
+        tectonic: "https://tectonic-typesetting.github.io/en-US/install.html",
       };
 
       const url = installGuides[selectedEngine];
