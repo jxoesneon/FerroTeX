@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "path";
+import * as crypto from "crypto";
 
 /**
  * Handles pasting of image data from the clipboard.
@@ -16,7 +17,7 @@ export class ImagePasteProvider implements vscode.DocumentPasteEditProvider {
    */
   public generateFilename(pattern: string): string {
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const uuid = Math.random().toString(36).substring(2, 9);
+    const uuid = crypto.randomBytes(4).toString("hex");
 
     // Simple replacement of variables
     let name = pattern.replace("{timestamp}", timestamp).replace("{uuid}", uuid);

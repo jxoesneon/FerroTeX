@@ -1,6 +1,6 @@
 import * as assert from "assert";
 import * as path from "path";
-import { ImagePasteProvider } from "../imagePaste";
+import { ImagePasteProvider } from "../../imagePaste";
 
 suite("ImagePasteProvider Test Suite", () => {
   const provider = new ImagePasteProvider();
@@ -19,6 +19,9 @@ suite("ImagePasteProvider Test Suite", () => {
     const result = provider.generateFilename(pattern);
     assert.ok(result.startsWith("pic-"));
     assert.ok(!result.includes("{uuid}"));
+    // 4 bytes -> 8 hex chars. pic- (4) + 8 + .png (4) = 16
+    assert.strictEqual(result.length, 16);
+    assert.ok(/pic-[0-9a-f]{8}\.png/.test(result));
   });
 
   test("generateFilename: ensures png extension", () => {
