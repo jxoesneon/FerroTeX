@@ -14,7 +14,7 @@ categories = ["development-tools", "text-editors"]
 workspace = true
 
 [dependencies]
-tokio = { version = "1.51", features = ["full"] }
+tokio = { version = "1.52", features = ["full"] }
 tower-lsp = "0.20"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -31,7 +31,7 @@ url = "2.5"
 glob = "0.3"
 walkdir = "2.4"
 regex = "1.10"
-uuid = { version = "1.6", features = ["v4"] }
+uuid = { version = "1.23", features = ["v4"] }
 line-index = "0.1"
 dirs = "6.0"
 which = "8.0"
@@ -58,4 +58,4 @@ default = []
 use-jxoesneon-tectonic = ["jxoesneon-tectonic"]
 
 [dev-dependencies]
-tokio = { version = "1.51", features = ["full"] }
+tokio = { version = "1.52", features = ["full"] }
