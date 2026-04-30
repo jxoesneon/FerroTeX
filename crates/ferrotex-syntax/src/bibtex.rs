@@ -74,10 +74,7 @@ pub fn parse_bibtex(input: &str) -> BibFile {
     let mut entries = Vec::new();
     let mut chars = input.char_indices().peekable();
 
-    loop {
-        let Some((start_idx, c)) = chars.next() else {
-            break;
-        };
+    while let Some((start_idx, c)) = chars.next() {
         if c == '@'
             && let Some(entry) = parse_entry(&mut chars, start_idx, input.len())
         {
