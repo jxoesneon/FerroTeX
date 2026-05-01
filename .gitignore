@@ -63,3 +63,11 @@ Dockerfile.local
 # Upstream Repositories
 upstream/
 .cargo-docker/
+
+# Build Artifacts
+cobertura.xml
+tarpaulin-report.html
+.fastembed_cache/
+editors/vscode/out/*.js
+editors/vscode/*.vsix
+inspect_multicol.rs

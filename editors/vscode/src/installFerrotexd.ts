@@ -3,6 +3,7 @@ import * as path from "path";
 import * as fs from "fs";
 import * as https from "https";
 import * as os from "os";
+import * as crypto from "crypto";
 import { spawnSync } from "child_process";
 
 const GITHUB_REPO = "jxoesneon/FerroTeX";
@@ -77,6 +78,15 @@ function extractZip(archivePath: string, destDir: string): void {
   if (result.status !== 0) {
     throw new Error(`Expand-Archive failed: ${result.stderr ?? result.error?.message ?? ""}`);
   }
+}
+
+/**
+ * Verifies the SHA-256 checksum of a file against an expected hex string.
+ */
+function verifyChecksum(filePath: string, expectedChecksum: string): boolean {
+  const fileBuffer = fs.readFileSync(filePath);
+  const actualChecksum = crypto.createHash("sha256").update(fileBuffer).digest("hex");
+  return actualChecksum.toLowerCase() === expectedChecksum.toLowerCase().trim();
 }
 
 /**
@@ -177,6 +187,28 @@ export async function ensureFerrotexdBinary(
         }
         const tmpArchive = path.join(os.tmpdir(), assetName);
         fs.writeFileSync(tmpArchive, archiveData);
+
+        // Optional: Verify SHA-256 if available
+        const checksumAsset = release.assets.find((a) => a.name === `${assetName}.sha256`);
+        if (checksumAsset) {
+          progress.report({ message: "Verifying checksum..." });
+          try {
+            const expectedChecksum = (await httpsGet(checksumAsset.browser_download_url)).toString(
+              "utf8",
+            );
+            if (!verifyChecksum(tmpArchive, expectedChecksum)) {
+              throw new Error("SHA-256 checksum verification failed. The download may be corrupt.");
+            }
+            console.log("[FerroTeX] Checksum verified for", assetName);
+          } catch (checksumErr) {
+            console.warn("[FerroTeX] Checksum verification skipped or failed:", checksumErr);
+            // We don't necessarily want to fail if the checksum file is missing or broken,
+            // but we SHOULD fail if it's present and doesn't match.
+            if (checksumErr instanceof Error && checksumErr.message.includes("verification failed")) {
+              throw checksumErr;
+            }
+          }
+        }
 
         progress.report({ message: "Extracting..." });
         if (process.platform === "win32") {

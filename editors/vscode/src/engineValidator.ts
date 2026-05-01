@@ -70,8 +70,15 @@ export async function validateBuildEngine() {
 async function checkEngineAvailable(command: string): Promise<boolean> {
   return new Promise((resolve) => {
     // Try to run --version or --help to check if command exists
-    child_process.exec(`${command} --version`, (error) => {
-      resolve(!error);
+    // Use spawn instead of exec to prevent command injection from user settings
+    const cp = child_process.spawn(command, ["--version"]);
+
+    cp.on("error", () => {
+      resolve(false);
+    });
+
+    cp.on("exit", (code) => {
+      resolve(code === 0);
     });
   });
 }

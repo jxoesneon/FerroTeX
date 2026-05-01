@@ -82,7 +82,7 @@ FerroTeX v0.24.0 closes the gap between the static analysis already present in t
 
 ## 🛠️ Developer Setup
 
-Requires **Rust 1.70+**.
+Requires **Rust 1.85+**.
 
 ```bash
 # Clone and build
