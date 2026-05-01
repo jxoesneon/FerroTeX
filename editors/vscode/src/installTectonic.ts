@@ -54,8 +54,8 @@ export async function checkAndInstallTectonic(context: vscode.ExtensionContext):
 function hasCommand(cmd: string): boolean {
   try {
     const checkCmd = process.platform === "win32" ? "where" : "which";
-    require("child_process").execSync(`${checkCmd} ${cmd}`);
-    return true;
+    const result = require("child_process").spawnSync(checkCmd, [cmd]);
+    return result.status === 0;
   } catch {
     return false;
   }

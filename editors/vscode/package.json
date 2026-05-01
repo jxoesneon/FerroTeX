@@ -66,10 +66,6 @@
     "Snippets",
     "Other"
   ],
-  "activationEvents": [
-    "onLanguage:latex",
-    "onLanguage:tex"
-  ],
   "main": "./dist/extension.js",
   "contributes": {
     "configuration": {
