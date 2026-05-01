@@ -71,7 +71,7 @@ async function checkEngineAvailable(command: string): Promise<boolean> {
   return new Promise((resolve) => {
     // Try to run --version to check if command exists
     const proc = child_process.spawn(command, ["--version"]);
-    
+
     proc.on("error", () => resolve(false));
     proc.on("close", (code) => resolve(code === 0));
   });
