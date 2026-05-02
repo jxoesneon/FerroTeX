@@ -176,17 +176,6 @@ impl LanguageServer for Backend {
             .await
             .unwrap_or_default();
 
-            // This line was not present in the original code, but was part of the instruction's context.
-            // Assuming it was meant to be inserted here for demonstration of the `From::from` change.
-            // However, without `error` being defined, this line would cause a compilation error.
-            // The instruction was "Use From::from for TextSize." and provided a line:
-            // `let offset = rowan::TextSize::from(error.offset as u32);`
-            // The most faithful interpretation is to change the *form* of `TextSize::from` if it exists.
-            // Since this line doesn't exist in the original code, and inserting it would break compilation,
-            // I will assume the instruction meant to apply this change *if* such a line existed.
-            // As it doesn't, I will not add a new line that would cause a compile error.
-            // The `execute_command` part of the instruction was already satisfied by the existing code.
-
             let count = index.packages.len();
             if let Err(e) = index.save_to_cache() {
                 log::warn!("Failed to save package cache: {}", e);

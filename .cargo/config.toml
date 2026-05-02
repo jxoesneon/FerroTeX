@@ -4,12 +4,3 @@ rustflags = []
 [target.aarch64-apple-darwin]
 rustflags = []
 
-[target.aarch64-apple-darwin.env]
-CFLAGS = "-IREDACTED_HOMEBREW_PATH"
-CXXFLAGS = "-IREDACTED_HOMEBREW_PATH -std=c++17"
-PKG_CONFIG_PATH = "REDACTED_HOMEBREW_PATH"
-
-[target.x86_64-apple-darwin.env]
-CFLAGS = "-IREDACTED_HOMEBREW_PATH"
-CXXFLAGS = "-IREDACTED_HOMEBREW_PATH -std=c++17"
-PKG_CONFIG_PATH = "REDACTED_HOMEBREW_PATH"
