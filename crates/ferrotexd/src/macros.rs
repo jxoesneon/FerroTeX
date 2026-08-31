@@ -42,14 +42,11 @@ fn parse_macro_definition(node: &SyntaxElement) -> Option<MacroDef> {
 
     // Helper to skip whitespace/comments
     let mut next_element = || loop {
-        if let Some(next) = current.next_sibling_or_token() {
-            current = next.clone();
-            let kind = current.kind();
-            if kind != SyntaxKind::Whitespace && kind != SyntaxKind::Comment {
-                return Some(current.clone());
-            }
-        } else {
-            return None;
+        let next = current.next_sibling_or_token()?;
+        current = next.clone();
+        let kind = current.kind();
+        if kind != SyntaxKind::Whitespace && kind != SyntaxKind::Comment {
+            return Some(current.clone());
         }
     };
 
@@ -91,15 +88,12 @@ fn parse_macro_definition(node: &SyntaxElement) -> Option<MacroDef> {
             if is_token_bracket {
                 // Consume until ]
                 loop {
-                    if let Some(n) = next_element() {
-                        let t = n.to_string();
-                        if t == "]" {
-                            break;
-                        }
-                        num_str.push_str(&t);
-                    } else {
-                        return None;
+                    let n = next_element()?;
+                    let t = n.to_string();
+                    if t == "]" {
+                        break;
                     }
+                    num_str.push_str(&t);
                 }
             } else {
                 // It's a Group like [2]
@@ -112,35 +106,26 @@ fn parse_macro_definition(node: &SyntaxElement) -> Option<MacroDef> {
             }
 
             // Move to next to check for [default] (Optional arg)
-            if let Some(n) = next_element() {
-                next = n;
-                // Check for [opt]
-                if next.to_string().starts_with('[') {
-                    has_optional = true;
+            let n = next_element()?;
+            next = n;
+            // Check for [opt]
+            if next.to_string().starts_with('[') {
+                has_optional = true;
 
-                    let is_token_bracket = next.to_string() == "[";
-                    if is_token_bracket {
-                        // Consume until ]
-                        loop {
-                            if let Some(n) = next_element() {
-                                if n.to_string() == "]" {
-                                    break;
-                                }
-                            } else {
-                                return None;
-                            }
+                let is_token_bracket = next.to_string() == "[";
+                if is_token_bracket {
+                    // Consume until ]
+                    loop {
+                        let n = next_element()?;
+                        if n.to_string() == "]" {
+                            break;
                         }
                     }
-
-                    // Move to body
-                    if let Some(b) = next_element() {
-                        next = b;
-                    } else {
-                        return None;
-                    }
                 }
-            } else {
-                return None;
+
+                // Move to body
+                let b = next_element()?;
+                next = b;
             }
         }
 
