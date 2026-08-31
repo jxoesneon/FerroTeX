@@ -71,14 +71,13 @@ fn handle_environment_hover(node: &SyntaxNode) -> Option<Hover> {
     let text = node.to_string();
 
     // Extract environment name
-    let env_name = if let Some(start) = text.find("\\begin{") {
+    let env_name = {
+        let start = text.find("\\begin{")?;
         if let Some(end) = text[start..].find('}') {
             &text[start + 7..start + end]
         } else {
             "unknown"
         }
-    } else {
-        return None;
     };
 
     let (icon, description, tip) = match env_name {
