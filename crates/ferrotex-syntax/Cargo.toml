@@ -14,7 +14,7 @@ categories = ["parser-implementations", "text-processing"]
 workspace = true
 
 [dependencies]
-rowan = "0.16"
+rowan = "0.17"
 ferrotex-build = { path = "../ferrotex-build" }
 
 
