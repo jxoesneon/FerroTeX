@@ -12,10 +12,10 @@
     "lint:links:external": "node scripts/check-links.mjs --config scripts/markdown-link-check.external.json"
   },
   "devDependencies": {
-    "markdown-link-check": "^3.12.2",
-    "markdownlint-cli2": "^0.22.1",
-    "prettier": "^3.8.3",
-    "yaml": "^2.6.1"
+    "markdown-link-check": "^3.15.0",
+    "markdownlint-cli2": "^0.23.2",
+    "prettier": "^3.9.6",
+    "yaml": "^2.9.0"
   },
   "overrides": {
     "basic-ftp": "^5.2.2"
