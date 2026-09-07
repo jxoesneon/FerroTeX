@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set Swap Space
         uses: pierotofy/set-swap-space@master
@@ -52,7 +52,7 @@ jobs:
           cargo tarpaulin --lib --out Xml --output-dir coverage --skip-clean ${{ matrix.args }}
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           files: coverage/cobertura.xml
           flags: ${{ matrix.flags }}
