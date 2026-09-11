@@ -58,7 +58,10 @@ pub mod error;
 pub use artifacts::FileArtifact;
 pub use compiler::{Compiler, PdfLatexTransform, ShellTransform};
 // Re-export error types for convenience
-pub use error::{AnalysisContext, ConfigurationErrorDetails, FerroTeXError, FerroTeXResult, SourceLocation, SourceSpan};
+pub use error::{
+    AnalysisContext, ConfigurationErrorDetails, FerroTeXError, FerroTeXResult, SourceLocation,
+    SourceSpan,
+};
 
 /// Represents a unique identifier for an artifact (content-addressed or path-based).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -102,7 +105,7 @@ pub trait Transform {
 
 /// The Build Graph represents the DAG of all transforms and artifacts.
 pub struct BuildGraph {
-    /// Map of ArtifactId -> Box<dyn Artifact>
+    /// Map of ArtifactId -> Box\<dyn Artifact\>
     artifacts: HashMap<ArtifactId, Box<dyn Artifact>>,
     /// List of transforms (edges/nodes in the DAG)
     transforms: Vec<Box<dyn Transform>>,

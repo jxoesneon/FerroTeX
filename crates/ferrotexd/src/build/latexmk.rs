@@ -217,7 +217,7 @@ mod tests {
         use std::os::unix::fs::PermissionsExt;
 
         let temp_dir = tempfile::tempdir().unwrap();
-        
+
         #[cfg(unix)]
         let script_name = "mock_latexmk.sh";
         #[cfg(windows)]
@@ -300,7 +300,7 @@ exit 0
         use std::sync::{Arc, Mutex};
 
         let temp_dir = tempfile::tempdir().unwrap();
-        
+
         #[cfg(unix)]
         let script_name = "mock_latexmk_logs.sh";
         #[cfg(windows)]

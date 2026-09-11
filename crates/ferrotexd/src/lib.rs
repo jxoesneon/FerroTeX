@@ -625,8 +625,14 @@ impl LanguageServer for Backend {
                     let start_lc = line_index.line_col(range.start());
                     let end_lc = line_index.line_col(range.end());
                     return Ok(Some(PrepareRenameResponse::Range(Range {
-                        start: Position { line: start_lc.line, character: start_lc.col },
-                        end: Position { line: end_lc.line, character: end_lc.col },
+                        start: Position {
+                            line: start_lc.line,
+                            character: start_lc.col,
+                        },
+                        end: Position {
+                            line: end_lc.line,
+                            character: end_lc.col,
+                        },
                     })));
                 }
             }
@@ -661,12 +667,13 @@ impl LanguageServer for Backend {
             return Ok(None);
         }
 
-        let mut changes: std::collections::HashMap<Url, Vec<TextEdit>> = std::collections::HashMap::new();
+        let mut changes: std::collections::HashMap<Url, Vec<TextEdit>> =
+            std::collections::HashMap::new();
         for loc in all_locations {
-            changes
-                .entry(loc.uri)
-                .or_default()
-                .push(TextEdit { range: loc.range, new_text: new_name.clone() });
+            changes.entry(loc.uri).or_default().push(TextEdit {
+                range: loc.range,
+                new_text: new_name.clone(),
+            });
         }
 
         Ok(Some(WorkspaceEdit {
@@ -729,10 +736,7 @@ impl LanguageServer for Backend {
     /// Returns code actions (quick-fixes) for the given range.
     ///
     /// Currently handles deprecated-command diagnostics emitted by `validate_deprecated`.
-    async fn code_action(
-        &self,
-        params: CodeActionParams,
-    ) -> Result<Option<CodeActionResponse>> {
+    async fn code_action(&self, params: CodeActionParams) -> Result<Option<CodeActionResponse>> {
         let uri = params.text_document.uri;
         let mut actions: Vec<CodeActionOrCommand> = Vec::new();
 
@@ -841,8 +845,14 @@ impl Backend {
                     let end_lc = li.line_col(range.end());
                     diagnostics.push(Diagnostic {
                         range: Range {
-                            start: Position { line: start_lc.line, character: start_lc.col },
-                            end: Position { line: end_lc.line, character: end_lc.col },
+                            start: Position {
+                                line: start_lc.line,
+                                character: start_lc.col,
+                            },
+                            end: Position {
+                                line: end_lc.line,
+                                character: end_lc.col,
+                            },
                         },
                         severity: Some(DiagnosticSeverity::WARNING),
                         source: Some("ferrotex".to_string()),
@@ -925,8 +935,14 @@ impl Backend {
         Location {
             uri,
             range: Range {
-                start: Position { line: start_lc.line, character: start_lc.col },
-                end: Position { line: end_lc.line, character: end_lc.col },
+                start: Position {
+                    line: start_lc.line,
+                    character: start_lc.col,
+                },
+                end: Position {
+                    line: end_lc.line,
+                    character: end_lc.col,
+                },
             },
         }
     }
@@ -938,10 +954,20 @@ impl Backend {
     pub async fn run_build(&self, uri: Url) {
         let client = self.client.clone();
         let engine = self.build_engine.clone();
+        let resolved_uri = self.workspace.resolve_build_target(&uri);
+
+        if resolved_uri != uri {
+            let _ = client
+                .log_message(
+                    MessageType::INFO,
+                    format!("Build redirected to root file: {}", resolved_uri),
+                )
+                .await;
+        }
 
         tokio::spawn(async move {
             let request = BuildRequest {
-                document_uri: uri,
+                document_uri: resolved_uri,
                 workspace_root: None,
             };
 
@@ -1036,9 +1062,7 @@ fn find_label_token_at(
 
     for node in root.descendants() {
         match node.kind() {
-            SyntaxKind::LabelDefinition
-            | SyntaxKind::LabelReference
-            | SyntaxKind::Citation => {}
+            SyntaxKind::LabelDefinition | SyntaxKind::LabelReference | SyntaxKind::Citation => {}
             _ => continue,
         }
         if !node.text_range().contains_inclusive(offset) {
@@ -1069,7 +1093,9 @@ fn find_label_token_at(
                         })
                         .find(|(_, s, e)| rel >= *s && rel <= *e)
                         .map(|(k, _, _)| k)
-                        .unwrap_or_else(|| content.split(',').next().unwrap_or("").trim().to_string());
+                        .unwrap_or_else(|| {
+                            content.split(',').next().unwrap_or("").trim().to_string()
+                        });
                     return Some((key, group.text_range()));
                 }
                 return Some((content, group.text_range()));
@@ -1133,10 +1159,13 @@ fn deprecated_quick_fix(uri: &Url, diag: &Diagnostic, code: &str) -> Option<Code
                         // markers. Since we only have the full block range, emit a single edit
                         // that replaces the entire diagnostic range text with \[...\].
                         // The client will preview before applying.
-                        m.insert(uri.clone(), vec![TextEdit {
-                            range: diag.range,
-                            new_text: "\\[CONTENT\\]".to_string(),
-                        }]);
+                        m.insert(
+                            uri.clone(),
+                            vec![TextEdit {
+                                range: diag.range,
+                                new_text: "\\[CONTENT\\]".to_string(),
+                            }],
+                        );
                         m
                     }),
                     ..Default::default()
@@ -1146,7 +1175,8 @@ fn deprecated_quick_fix(uri: &Url, diag: &Diagnostic, code: &str) -> Option<Code
             })
         }
         "deprecated-command" => {
-            let cmd = diag.message
+            let cmd = diag
+                .message
                 .split('`')
                 .nth(1)
                 .unwrap_or("")
@@ -1168,10 +1198,13 @@ fn deprecated_quick_fix(uri: &Url, diag: &Diagnostic, code: &str) -> Option<Code
                 edit: Some(WorkspaceEdit {
                     changes: Some({
                         let mut m = std::collections::HashMap::new();
-                        m.insert(uri.clone(), vec![TextEdit {
-                            range: diag.range,
-                            new_text: format!("{rep}{{CONTENT}}"),
-                        }]);
+                        m.insert(
+                            uri.clone(),
+                            vec![TextEdit {
+                                range: diag.range,
+                                new_text: format!("{rep}{{CONTENT}}"),
+                            }],
+                        );
                         m
                     }),
                     ..Default::default()
@@ -1463,7 +1496,10 @@ mod tests {
         let def_params = GotoDefinitionParams {
             text_document_position_params: TextDocumentPositionParams {
                 text_document: TextDocumentIdentifier { uri: uri.clone() },
-                position: Position { line: 0, character: 28 }, // inside "sec:intro" in \ref
+                position: Position {
+                    line: 0,
+                    character: 28,
+                }, // inside "sec:intro" in \ref
             },
             work_done_progress_params: Default::default(),
             partial_result_params: Default::default(),
@@ -1479,7 +1515,10 @@ mod tests {
         let ref_params = ReferenceParams {
             text_document_position: TextDocumentPositionParams {
                 text_document: TextDocumentIdentifier { uri: uri.clone() },
-                position: Position { line: 0, character: 28 }, // inside \ref{sec:intro}
+                position: Position {
+                    line: 0,
+                    character: 28,
+                }, // inside \ref{sec:intro}
             },
             work_done_progress_params: Default::default(),
             partial_result_params: Default::default(),
@@ -1661,7 +1700,7 @@ mod tests {
         let backend = service.inner();
         let text = "% comment\n\\section{Title}\n\\begin{itemize}\n\\item Item\n\\end{itemize}";
         let tokens = backend.compute_semantic_tokens(text);
-        
+
         assert!(!tokens.is_empty());
         // Verify we find at least one of each expected type
         assert!(tokens.iter().any(|t| t.token_type == 3)); // COMMENT
@@ -1677,14 +1716,20 @@ mod tests {
 
         let msg = deprecated_message("\\bf:group");
         assert!(msg.contains("\\bf"), "message should mention the command");
-        assert!(msg.contains("\\textbf"), "message should suggest replacement");
+        assert!(
+            msg.contains("\\textbf"),
+            "message should suggest replacement"
+        );
 
         let msg = deprecated_message("displaymath");
         assert!(msg.contains("\\["), "message should suggest \\[...\\]");
 
         let msg = deprecated_message("package:times");
         assert!(msg.contains("times"), "message should mention the package");
-        assert!(msg.contains("mathptmx") || msg.contains("newtx"), "should suggest replacement");
+        assert!(
+            msg.contains("mathptmx") || msg.contains("newtx"),
+            "should suggest replacement"
+        );
     }
 
     #[tokio::test]

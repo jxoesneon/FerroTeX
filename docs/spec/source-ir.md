@@ -50,21 +50,11 @@ Ranges use LSP-style 0-indexed positions.
   "uri": "file:///.../main.tex",
   "version": 12,
   "language": "latex",
-  "tokens": [
-    /* Token[] */
-  ],
-  "cst": {
-    /* Node */
-  },
-  "ast": {
-    /* Node | null */
-  },
-  "index": [
-    /* IndexRecord[] */
-  ],
-  "diagnostics": [
-    /* DiagnosticRecord[] */
-  ]
+  "tokens": [/* Token[] */],
+  "cst": {/* Node */},
+  "ast": {/* Node | null */},
+  "index": [/* IndexRecord[] */],
+  "diagnostics": [/* DiagnosticRecord[] */]
 }
 ```
 
@@ -89,9 +79,7 @@ Nodes are discriminated unions.
 {
   "kind": "Environment",
   "range": { "start": { "line": 20, "character": 0 }, "end": { "line": 30, "character": 0 } },
-  "children": [
-    /* Node[] */
-  ],
+  "children": [/* Node[] */],
   "data": { "name": "figure" },
   "confidence": 0.95
 }

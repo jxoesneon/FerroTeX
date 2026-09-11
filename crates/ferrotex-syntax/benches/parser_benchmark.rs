@@ -1,6 +1,6 @@
 use criterion::{Criterion, criterion_group, criterion_main};
-use std::hint::black_box;
 use ferrotex_syntax::parse;
+use std::hint::black_box;
 
 fn generate_synthetic_tex(lines: usize) -> String {
     let mut s = String::with_capacity(lines * 50);
