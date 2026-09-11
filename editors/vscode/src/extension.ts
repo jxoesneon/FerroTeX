@@ -1,3 +1,4 @@
+import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
 import { LanguageClient, LanguageClientOptions, ServerOptions } from "vscode-languageclient/node";
@@ -8,6 +9,77 @@ import { validateBuildEngine, validateSyncTeX } from "./engineValidator";
 import { ImagePasteProvider } from "./imagePaste";
 
 let client: LanguageClient;
+
+/**
+ * Resolves which TeX file to build for multi-file projects.
+ * Priority: %!TEX root magic comment → .ferrotex.json config → VS Code setting → main.tex heuristic → current file
+ */
+async function resolveBuildTargetFromUri(uri: vscode.Uri): Promise<string> {
+  const currentPath = uri.fsPath;
+  const dir = path.dirname(currentPath);
+
+  // 1. Check for %!TEX root magic comment
+  try {
+    const doc = await vscode.workspace.openTextDocument(uri);
+    const text = doc.getText();
+    const head = text.length > 1024 ? text.substring(0, 1024) : text;
+    const magicMatch = head.match(/^%\s*!TEX\s+root\s*=\s*(.+)$/im);
+    if (magicMatch) {
+      const rootPath = magicMatch[1].trim();
+      const resolved = path.resolve(dir, rootPath);
+      if (fs.existsSync(resolved)) {
+        return vscode.Uri.file(resolved).toString();
+      }
+    }
+  } catch {
+    // Can't read document, continue
+  }
+
+  // 2. .ferrotex.json config (walk up parent directories)
+  let currentDir: string = dir;
+  for (let i = 0; i < 20; i++) {
+    const configPath = path.join(currentDir, ".ferrotex.json");
+    if (fs.existsSync(configPath)) {
+      try {
+        const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+        if (config.mainFile) {
+          const mainPath = path.resolve(currentDir, config.mainFile);
+          if (fs.existsSync(mainPath)) {
+            return vscode.Uri.file(mainPath).toString();
+          }
+        }
+      } catch {
+        // Invalid JSON, continue
+      }
+    }
+    const parent = path.dirname(currentDir);
+    if (parent === currentDir) break;
+    currentDir = parent;
+  }
+
+  // 3. Check VS Code setting ferrotex.build.mainFile
+  const config = vscode.workspace.getConfiguration("ferrotex");
+  const mainFileSetting = config.get<string>("build.mainFile", "");
+  if (mainFileSetting) {
+    const mainPath = path.resolve(dir, mainFileSetting);
+    if (fs.existsSync(mainPath)) {
+      return vscode.Uri.file(mainPath).toString();
+    }
+  }
+
+  // 4. Check for main.tex heuristic
+  const mainTexPath = path.join(dir, "main.tex");
+  if (fs.existsSync(mainTexPath) && mainTexPath !== currentPath) {
+    return vscode.Uri.file(mainTexPath).toString();
+  }
+
+  // 5. Fallback to current file
+  return uri.toString();
+}
+
+async function resolveBuildTarget(editor: vscode.TextEditor): Promise<string> {
+  return resolveBuildTargetFromUri(editor.document.uri);
+}
 
 export async function activate(context: vscode.ExtensionContext) {
   const config = vscode.workspace.getConfiguration("ferrotex");
@@ -88,7 +160,7 @@ export async function activate(context: vscode.ExtensionContext) {
       // Auto-save before build
       await editor.document.save();
 
-      const uri = editor.document.uri.toString();
+      const uri = await resolveBuildTarget(editor);
       try {
         await client.sendRequest("workspace/executeCommand", {
           command: "ferrotex.internal.build",
@@ -154,8 +226,10 @@ export async function activate(context: vscode.ExtensionContext) {
       // Try to find the PDF
       // 1. Check build/ subdirectory (common output location)
       // 2. Check same directory as source
-      const baseName = path.basename(texUri.fsPath, path.extname(texUri.fsPath));
-      const dirName = path.dirname(texUri.fsPath);
+      const rootUriString = await resolveBuildTargetFromUri(texUri);
+      const rootUri = vscode.Uri.parse(rootUriString);
+      const baseName = path.basename(rootUri.fsPath, path.extname(rootUri.fsPath));
+      const dirName = path.dirname(rootUri.fsPath);
 
       const possiblePdfPaths = [
         path.join(dirName, "build", `${baseName}.pdf`),
@@ -268,7 +342,7 @@ export async function activate(context: vscode.ExtensionContext) {
       }
 
       // Trigger build
-      const uri = document.uri.toString();
+      const uri = await resolveBuildTargetFromUri(document.uri);
       try {
         await client.sendRequest("workspace/executeCommand", {
           command: "ferrotex.internal.build",

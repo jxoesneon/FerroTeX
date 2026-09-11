@@ -60,7 +60,10 @@ pub fn execute(cli: Cli) -> FerroTeXResult<()> {
             let content = fs::read_to_string(path)?;
             let parser = LogParser::new();
             let events = parser.parse(&content);
-            println!("{}", serde_json::to_string_pretty(&events).map_err(anyhow::Error::from)?);
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&events).map_err(anyhow::Error::from)?
+            );
         }
         Commands::Watch { path } => {
             watch_log(path)?;
@@ -204,13 +207,18 @@ fn watch_log(path: &Path) -> FerroTeXResult<()> {
         pos = len;
         let events = parser.update(&buffer);
         for event in events {
-            println!("{}", serde_json::to_string(&event).map_err(anyhow::Error::from)?);
+            println!(
+                "{}",
+                serde_json::to_string(&event).map_err(anyhow::Error::from)?
+            );
         }
     }
 
     let (tx, rx) = channel();
     let mut watcher = notify::recommended_watcher(tx).map_err(anyhow::Error::from)?;
-    watcher.watch(path, RecursiveMode::NonRecursive).map_err(anyhow::Error::from)?;
+    watcher
+        .watch(path, RecursiveMode::NonRecursive)
+        .map_err(anyhow::Error::from)?;
 
     eprintln!("Watching {}...", path.display());
 

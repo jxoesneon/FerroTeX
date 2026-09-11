@@ -35,7 +35,7 @@
 //! use the [`CommandExecutor`] trait:
 //!
 //! - **Production**: [`RealCommandExecutor`] uses `std::process::Command`
-//! - **Testing**: [`MockCommandExecutor`] returns pre-configured outputs
+//! - **Testing**: `MockCommandExecutor` returns pre-configured outputs
 //!
 //! This allows comprehensive testing of error handling, parsing logic, and edge cases
 //! without requiring a TeX distribution to be installed.

@@ -26,7 +26,7 @@
 //!                                   Final events
 //! ```
 //!
-//! The core type is [`LogParser`](parser::LogParser), which maintains:
+//! The core type is [`LogParser`], which maintains:
 //!
 //! - **File stack**: Tracks nested includes via `(...` and `)`
 //! - **Internal buffer**: Holds partial lines not yet processed

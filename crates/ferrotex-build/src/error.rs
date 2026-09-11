@@ -113,7 +113,10 @@ impl SourceSpan {
 
     /// Create a single-point span at the given location.
     pub fn point(loc: SourceLocation) -> Self {
-        Self { start: loc, end: loc }
+        Self {
+            start: loc,
+            end: loc,
+        }
     }
 }
 
@@ -324,7 +327,10 @@ impl FerroTeXError {
 
     /// Add a path to an I/O error (builder pattern).
     pub fn with_path(mut self, path: impl Into<String>) -> Self {
-        if let Self::IoError { path: ref mut p, .. } = self {
+        if let Self::IoError {
+            path: ref mut p, ..
+        } = self
+        {
             *p = Some(path.into());
         }
         self
@@ -368,7 +374,11 @@ impl FerroTeXError {
 
     /// Add a location to a generic error (builder pattern).
     pub fn with_location(mut self, location: SourceLocation) -> Self {
-        if let Self::GenericError { location: ref mut loc, .. } = self {
+        if let Self::GenericError {
+            location: ref mut loc,
+            ..
+        } = self
+        {
             *loc = Some(location);
         }
         self
@@ -630,8 +640,8 @@ mod tests {
 
     #[test]
     fn test_configuration_error() {
-        let details = ConfigurationErrorDetails::new("output_format", "pdf or dvi")
-            .with_actual("txt");
+        let details =
+            ConfigurationErrorDetails::new("output_format", "pdf or dvi").with_actual("txt");
         let err = FerroTeXError::configuration_error("Invalid format", details);
         assert!(err.is_configuration_error());
         let msg = format!("{}", err);
@@ -725,9 +735,11 @@ mod tests {
     #[test]
     fn test_error_message_variants() {
         let parse_err = FerroTeXError::parse_error("parse", SourceLocation::start());
-        let analysis_err = FerroTeXError::analysis_error("analysis", AnalysisContext::new("p", "c"));
+        let analysis_err =
+            FerroTeXError::analysis_error("analysis", AnalysisContext::new("p", "c"));
         let io_err = FerroTeXError::io_error("io");
-        let config_err = FerroTeXError::configuration_error("config", ConfigurationErrorDetails::new("k", "e"));
+        let config_err =
+            FerroTeXError::configuration_error("config", ConfigurationErrorDetails::new("k", "e"));
         let generic_err = FerroTeXError::generic_error("generic");
 
         assert_eq!(parse_err.message(), "parse");
@@ -740,7 +752,8 @@ mod tests {
     #[test]
     fn test_error_location_none() {
         let io_err = FerroTeXError::io_error("io");
-        let config_err = FerroTeXError::configuration_error("config", ConfigurationErrorDetails::new("k", "e"));
+        let config_err =
+            FerroTeXError::configuration_error("config", ConfigurationErrorDetails::new("k", "e"));
         assert_eq!(io_err.location(), None);
         assert_eq!(config_err.location(), None);
     }
@@ -783,7 +796,8 @@ mod tests {
         assert!(io_err.is_io_error());
         assert!(!io_err.is_configuration_error());
 
-        let config_err = FerroTeXError::configuration_error("c", ConfigurationErrorDetails::new("k", "e"));
+        let config_err =
+            FerroTeXError::configuration_error("c", ConfigurationErrorDetails::new("k", "e"));
         assert!(config_err.is_configuration_error());
         assert!(!config_err.is_generic_error());
 
@@ -795,7 +809,7 @@ mod tests {
     #[test]
     fn test_builder_methods_on_wrong_variants() {
         let parse_err = FerroTeXError::parse_error("p", SourceLocation::start());
-        
+
         // with_path should be a no-op on non-IoError
         let still_parse_err = parse_err.clone().with_path("foo");
         assert_eq!(parse_err, still_parse_err);

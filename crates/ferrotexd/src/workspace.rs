@@ -199,6 +199,62 @@ impl Workspace {
         self.explicit_roots.get(uri).map(|v| v.value().clone())
     }
 
+    /// Resolves which file to actually build, with priority:
+    /// 1. `%!TEX root` magic comment
+    /// 2. `.ferrotex.json` project config file (walks up parent directories)
+    /// 3. `main.tex` heuristic (if main.tex exists in same directory)
+    /// 4. Fallback to the original URI
+    pub fn resolve_build_target(&self, uri: &Url) -> Url {
+        // 1. Magic comment
+        if let Some(root_path) = self.get_explicit_root(uri) {
+            if let Ok(file_path) = uri.to_file_path() {
+                if let Some(parent) = file_path.parent() {
+                    let root_buf = parent.join(&root_path);
+                    if let Ok(root_uri) = Url::from_file_path(&root_buf) {
+                        return root_uri;
+                    }
+                }
+            }
+        }
+
+        // 2. .ferrotex.json config file
+        if let Ok(file_path) = uri.to_file_path() {
+            let mut dir = file_path.parent().map(|p| p.to_path_buf());
+            while let Some(current_dir) = dir {
+                let config_path = current_dir.join(".ferrotex.json");
+                if config_path.exists() {
+                    if let Ok(content) = std::fs::read_to_string(&config_path) {
+                        if let Ok(config) = serde_json::from_str::<serde_json::Value>(&content) {
+                            if let Some(main_file) = config.get("mainFile").and_then(|v| v.as_str())
+                            {
+                                let main_path = current_dir.join(main_file);
+                                if let Ok(main_uri) = Url::from_file_path(&main_path) {
+                                    return main_uri;
+                                }
+                            }
+                        }
+                    }
+                }
+                dir = current_dir.parent().map(|p| p.to_path_buf());
+            }
+        }
+
+        // 3. main.tex heuristic
+        if let Ok(file_path) = uri.to_file_path() {
+            if let Some(parent) = file_path.parent() {
+                let main_tex = parent.join("main.tex");
+                if main_tex.exists() && main_tex != file_path {
+                    if let Ok(main_uri) = Url::from_file_path(&main_tex) {
+                        return main_uri;
+                    }
+                }
+            }
+        }
+
+        // 4. Fallback
+        uri.clone()
+    }
+
     /// Retrieves the list of used packages for a given document URI.
     ///
     /// If an explicit root is set, it also includes packages from the root.
@@ -882,7 +938,6 @@ fn scan_file(text: &str) -> ScanResult {
                                 let arg = content.trim().to_string();
 
                                 match cmd_name.as_str() {
-
                                     "\\label" => defs.push(LabelDef {
                                         name: arg,
                                         range: cmd_range,
@@ -1122,7 +1177,10 @@ mod tests {
         let res = scan_file(text);
         assert!(res.6.contains(&"pkg1".to_string()));
         assert!(res.6.contains(&"pkg2".to_string()));
-        assert!(res.6.contains(&"pkg3".to_string()), "\\RequirePackage should now be scanned");
+        assert!(
+            res.6.contains(&"pkg3".to_string()),
+            "\\RequirePackage should now be scanned"
+        );
     }
 
     #[test]
@@ -1504,12 +1562,12 @@ mod tests {
         #[cfg(not(windows))]
         let (root_uri, sub_uri) = (
             Url::parse("file:///root.tex").unwrap(),
-            Url::parse("file:///sub.tex").unwrap()
+            Url::parse("file:///sub.tex").unwrap(),
         );
         #[cfg(windows)]
         let (root_uri, sub_uri) = (
             Url::parse("file:///C:/root.tex").unwrap(),
-            Url::parse("file:///C:/sub.tex").unwrap()
+            Url::parse("file:///C:/sub.tex").unwrap(),
         );
 
         workspace.update(&root_uri, r"\usepackage{rootpkg}");
@@ -1530,12 +1588,12 @@ mod tests {
         #[cfg(not(windows))]
         let (uri, bib_uri) = (
             Url::parse("file:///doc.tex").unwrap(),
-            Url::parse("file:///refs.bib").unwrap()
+            Url::parse("file:///refs.bib").unwrap(),
         );
         #[cfg(windows)]
         let (uri, bib_uri) = (
             Url::parse("file:///C:/doc.tex").unwrap(),
-            Url::parse("file:///C:/refs.bib").unwrap()
+            Url::parse("file:///C:/refs.bib").unwrap(),
         );
 
         workspace.update_bib(
@@ -1574,13 +1632,13 @@ mod tests {
         let (uri_a, uri_b, uri_c) = (
             Url::parse("file:///a.tex").unwrap(),
             Url::parse("file:///b.tex").unwrap(),
-            Url::parse("file:///c.tex").unwrap()
+            Url::parse("file:///c.tex").unwrap(),
         );
         #[cfg(windows)]
         let (uri_a, uri_b, uri_c) = (
             Url::parse("file:///C:/a.tex").unwrap(),
             Url::parse("file:///C:/b.tex").unwrap(),
-            Url::parse("file:///C:/c.tex").unwrap()
+            Url::parse("file:///C:/c.tex").unwrap(),
         );
 
         workspace.update(&uri_a, r"\include{b.tex} \include{c.tex}");
@@ -1836,7 +1894,7 @@ mod tests {
         // 10. bibliography as a node (hits 868)
         let res_node = scan_file(r"\bibliography{r}");
         assert!(!res_node.4.is_empty());
-        
+
         // 11. extract_label_data without closing brace (hits 1007)
         // We need a SyntaxNode that doesn't end with }.
         // This might be tricky via scan_file, but let's try.
@@ -1850,5 +1908,86 @@ mod tests {
         // 13. Test group with only spaces (hits 1011)
         let res_only_spaces = scan_file(r"\label{   }");
         assert_eq!(res_only_spaces.1[0].name, "");
+    }
+}
+
+#[cfg(test)]
+mod resolve_tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_resolve_fallback_to_original() {
+        let ws = Workspace::new();
+        let temp = TempDir::new().unwrap();
+        let tex_path = temp.path().join("chapter1.tex");
+        std::fs::write(&tex_path, "\\section{Chapter 1}").unwrap();
+        let uri = Url::from_file_path(&tex_path).unwrap();
+        let result = ws.resolve_build_target(&uri);
+        assert_eq!(result, uri);
+    }
+
+    #[test]
+    fn test_resolve_magic_comment() {
+        let ws = Workspace::new();
+        let temp = TempDir::new().unwrap();
+        let main_path = temp.path().join("main.tex");
+        let sub_path = temp.path().join("chapter1.tex");
+        std::fs::write(&main_path, "\\documentclass{article}").unwrap();
+        std::fs::write(&sub_path, "% !TEX root = main.tex\n\\section{Chapter 1}").unwrap();
+
+        let sub_uri = Url::from_file_path(&sub_path).unwrap();
+        // Simulate what update() does: parse magic comment and store in explicit_roots
+        ws.update(&sub_uri, "% !TEX root = main.tex\n\\section{Chapter 1}");
+
+        let result = ws.resolve_build_target(&sub_uri);
+        let main_uri = Url::from_file_path(&main_path).unwrap();
+        assert_eq!(result, main_uri);
+    }
+
+    #[test]
+    fn test_resolve_ferrotex_json_config() {
+        let ws = Workspace::new();
+        let temp = TempDir::new().unwrap();
+        let main_path = temp.path().join("thesis.tex");
+        let chapter_path = temp.path().join("chapter1.tex");
+        let config_path = temp.path().join(".ferrotex.json");
+
+        std::fs::write(&main_path, "\\documentclass{article}").unwrap();
+        std::fs::write(&chapter_path, "\\section{Chapter 1}").unwrap();
+        std::fs::write(&config_path, r#"{"mainFile": "thesis.tex"}"#).unwrap();
+
+        let chapter_uri = Url::from_file_path(&chapter_path).unwrap();
+        let result = ws.resolve_build_target(&chapter_uri);
+        let main_uri = Url::from_file_path(&main_path).unwrap();
+        assert_eq!(result, main_uri);
+    }
+
+    #[test]
+    fn test_resolve_main_tex_heuristic() {
+        let ws = Workspace::new();
+        let temp = TempDir::new().unwrap();
+        let main_path = temp.path().join("main.tex");
+        let chapter_path = temp.path().join("chapter1.tex");
+
+        std::fs::write(&main_path, "\\documentclass{article}").unwrap();
+        std::fs::write(&chapter_path, "\\section{Chapter 1}").unwrap();
+
+        let chapter_uri = Url::from_file_path(&chapter_path).unwrap();
+        let result = ws.resolve_build_target(&chapter_uri);
+        let main_uri = Url::from_file_path(&main_path).unwrap();
+        assert_eq!(result, main_uri);
+    }
+
+    #[test]
+    fn test_resolve_no_main_tex_no_config_returns_original() {
+        let ws = Workspace::new();
+        let temp = TempDir::new().unwrap();
+        let chapter_path = temp.path().join("chapter1.tex");
+        std::fs::write(&chapter_path, "\\section{Chapter 1}").unwrap();
+
+        let chapter_uri = Url::from_file_path(&chapter_path).unwrap();
+        let result = ws.resolve_build_target(&chapter_uri);
+        assert_eq!(result, chapter_uri);
     }
 }
