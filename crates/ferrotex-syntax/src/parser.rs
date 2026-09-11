@@ -572,7 +572,12 @@ mod tests {
         // This should probably be an error, although some parsers might just close the current env.
         // Let's see what our current implementation does.
         assert!(!result.errors.is_empty());
-        assert!(result.errors.iter().any(|e| e.message.contains("Mismatched environment")));
+        assert!(
+            result
+                .errors
+                .iter()
+                .any(|e| e.message.contains("Mismatched environment"))
+        );
     }
 
     #[test]
@@ -604,7 +609,11 @@ mod tests {
         let input = "text } more text";
         let res = parse(input);
         assert!(!res.errors.is_empty());
-        assert!(res.errors.iter().any(|e| e.message.contains("Unmatched '}'")));
+        assert!(
+            res.errors
+                .iter()
+                .any(|e| e.message.contains("Unmatched '}'"))
+        );
     }
 
     #[test]
@@ -620,16 +629,24 @@ mod tests {
     fn test_parser_nested_same_env() {
         let input = r"\begin{center} \begin{center} inner \end{center} outer \end{center}";
         let res = parse(input);
-        assert!(res.errors.is_empty(), "Nested same-name envs should parse: {:?}", res.errors);
+        assert!(
+            res.errors.is_empty(),
+            "Nested same-name envs should parse: {:?}",
+            res.errors
+        );
     }
 
     #[test]
     fn test_parser_deep_recovery() {
-        let input = r"\section{One} \invalid{ \begin{itemize} \item Two \end{itemize} } \section{Three}";
+        let input =
+            r"\section{One} \invalid{ \begin{itemize} \item Two \end{itemize} } \section{Three}";
         let res = parse(input);
         let node = res.syntax();
         // Should find two sections despite the \invalid{...} part
-        let sections: Vec<_> = node.descendants().filter(|n| n.kind() == SyntaxKind::Section).collect();
+        let sections: Vec<_> = node
+            .descendants()
+            .filter(|n| n.kind() == SyntaxKind::Section)
+            .collect();
         assert!(sections.len() >= 2);
     }
 
@@ -638,7 +655,11 @@ mod tests {
         let input = r"\begin{env} some text";
         let res = parse(input);
         assert!(!res.errors.is_empty());
-        assert!(res.errors.iter().any(|e| e.message.contains("Unclosed environment")));
+        assert!(
+            res.errors
+                .iter()
+                .any(|e| e.message.contains("Unclosed environment"))
+        );
     }
 
     #[test]

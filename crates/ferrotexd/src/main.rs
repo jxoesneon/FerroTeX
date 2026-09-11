@@ -54,7 +54,7 @@ mod tests {
             package_index: Arc::new(Mutex::new(None)),
             build_engine: Arc::new(LatexmkAdapter::new()),
         });
-        
+
         let backend = service.inner();
         assert!(backend.documents.is_empty());
     }

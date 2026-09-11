@@ -60,9 +60,10 @@ impl AbstractMachine {
     pub fn step(&mut self) -> Option<AbstractValue> {
         if self.expansion_depth > self.max_depth {
             let ctx = AnalysisContext::new("abstract_machine", "recursion depth check");
-            return Some(AbstractValue::AnalysisError(
-                FerroTeXError::analysis_error("Maximum recursion depth exceeded", ctx),
-            ));
+            return Some(AbstractValue::AnalysisError(FerroTeXError::analysis_error(
+                "Maximum recursion depth exceeded",
+                ctx,
+            )));
         }
 
         // Pop the next token from input
@@ -70,13 +71,12 @@ impl AbstractMachine {
             match &token {
                 AbstractValue::ControlSequence(name) => {
                     if self.call_stack.contains(name) {
-                        let ctx = AnalysisContext::new("abstract_machine", format!("expanding {}", name));
-                        return Some(AbstractValue::AnalysisError(
-                            FerroTeXError::analysis_error(
-                                format!("Infinite recursion detected in control sequence: {}", name),
-                                ctx,
-                            ),
-                        ));
+                        let ctx =
+                            AnalysisContext::new("abstract_machine", format!("expanding {}", name));
+                        return Some(AbstractValue::AnalysisError(FerroTeXError::analysis_error(
+                            format!("Infinite recursion detected in control sequence: {}", name),
+                            ctx,
+                        )));
                     }
                     self.call_stack.push(name.clone());
                     self.expansion_depth += 1;
