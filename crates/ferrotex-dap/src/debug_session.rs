@@ -1003,28 +1003,43 @@ Hello, FerroTeX!
 
         // 1. Test Step
         tx.send(EngineCommand::Step).unwrap();
-        let ev = rx.recv_timeout(std::time::Duration::from_millis(500)).unwrap();
+        let ev = rx
+            .recv_timeout(std::time::Duration::from_millis(500))
+            .unwrap();
         assert!(matches!(ev, EngineEvent::Output(s) if s.contains("Step 0")));
-        let ev = rx.recv_timeout(std::time::Duration::from_millis(500)).unwrap();
+        let ev = rx
+            .recv_timeout(std::time::Duration::from_millis(500))
+            .unwrap();
         assert!(matches!(ev, EngineEvent::Stopped { reason, .. } if reason == "step"));
 
         // 2. Test Continue multiple times
         for i in 1..=4 {
             tx.send(EngineCommand::Continue).unwrap();
-            let ev = rx.recv_timeout(std::time::Duration::from_millis(500)).unwrap();
-            assert!(matches!(ev, EngineEvent::Output(s) if s.contains(&format!("Processing chunk {}", i))));
+            let ev = rx
+                .recv_timeout(std::time::Duration::from_millis(500))
+                .unwrap();
+            assert!(
+                matches!(ev, EngineEvent::Output(s) if s.contains(&format!("Processing chunk {}", i)))
+            );
         }
 
         // 3. The next continue should reach steps=6 and terminate
         tx.send(EngineCommand::Continue).unwrap();
-        let ev = rx.recv_timeout(std::time::Duration::from_millis(500)).unwrap();
+        let ev = rx
+            .recv_timeout(std::time::Duration::from_millis(500))
+            .unwrap();
         assert!(matches!(ev, EngineEvent::Output(s) if s.contains("Processing chunk 5")));
-        let ev = rx.recv_timeout(std::time::Duration::from_millis(500)).unwrap();
+        let ev = rx
+            .recv_timeout(std::time::Duration::from_millis(500))
+            .unwrap();
         assert!(matches!(ev, EngineEvent::Terminated));
 
         // 4. After termination, the event channel should be closed
         let result = rx.recv_timeout(std::time::Duration::from_millis(100));
-        assert!(matches!(result, Err(std::sync::mpsc::RecvTimeoutError::Disconnected)));
+        assert!(matches!(
+            result,
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected)
+        ));
     }
 
     #[test]
@@ -1033,7 +1048,10 @@ Hello, FerroTeX!
         let (tx, rx) = driver.spawn();
         drop(tx); // Should cause recv() to return Err and break the loop
         let result = rx.recv_timeout(std::time::Duration::from_millis(500));
-        assert!(matches!(result, Err(std::sync::mpsc::RecvTimeoutError::Disconnected)));
+        assert!(matches!(
+            result,
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected)
+        ));
     }
 
     #[test]
@@ -1053,7 +1071,10 @@ Hello, FerroTeX!
         tx.send(EngineCommand::Pause).unwrap();
         // Pause should hit the wildcard and break the loop
         let result = rx.recv_timeout(std::time::Duration::from_millis(500));
-        assert!(matches!(result, Err(std::sync::mpsc::RecvTimeoutError::Disconnected)));
+        assert!(matches!(
+            result,
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected)
+        ));
     }
 
     struct DummyDriver;
