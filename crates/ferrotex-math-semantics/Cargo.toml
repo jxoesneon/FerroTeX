@@ -1,6 +1,6 @@
 [package]
 name = "ferrotex-math-semantics"
-version = "0.24.0"
+version = "0.25.0"
 edition = "2024"
 description = "Formal semantics and shape analysis for LaTeX math environments"
 license = "Apache-2.0 OR MIT"
@@ -14,7 +14,7 @@ categories = ["mathematics", "development-tools"]
 workspace = true
 
 [dependencies]
-ferrotex-syntax = { path = "../ferrotex-syntax", version = "0.24.0" }
+ferrotex-syntax = { path = "../ferrotex-syntax", version = "0.25.0" }
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "2.0"
 rowan = "0.17"
