@@ -13,9 +13,9 @@
   },
   "devDependencies": {
     "markdown-link-check": "^3.15.0",
-    "markdownlint-cli2": "^0.23.2",
-    "prettier": "^3.9.6",
-    "yaml": "^2.9.0"
+    "markdownlint-cli2": "^0.23.3",
+    "prettier": "^3.9.8",
+    "yaml": "^2.9.1"
   },
   "overrides": {
     "basic-ftp": ">=5.3.1",
