@@ -460,18 +460,18 @@
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
-    "@types/node": "^22.20.2",
-    "@types/vscode": "^1.137.0",
+    "@types/node": "^26.6.4",
+    "@types/vscode": "^1.140.0",
     "@vscode/test-electron": "^3.1.0",
-    "@vscode/vsce": "^3.9.2",
+    "@vscode/vsce": "^4.0.0",
     "esbuild": "^0.28.2",
     "glob": "^13.0.6",
-    "mocha": "^12.0.0",
+    "mocha": "^12.0.3",
     "typescript": "^7.0.2"
   },
   "dependencies": {
-    "pdfjs-dist": "^6.3.289",
-    "vscode-languageclient": "^10.1.1"
+    "pdfjs-dist": "^6.4.299",
+    "vscode-languageclient": "^10.1.2"
   },
   "overrides": {
     "serialize-javascript": "^7.0.5",
