@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://github.com/jxoesneon/FerroTex/raw/main/editors/vscode/images/hero_banner.png" alt="FerroTeX Hero Banner" width="100%">
+  <img src="images/hero_banner.png" alt="FerroTeX Hero Banner" width="100%">
 </p>
 
 # FerroTeX for Visual Studio Code
@@ -40,6 +40,12 @@
 
 ## 🎬 Real Feature Walkthrough
 
+<p align="center">
+  <img src="images/brag_extension.gif" alt="FerroTeX VS Code Extension Complete Feature Showcase" width="100%">
+</p>
+
+---
+
 ### 1. Zero-Config Build & Live PDF Preview with SyncTeX
 
 Compile complex documents on a clean machine without installing external TeX distributions. The integrated PDF viewer automatically re-renders on save with responsive auto-fit scaling and SyncTeX synchronization.
@@ -47,7 +53,7 @@ Compile complex documents on a clean machine without installing external TeX dis
 > **Key Shortcut**: Press <kbd>Cmd</kbd>+<kbd>Alt</kbd>+<kbd>B</kbd> (macOS) or <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>B</kbd> (Windows/Linux) to build, and click the **PDF Preview** icon in the editor toolbar.
 
 <p align="center">
-  <img src="https://github.com/jxoesneon/FerroTex/raw/main/editors/vscode/images/feature_preview.gif" alt="Zero-Config Build and Live PDF Preview" width="100%">
+  <img src="images/feature_preview.gif" alt="Zero-Config Build and Live PDF Preview" width="100%">
 </p>
 
 ---
@@ -59,7 +65,7 @@ FerroTeX continuously validates your mathematical environments in real-time. Jag
 > **Key Shortcut**: Place cursor on any warning squiggle and press <kbd>Cmd</kbd>+<kbd>.</kbd> / <kbd>Ctrl</kbd>+<kbd>.</kbd> to apply the suggested quick fix.
 
 <p align="center">
-  <img src="https://github.com/jxoesneon/FerroTex/raw/main/editors/vscode/images/feature_diagnostics.gif" alt="Semantic Math Diagnostics and Quick Fixes" width="100%">
+  <img src="images/feature_diagnostics.gif" alt="Semantic Math Diagnostics and Quick Fixes" width="100%">
 </p>
 
 ---
@@ -71,7 +77,7 @@ Intelligent completions adapt dynamically to your cursor context. Type `\begin{p
 > **Key Shortcut**: Press <kbd>Ctrl</kbd>+<kbd>Space</kbd> anywhere to trigger contextual suggestions.
 
 <p align="center">
-  <img src="https://github.com/jxoesneon/FerroTex/raw/main/editors/vscode/images/feature_completion.gif" alt="Contextual Autocompletion" width="100%">
+  <img src="images/feature_completion.gif" alt="Contextual Autocompletion" width="100%">
 </p>
 
 ---
@@ -81,7 +87,7 @@ Intelligent completions adapt dynamically to your cursor context. Type `\begin{p
 Hover over any citation key (`\cite{...}`) to view author, title, publication venue, and DOI extracted directly from your `.bib` library. Hovering over LaTeX commands displays rich signatures, required packages, and parameter explanations.
 
 <p align="center">
-  <img src="https://github.com/jxoesneon/FerroTex/raw/main/editors/vscode/images/feature_hover.gif" alt="Rich Interactive Hovers" width="100%">
+  <img src="images/feature_hover.gif" alt="Rich Interactive Hovers" width="100%">
 </p>
 
 ---

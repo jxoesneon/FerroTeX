@@ -25,6 +25,9 @@
       "pattern": "^https://github\\.com/jxoesneon/FerroTex/discussions"
     },
     {
+      "pattern": "^https://github\\.com/jxoesneon/FerroTex/raw/"
+    },
+    {
       "pattern": "^file://"
     }
   ],

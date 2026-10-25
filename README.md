@@ -41,6 +41,10 @@ Built entirely in safe, concurrent **Rust** 🦀, FerroTeX provides:
 
 Every recording below is captured live inside VS Code running our native `ferrotexd` language server daemon and bundled on-demand compiler engine.
 
+<p align="center">
+  <img src="editors/vscode/images/brag_project.gif" alt="FerroTeX Platform Complete Showcase" width="100%">
+</p>
+
 ---
 
 ### 1. Semantic Math Analysis & One-Click Fixes
