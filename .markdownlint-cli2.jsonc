@@ -8,6 +8,8 @@
     "**/.agent/**",
     "**/.vscode-test/**",
     "**/.cargo-docker/**",
+    "vault/**",
+    "brag-*/**",
   ],
   "config": {
     "MD013": false,

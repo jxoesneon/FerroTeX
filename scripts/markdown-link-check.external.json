@@ -14,6 +14,21 @@
     },
     {
       "pattern": "^https://crates\\.io/crates/jxoesneon-tectonic"
+    },
+    {
+      "pattern": "^https://marketplace\\.visualstudio\\.com"
+    },
+    {
+      "pattern": "^https://open-vsx\\.org"
+    },
+    {
+      "pattern": "^https://github\\.com/jxoesneon/FerroTex/discussions"
+    },
+    {
+      "pattern": "^https://github\\.com/jxoesneon/FerroTex/raw/"
+    },
+    {
+      "pattern": "^file://"
     }
   ],
   "timeout": "20s",

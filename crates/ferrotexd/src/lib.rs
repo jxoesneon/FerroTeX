@@ -219,7 +219,16 @@ impl LanguageServer for Backend {
                         work_done_progress: Some(true),
                     },
                 }),
-                code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
+                code_action_provider: Some(CodeActionProviderCapability::Options(
+                    CodeActionOptions {
+                        code_action_kinds: Some(vec![
+                            CodeActionKind::QUICKFIX,
+                            CodeActionKind::REFACTOR,
+                        ]),
+                        work_done_progress_options: WorkDoneProgressOptions::default(),
+                        resolve_provider: Some(false),
+                    },
+                )),
                 definition_provider: Some(OneOf::Left(true)),
                 references_provider: Some(OneOf::Left(true)),
                 rename_provider: Some(OneOf::Right(RenameOptions {
@@ -686,22 +695,63 @@ impl LanguageServer for Backend {
     async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
         let uri = params.text_document_position_params.text_document.uri;
         let pos = params.text_document_position_params.position;
-        if let Some(text) = self.documents.get(&uri) {
-            let offset = {
-                let line_index = LineIndex::new(&text);
-                line_index.offset(line_index::LineCol {
-                    line: pos.line,
-                    col: pos.character,
-                })
-            };
-
-            if let Some(off) = offset {
-                let parse_res = ferrotex_syntax::parse(&text);
-                let root = ferrotex_syntax::SyntaxNode::new_root(parse_res.green_node());
-                let h = hover::find_hover(&root, off, &self.workspace);
-                return Ok(h);
+        let text = if let Some(t) = self.documents.get(&uri) {
+            t.clone()
+        } else if let Ok(path) = uri.to_file_path() {
+            if let Ok(content) = std::fs::read_to_string(&path) {
+                self.documents.insert(uri.clone(), content.clone());
+                content
+            } else {
+                return Ok(None);
             }
+        } else {
+            return Ok(None);
+        };
+
+        let offset = {
+            let line_index = LineIndex::new(&text);
+            line_index.offset(line_index::LineCol {
+                line: pos.line,
+                col: pos.character,
+            })
+        };
+
+        if let Some(off) = offset {
+            self.workspace.update(&uri, &text);
+
+            for bib_uri in self.workspace.get_referenced_bib_uris() {
+                if let Ok(bib_path) = bib_uri.to_file_path() {
+                    if bib_path.exists() {
+                        if let Ok(content) = std::fs::read_to_string(&bib_path) {
+                            self.workspace.update_bib(&bib_uri, &content);
+                        }
+                    }
+                }
+            }
+
+            if let Ok(doc_path) = uri.to_file_path() {
+                if let Some(parent) = doc_path.parent() {
+                    if let Ok(entries) = std::fs::read_dir(parent) {
+                        for entry in entries.flatten() {
+                            let p = entry.path();
+                            if p.extension().and_then(|e| e.to_str()) == Some("bib") {
+                                if let Ok(bib_u) = Url::from_file_path(&p) {
+                                    if let Ok(content) = std::fs::read_to_string(&p) {
+                                        self.workspace.update_bib(&bib_u, &content);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            let parse_res = ferrotex_syntax::parse(&text);
+            let root = ferrotex_syntax::SyntaxNode::new_root(parse_res.green_node());
+            let h = hover::find_hover(&root, off, &self.workspace);
+            return Ok(h);
         }
+
         Ok(None)
     }
 
@@ -741,12 +791,59 @@ impl LanguageServer for Backend {
         let mut actions: Vec<CodeActionOrCommand> = Vec::new();
 
         for diag in &params.context.diagnostics {
-            let fix = match diag.code.as_ref() {
-                Some(NumberOrString::String(code)) => deprecated_quick_fix(&uri, diag, code),
+            let code_str = match diag.code.as_ref() {
+                Some(NumberOrString::String(code)) => Some(code.as_str()),
                 _ => None,
+            };
+            let fix = if let Some(code) = code_str {
+                deprecated_quick_fix(&uri, diag, code)
+            } else if diag.message.contains("deprecated") || diag.message.contains("\\bf") {
+                deprecated_quick_fix(&uri, diag, "deprecated-command")
+            } else {
+                None
             };
             if let Some(action) = fix {
                 actions.push(CodeActionOrCommand::CodeAction(action));
+            }
+        }
+
+        // Fallback: If context diagnostics didn't yield actions, check workspace deprecated usages at params.range
+        if actions.is_empty() {
+            if let Some(text) = self.documents.get(&uri) {
+                let li = LineIndex::new(&text);
+                for (dep_uri, text_range, msg) in self.workspace.validate_deprecated() {
+                    if dep_uri == uri {
+                        let start_lc = li.line_col(text_range.start());
+                        let end_lc = li.line_col(text_range.end());
+                        let diag_range = Range {
+                            start: Position {
+                                line: start_lc.line,
+                                character: start_lc.col,
+                            },
+                            end: Position {
+                                line: end_lc.line,
+                                character: end_lc.col,
+                            },
+                        };
+
+                        if diag_range.start.line <= params.range.end.line
+                            && diag_range.end.line >= params.range.start.line
+                        {
+                            let code = deprecated_code(&msg);
+                            let diag = Diagnostic {
+                                range: diag_range,
+                                severity: Some(DiagnosticSeverity::WARNING),
+                                source: Some("ferrotex".to_string()),
+                                code: Some(NumberOrString::String(code.clone())),
+                                message: deprecated_message(&msg),
+                                ..Default::default()
+                            };
+                            if let Some(action) = deprecated_quick_fix(&uri, &diag, &code) {
+                                actions.push(CodeActionOrCommand::CodeAction(action));
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -789,6 +886,33 @@ impl Backend {
     pub async fn validate_document(&self, uri: Url) {
         if let Some(text) = self.documents.get(&uri) {
             self.workspace.update(&uri, &text);
+
+            for bib_uri in self.workspace.get_referenced_bib_uris() {
+                if let Ok(bib_path) = bib_uri.to_file_path() {
+                    if bib_path.exists() {
+                        if let Ok(content) = std::fs::read_to_string(&bib_path) {
+                            self.workspace.update_bib(&bib_uri, &content);
+                        }
+                    }
+                }
+            }
+
+            if let Ok(doc_path) = uri.to_file_path() {
+                if let Some(parent) = doc_path.parent() {
+                    if let Ok(entries) = std::fs::read_dir(parent) {
+                        for entry in entries.flatten() {
+                            let p = entry.path();
+                            if p.extension().and_then(|e| e.to_str()) == Some("bib") {
+                                if let Ok(bib_u) = Url::from_file_path(&p) {
+                                    if let Ok(content) = std::fs::read_to_string(&p) {
+                                        self.workspace.update_bib(&bib_u, &content);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
 
             let mut diagnostics = Vec::new();
 
@@ -1102,14 +1226,126 @@ fn find_label_token_at(
             }
         }
     }
+
+    // Fallback for flat or environment-enclosed trees where commands and groups are sibling tokens/nodes
+    if let Some(token) = root.token_at_offset(offset).right_biased() {
+        let group_node = token
+            .parent()
+            .filter(|parent| parent.kind() == SyntaxKind::Group);
+
+        if let Some(group) = group_node {
+            let mut prev = group.prev_sibling_or_token();
+            while let Some(p) = prev {
+                match p {
+                    rowan::NodeOrToken::Token(t) => {
+                        if t.kind() == SyntaxKind::Whitespace {
+                            prev = t.prev_sibling_or_token();
+                            continue;
+                        }
+                        if t.kind() == SyntaxKind::Command {
+                            let text = t.text();
+                            if text.starts_with("\\label")
+                                || text.starts_with("\\ref")
+                                || text.starts_with("\\cite")
+                            {
+                                let raw = group.text().to_string();
+                                let content = if raw.starts_with('{') && raw.ends_with('}') {
+                                    raw[1..raw.len() - 1].trim().to_string()
+                                } else {
+                                    raw.trim().to_string()
+                                };
+                                if !content.is_empty() {
+                                    return Some((content, group.text_range()));
+                                }
+                            }
+                        }
+                        break;
+                    }
+                    rowan::NodeOrToken::Node(n) => {
+                        if n.kind() == SyntaxKind::Command {
+                            let text = n.to_string();
+                            if text.starts_with("\\label")
+                                || text.starts_with("\\ref")
+                                || text.starts_with("\\cite")
+                            {
+                                let raw = group.text().to_string();
+                                let content = if raw.starts_with('{') && raw.ends_with('}') {
+                                    raw[1..raw.len() - 1].trim().to_string()
+                                } else {
+                                    raw.trim().to_string()
+                                };
+                                if !content.is_empty() {
+                                    return Some((content, group.text_range()));
+                                }
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        let cmd_token = if token.kind() == SyntaxKind::Command {
+            Some(token)
+        } else {
+            token
+                .prev_token()
+                .filter(|prev| prev.kind() == SyntaxKind::Command)
+        };
+
+        if let Some(t) = cmd_token {
+            let text = t.text();
+            if text.starts_with("\\label")
+                || text.starts_with("\\ref")
+                || text.starts_with("\\cite")
+            {
+                let mut next = t.next_sibling_or_token();
+                while let Some(n) = next {
+                    match n {
+                        rowan::NodeOrToken::Token(tok) => {
+                            if tok.kind() == SyntaxKind::Whitespace {
+                                next = tok.next_sibling_or_token();
+                                continue;
+                            }
+                            break;
+                        }
+                        rowan::NodeOrToken::Node(node) => {
+                            if node.kind() == SyntaxKind::Group {
+                                let raw = node.text().to_string();
+                                let content = if raw.starts_with('{') && raw.ends_with('}') {
+                                    raw[1..raw.len() - 1].trim().to_string()
+                                } else {
+                                    raw.trim().to_string()
+                                };
+                                if !content.is_empty() {
+                                    return Some((content, node.text_range()));
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     None
+}
+
+fn extract_deprecated_command(s: &str) -> &str {
+    for candidate in &["\\bf", "\\it", "\\rm", "\\sf", "\\tt", "\\sc", "\\sl"] {
+        if s.contains(candidate) {
+            return candidate;
+        }
+    }
+    ""
 }
 
 /// Maps a deprecated-usage key (as stored in `deprecated_usages`) to a short diagnostic code.
 fn deprecated_code(msg: &str) -> String {
-    if msg.starts_with("package:") {
+    if msg.starts_with("package:") || msg.contains("package:") {
         "deprecated-package".to_string()
-    } else if msg == "displaymath" {
+    } else if msg == "displaymath" || msg.contains("displaymath") || msg.contains("$$") {
         "deprecated-displaymath".to_string()
     } else {
         "deprecated-command".to_string()
@@ -1126,10 +1362,10 @@ fn deprecated_message(msg: &str) -> String {
             _ => "This package is obsolete.",
         };
         format!("Package `{pkg}` is deprecated. {replacement}")
-    } else if msg == "displaymath" {
+    } else if msg == "displaymath" || msg.contains("displaymath") || msg.contains("$$") {
         "Display math `$$...$$` is deprecated. Use `\\[...\\]` instead.".to_string()
     } else {
-        let cmd = msg.trim_end_matches(":group");
+        let cmd = extract_deprecated_command(msg);
         let replacement = match cmd {
             "\\bf" => "`\\textbf{...}`",
             "\\it" => "`\\textit{...}`",
@@ -1175,12 +1411,7 @@ fn deprecated_quick_fix(uri: &Url, diag: &Diagnostic, code: &str) -> Option<Code
             })
         }
         "deprecated-command" => {
-            let cmd = diag
-                .message
-                .split('`')
-                .nth(1)
-                .unwrap_or("")
-                .trim_end_matches(":group");
+            let cmd = extract_deprecated_command(&diag.message);
             let replacement_cmd = match cmd {
                 "\\bf" => Some("\\textbf"),
                 "\\it" => Some("\\textit"),
@@ -1753,6 +1984,58 @@ mod tests {
             dep.iter().any(|(u, _, m)| u == &uri && m.contains("\\bf")),
             "validate_deprecated should surface \\bf usage"
         );
+    }
+
+    #[tokio::test]
+    async fn test_backend_code_action_deprecated() {
+        let service = setup().await;
+        let backend = service.inner();
+        let uri = Url::parse("file:///legacy_test.tex").unwrap();
+        let text =
+            "\\documentclass{article}\n\\begin{document}\n{\\bf bold text}\n\\end{document}\n";
+        backend
+            .did_open(DidOpenTextDocumentParams {
+                text_document: TextDocumentItem {
+                    uri: uri.clone(),
+                    language_id: "latex".to_string(),
+                    version: 1,
+                    text: text.to_string(),
+                },
+            })
+            .await;
+
+        let dep = backend.workspace.validate_deprecated();
+        eprintln!("DEBUG dep: {:?}", dep);
+        assert!(
+            !dep.is_empty(),
+            "Deprecated usage should be found in workspace"
+        );
+
+        let params = CodeActionParams {
+            text_document: TextDocumentIdentifier { uri: uri.clone() },
+            range: Range {
+                start: Position {
+                    line: 2,
+                    character: 0,
+                },
+                end: Position {
+                    line: 2,
+                    character: 16,
+                },
+            },
+            context: CodeActionContext {
+                diagnostics: vec![],
+                only: None,
+                ..Default::default()
+            },
+            work_done_progress_params: Default::default(),
+            partial_result_params: Default::default(),
+        };
+
+        let res = backend.code_action(params).await.unwrap();
+        assert!(res.is_some(), "code_action should return a response");
+        let actions = res.unwrap();
+        assert!(!actions.is_empty(), "Should return at least one action");
     }
 
     #[test]

@@ -16,7 +16,9 @@ async function* walk(dir) {
       entry.name === "target" ||
       entry.name === ".cargo-docker" ||
       entry.name === ".agent" ||
-      entry.name === ".vscode-test"
+      entry.name === ".vscode-test" ||
+      entry.name === "vault" ||
+      entry.name.startsWith("brag-")
     )
       continue;
     const fullPath = path.join(dir, entry.name);
@@ -56,5 +58,5 @@ mdFiles.sort();
 
 for (const file of mdFiles) {
   const npmCmd = process.platform === "win32" ? "npm.cmd" : "npm";
-  await run(npmCmd, ["exec", "--", "markdown-link-check", "-q", "-c", configPath, file]);
+  await run(npmCmd, ["exec", "--yes", "--", "markdown-link-check", "-q", "-c", configPath, file]);
 }

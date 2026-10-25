@@ -85,8 +85,8 @@ export async function activate(context: vscode.ExtensionContext) {
   const config = vscode.workspace.getConfiguration("ferrotex");
   let serverPath = config.get<string>("serverPath");
 
-  // UX-Upgrade: Frictionless Install
-  checkAndInstallTectonic(context);
+  // Self-install Tectonic engine from jxoesneon/tectonic if not present
+  await checkAndInstallTectonic(context);
 
   // Validate build engine when configuration changes
   context.subscriptions.push(
@@ -231,16 +231,16 @@ export async function activate(context: vscode.ExtensionContext) {
       const baseName = path.basename(rootUri.fsPath, path.extname(rootUri.fsPath));
       const dirName = path.dirname(rootUri.fsPath);
 
-      const possiblePdfPaths = [
-        path.join(dirName, "build", `${baseName}.pdf`),
-        path.join(dirName, `${baseName}.pdf`),
+      const possibleUris = [
+        rootUri.with({ path: path.join(dirName, "build", `${baseName}.pdf`) }),
+        rootUri.with({ path: path.join(dirName, `${baseName}.pdf`) }),
       ];
 
       let pdfUri: vscode.Uri | null = null;
-      for (const pdfPath of possiblePdfPaths) {
+      for (const candidate of possibleUris) {
         try {
-          await vscode.workspace.fs.stat(vscode.Uri.file(pdfPath));
-          pdfUri = vscode.Uri.file(pdfPath);
+          await vscode.workspace.fs.stat(candidate);
+          pdfUri = candidate;
           break;
         } catch {
           // File doesn't exist, try next
@@ -261,10 +261,10 @@ export async function activate(context: vscode.ExtensionContext) {
           // Wait a bit for build to complete and try again
           await new Promise((resolve) => setTimeout(resolve, 500));
 
-          for (const pdfPath of possiblePdfPaths) {
+          for (const candidate of possibleUris) {
             try {
-              await vscode.workspace.fs.stat(vscode.Uri.file(pdfPath));
-              pdfUri = vscode.Uri.file(pdfPath);
+              await vscode.workspace.fs.stat(candidate);
+              pdfUri = candidate;
               break;
             } catch {
               // Still doesn't exist

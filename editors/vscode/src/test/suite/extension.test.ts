@@ -228,6 +228,7 @@ suite("Regression Suite v2 (Comprehensive)", function () {
     if (!ws || ws!.length === 0) throw new Error("No workspace open");
     const docUri = vscode.Uri.file(path.resolve(ws![0].uri.fsPath, "main.tex"));
     const doc = await vscode.workspace.openTextDocument(docUri);
+    await vscode.window.showTextDocument(doc);
 
     // Wait for indexing (heuristic, usually fast on small demo)
     await waitFor("Indexing", async () => true, 3000);
@@ -289,17 +290,218 @@ suite("Regression Suite v2 (Comprehensive)", function () {
     assert.ok(diags.length > 0, "No diagnostics found after didOpen");
   });
 
-  /*
-  test.skip("Feature v0.16.0: Quick Fixes (Deprecated Commands)", async function() {
-    // SKIPPED: This test is flaky due to async indexing timing in CI/test environment
-    // Manual verification confirms quickfixes work correctly
+  test("Feature v0.16.0: Find All References", async function () {
+    const ws = vscode.workspace.workspaceFolders;
+    if (!ws || ws!.length === 0) throw new Error("No workspace open");
+    const docPath = path.resolve(ws![0].uri.fsPath, "refs_find.tex");
+    const fs = require("fs");
+    fs.writeFileSync(
+      docPath,
+      "\\documentclass{article}\n\\begin{document}\n\\section{Intro}\\label{sec:ref_target}\nSee \\ref{sec:ref_target} and also \\ref{sec:ref_target}.\n\\end{document}\n",
+    );
+    const docUri = vscode.Uri.file(docPath);
+    const doc = await vscode.workspace.openTextDocument(docUri);
+    await vscode.window.showTextDocument(doc);
+
+    await waitFor(
+      "References Provider Indexing",
+      async () => {
+        const refs = await vscode.commands.executeCommand<vscode.Location[]>(
+          "vscode.executeReferenceProvider",
+          docUri,
+          new vscode.Position(2, 25), // On \label{sec:ref_target}
+        );
+        return Array.isArray(refs) && refs.length >= 2;
+      },
+      15000,
+    );
+
+    const refs = await vscode.commands.executeCommand<vscode.Location[]>(
+      "vscode.executeReferenceProvider",
+      docUri,
+      new vscode.Position(2, 25),
+    );
+    assert.ok(refs && refs.length >= 2, "References should find both usages of sec:ref_target");
   });
 
-  test("Feature v0.16.0: Quick Fixes (Display Math & Packages)", async function() {
-    this.skip(); // Skip for now due to async indexing timing issues in test environment
-    // ... test implementation ...
+  test("Feature v0.16.0: Document Symbols (Outline)", async function () {
+    const ws = vscode.workspace.workspaceFolders;
+    if (!ws || ws!.length === 0) throw new Error("No workspace open");
+    const docPath = path.resolve(ws![0].uri.fsPath, "symbols.tex");
+    const fs = require("fs");
+    fs.writeFileSync(
+      docPath,
+      "\\documentclass{article}\n\\begin{document}\n\\section{Main Section}\\label{sec:main}\n\\begin{equation}\nx = 1\n\\end{equation}\n\\end{document}\n",
+    );
+    const docUri = vscode.Uri.file(docPath);
+    const doc = await vscode.workspace.openTextDocument(docUri);
+    await vscode.window.showTextDocument(doc);
+
+    await waitFor(
+      "Document Symbol Indexing",
+      async () => {
+        const symbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
+          "vscode.executeDocumentSymbolProvider",
+          docUri,
+        );
+        return Array.isArray(symbols) && symbols.length > 0;
+      },
+      15000,
+    );
+
+    const symbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
+      "vscode.executeDocumentSymbolProvider",
+      docUri,
+    );
+    assert.ok(symbols && symbols.length > 0, "Document symbol provider should return symbols");
+    const names = symbols.map((s) => s.name);
+    assert.ok(
+      names.some(
+        (n) => n.includes("Main Section") || n.includes("sec:main") || n.includes("equation"),
+      ),
+      `Symbols should contain section, label, or equation, found: ${names.join(", ")}`,
+    );
   });
-*/
+
+  test("Feature v0.16.0: Semantic Tokens", async function () {
+    const ws = vscode.workspace.workspaceFolders;
+    if (!ws || ws!.length === 0) throw new Error("No workspace open");
+    const docPath = path.resolve(ws![0].uri.fsPath, "semantic.tex");
+    const fs = require("fs");
+    fs.writeFileSync(
+      docPath,
+      "\\documentclass{article}\n% A comment\n\\begin{document}\n\\section{Title}\n\\end{document}\n",
+    );
+    const docUri = vscode.Uri.file(docPath);
+    const doc = await vscode.workspace.openTextDocument(docUri);
+    await vscode.window.showTextDocument(doc);
+
+    await waitFor(
+      "Semantic Tokens Provider",
+      async () => {
+        const tokens = await vscode.commands.executeCommand<vscode.SemanticTokens>(
+          "vscode.provideDocumentSemanticTokens",
+          docUri,
+        );
+        return tokens && tokens.data && tokens.data.length > 0;
+      },
+      15000,
+    );
+
+    const tokens = await vscode.commands.executeCommand<vscode.SemanticTokens>(
+      "vscode.provideDocumentSemanticTokens",
+      docUri,
+    );
+    assert.ok(
+      tokens && tokens.data && tokens.data.length > 0,
+      "Semantic tokens data should not be empty",
+    );
+  });
+
+  test("Feature v0.16.0: Math Validation Diagnostics (Delimiter Mismatch)", async function () {
+    const ws = vscode.workspace.workspaceFolders;
+    if (!ws || ws!.length === 0) throw new Error("No workspace open");
+    const docPath = path.resolve(ws![0].uri.fsPath, "math_error.tex");
+    const fs = require("fs");
+    fs.writeFileSync(
+      docPath,
+      "\\documentclass{article}\n\\begin{document}\n\\begin{equation}\n\\left( x + y\n\\end{equation}\n\\end{document}\n",
+    );
+    const docUri = vscode.Uri.file(docPath);
+    const doc = await vscode.workspace.openTextDocument(docUri);
+    await vscode.window.showTextDocument(doc);
+
+    await waitFor(
+      "Math Delimiter Diagnostics",
+      async () => {
+        const diags = vscode.languages.getDiagnostics(docUri);
+        return diags.some(
+          (d) =>
+            d.source === "ferrotex-math" ||
+            d.message.toLowerCase().includes("delimiter") ||
+            d.message.toLowerCase().includes("unmatched"),
+        );
+      },
+      15000,
+    );
+
+    const diags = vscode.languages.getDiagnostics(docUri);
+    const mathDiag = diags.find(
+      (d) =>
+        d.source === "ferrotex-math" ||
+        d.message.toLowerCase().includes("delimiter") ||
+        d.message.toLowerCase().includes("unmatched"),
+    );
+    assert.ok(mathDiag, "Math delimiter error diagnostic should be emitted");
+  });
+
+  test("Feature v0.16.0: Quick Fixes (Deprecated Commands Code Actions)", async function () {
+    const ws = vscode.workspace.workspaceFolders;
+    if (!ws || ws!.length === 0) throw new Error("No workspace open");
+    const docPath = path.resolve(ws![0].uri.fsPath, "deprecated.tex");
+    const fs = require("fs");
+    fs.writeFileSync(
+      docPath,
+      "\\documentclass{article}\n\\begin{document}\n{\\bf bold text}\n\\end{document}\n",
+    );
+    const docUri = vscode.Uri.file(docPath);
+    const doc = await vscode.workspace.openTextDocument(docUri);
+    await vscode.window.showTextDocument(doc);
+
+    // Wait for deprecated diagnostic to arrive
+    await waitFor(
+      "Deprecated Command Diagnostic",
+      async () => {
+        const diags = vscode.languages.getDiagnostics(docUri);
+        return diags.some(
+          (d) =>
+            d.code === "deprecated-command" ||
+            d.message.includes("\\bf") ||
+            d.message.includes("deprecated"),
+        );
+      },
+      15000,
+    );
+
+    const diags = vscode.languages.getDiagnostics(docUri);
+    const depDiag = diags.find(
+      (d) =>
+        d.code === "deprecated-command" ||
+        d.message.includes("\\bf") ||
+        d.message.includes("deprecated"),
+    );
+    assert.ok(depDiag, "Deprecated command diagnostic should be emitted for \\bf");
+
+    // Wait for code action to be registered and returned
+    await waitFor(
+      "Quick Fix Code Action",
+      async () => {
+        const actions = await vscode.commands.executeCommand<
+          (vscode.CodeAction | vscode.Command)[]
+        >("vscode.executeCodeActionProvider", docUri, depDiag.range);
+        return (
+          actions &&
+          actions.some(
+            (a: any) => a.title && (a.title.includes("textbf") || a.title.includes("Replace")),
+          )
+        );
+      },
+      15000,
+    );
+
+    const codeActions = await vscode.commands.executeCommand<
+      (vscode.CodeAction | vscode.Command)[]
+    >("vscode.executeCodeActionProvider", docUri, depDiag.range);
+
+    assert.ok(codeActions && codeActions.length > 0, "Quick fix code action should be available");
+    const fix = codeActions.find(
+      (a: any) => a.title && (a.title.includes("textbf") || a.title.includes("Replace")),
+    );
+    assert.ok(
+      fix,
+      `Code action should propose replacing \\bf with \\textbf, found: ${codeActions.map((c: any) => c.title || c.command).join(", ")}`,
+    );
+  });
 
   // ============================================================
   // Settings Validation Tests (v0.17.0)

@@ -1,0 +1,5 @@
+Stop downloading 5GB TeX Live packages just to write a LaTeX paper in VS Code.
+
+FerroTeX for Visual Studio Code is here: a zero-config, blazing fast LaTeX IDE platform. Instant split-view PDF preview with SyncTeX, algebraic math diagnostics that catch broken matrices as you type, intelligent snippet completion, and 1-click clipboard image pasting.
+
+Install now from the VS Code Marketplace or Open VSX: https://marketplace.visualstudio.com/items?itemName=ferrotex.ferrotex

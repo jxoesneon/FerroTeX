@@ -5,8 +5,39 @@ use std::process::Stdio;
 use tokio::io::AsyncBufReadExt;
 use tokio::process::Command;
 
+fn resolve_tectonic_binary() -> std::path::PathBuf {
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            let candidate = dir.join(if cfg!(windows) {
+                "tectonic.exe"
+            } else {
+                "tectonic"
+            });
+            if candidate.exists() {
+                return candidate;
+            }
+        }
+    }
+    if let Ok(path) = which::which("tectonic") {
+        return path;
+    }
+    std::path::PathBuf::from("tectonic")
+}
+
 /// Implementation of `BuildEngine` using the `tectonic` command-line tool.
 pub struct TectonicAdapter;
+
+impl Default for TectonicAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl TectonicAdapter {
+    pub fn new() -> Self {
+        Self
+    }
+}
 
 #[async_trait]
 impl BuildEngine for TectonicAdapter {
@@ -35,7 +66,8 @@ impl BuildEngine for TectonicAdapter {
         let out_dir = parent_dir.join("build");
         tokio::fs::create_dir_all(&out_dir).await?;
 
-        let mut child = Command::new("tectonic")
+        let tectonic_bin = resolve_tectonic_binary();
+        let mut child = Command::new(tectonic_bin)
             .arg("-o")
             .arg(&out_dir)
             .arg(&file_path)

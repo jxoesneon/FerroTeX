@@ -75,3 +75,7 @@ coverage/
 
 # Scratch/debug files
 inspect_multicol.rs
+
+# Obsidian local settings and credentials
+vault/.obsidian/
+
