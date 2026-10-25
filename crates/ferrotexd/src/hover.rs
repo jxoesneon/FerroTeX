@@ -34,6 +34,31 @@ pub fn find_hover(
         return handle_command_hover(&current.to_string(), workspace);
     }
 
+    // Check if we are inside a Group that belongs to a command like \cite
+    if current.kind() == SyntaxKind::Group {
+        let mut prev = current.prev_sibling_or_token();
+        while let Some(p) = prev {
+            match p {
+                rowan::NodeOrToken::Token(t) => {
+                    if t.kind() == SyntaxKind::Whitespace {
+                        prev = t.prev_sibling_or_token();
+                        continue;
+                    }
+                    if t.kind() == SyntaxKind::Command && t.text().starts_with("\\cite") {
+                        return handle_citation_hover(&current, workspace);
+                    }
+                    break;
+                }
+                rowan::NodeOrToken::Node(n) => {
+                    if n.kind() == SyntaxKind::Command && n.to_string().starts_with("\\cite") {
+                        return handle_citation_hover(&current, workspace);
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
     // Check for citation (can be inside command groups)
     while current.kind() != SyntaxKind::Root {
         match current.kind() {
@@ -499,6 +524,33 @@ mod tests {
             HoverContents::Markup(m) => {
                 assert!(m.value.contains("Knuth"));
                 assert!(m.value.contains("Art"));
+            }
+            _ => panic!("Wrong hover content type"),
+        }
+    }
+
+    #[test]
+    fn test_hover_citation_in_full_document() {
+        use tower_lsp::lsp_types::Url;
+        let workspace = crate::workspace::Workspace::default();
+        let doc_uri = Url::parse("file:///demo/main.tex").unwrap();
+        let bib_uri = Url::parse("file:///demo/refs.bib").unwrap();
+        workspace.update_bib(
+            &bib_uri,
+            "@article{knuth84, author={Donald E. Knuth}, title={The TeXbook}, year={1984}}",
+        );
+
+        let input = "\\documentclass{article}\n\\usepackage{amsmath}\n\\begin{document}\n\\section{Main Document}\\label{sec:main}\nThis is a test document citing Donald Knuth \\cite{knuth84}.\nSee section \\ref{sec:main}.\n\\bibliography{refs}\n\\end{document}";
+        workspace.update(&doc_uri, input);
+
+        let p = parse(input);
+        let offset = TextSize::from(input.find("knuth84").unwrap() as u32);
+        let hover = find_hover(&p.syntax(), offset, &workspace)
+            .expect("No citation hover found in full doc");
+        match hover.contents {
+            HoverContents::Markup(m) => {
+                assert!(m.value.contains("Knuth"), "Markup value: {}", m.value);
+                assert!(m.value.contains("The TeXbook"), "Markup value: {}", m.value);
             }
             _ => panic!("Wrong hover content type"),
         }

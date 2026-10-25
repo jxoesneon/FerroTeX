@@ -69,8 +69,9 @@ export async function validateBuildEngine() {
  */
 async function checkEngineAvailable(command: string): Promise<boolean> {
   return new Promise((resolve) => {
-    // Try to run --version to check if command exists
-    const proc = child_process.spawn(command, ["--version"]);
+    // Tectonic uses --help (-h) rather than --version; others accept --version
+    const arg = command.toLowerCase().includes("tectonic") ? "--help" : "--version";
+    const proc = child_process.spawn(command, [arg]);
 
     proc.on("error", () => resolve(false));
     proc.on("close", (code) => resolve(code === 0));

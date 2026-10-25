@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>FerroTeX for VS Code — Extension Launch Video</title>
+  <meta name="viewport" content="width=1280, height=720">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      background-color: #181a1f;
+      color: #f0f6fc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      position: relative;
+    }
+
+    /* Ambient VS Code Theme */
+    .bg-mesh {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 15% 20%, rgba(0, 122, 204, 0.15) 0%, transparent 45%),
+                  radial-gradient(circle at 85% 80%, rgba(46, 160, 67, 0.12) 0%, transparent 45%),
+                  #111317;
+      z-index: 1;
+    }
+    .grid-lines {
+      position: absolute;
+      inset: 0;
+      background-image: linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+      background-size: 32px 32px;
+      z-index: 2;
+    }
+
+    /* Scene Transitions */
+    .scene {
+      position: absolute;
+      inset: 0;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 44px;
+      z-index: 10;
+    }
+    .scene.active {
+      display: flex;
+    }
+
+    /* Common Components */
+    .badge-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      background: rgba(0, 122, 204, 0.18);
+      color: #388bfd;
+      border: 1px solid rgba(0, 122, 204, 0.35);
+      margin-bottom: 16px;
+    }
+    .title-large {
+      font-size: 46px;
+      font-weight: 800;
+      text-align: center;
+      line-height: 1.15;
+      letter-spacing: -0.5px;
+      margin-bottom: 14px;
+      color: #ffffff;
+    }
+    .subtitle {
+      font-size: 20px;
+      color: #9da7b3;
+      text-align: center;
+      max-width: 820px;
+      line-height: 1.45;
+    }
+
+    /* Scene 1: Legacy Pain */
+    .pain-card {
+      width: 700px;
+      background: #1e2228;
+      border: 1px solid #3b424e;
+      border-radius: 12px;
+      padding: 24px;
+      margin-top: 24px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+    }
+    .file-progress {
+      background: #282e38;
+      border-radius: 6px;
+      padding: 14px 18px;
+      margin-top: 12px;
+    }
+    .bar {
+      height: 8px;
+      background: #3e4654;
+      border-radius: 4px;
+      margin: 10px 0;
+      overflow: hidden;
+    }
+    .bar-fill {
+      width: 32%;
+      height: 100%;
+      background: #ff5f56;
+    }
+
+    /* Scene 2: VS Code Marketplace Hero */
+    .ext-card {
+      width: 820px;
+      background: #1f232a;
+      border: 1px solid #3b424e;
+      border-radius: 14px;
+      padding: 24px 32px;
+      display: flex;
+      gap: 28px;
+      align-items: center;
+      margin-top: 20px;
+      box-shadow: 0 20px 50px rgba(0, 122, 204, 0.2);
+    }
+    .ext-logo {
+      width: 110px;
+      height: 110px;
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      flex-shrink: 0;
+    }
+    .ext-logo img { width: 100%; height: 100%; object-fit: cover; }
+    .ext-info h2 { font-size: 24px; color: #ffffff; margin-bottom: 6px; }
+    .ext-info p { font-size: 14px; color: #8b949e; line-height: 1.4; margin-bottom: 12px; }
+    .badges-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .badge-pill {
+      background: #2d333b;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #adbac7;
+      border: 1px solid #444c56;
+    }
+
+    /* Scene 3: Feature Superpowers Carousel */
+    .feature-showcase-box {
+      width: 880px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 16px 48px rgba(0,0,0,0.7);
+      margin-top: 16px;
+      position: relative;
+    }
+    .feature-img { width: 100%; display: none; }
+    .feature-img.active-img { display: block; }
+    .feature-caption {
+      background: #1c2128;
+      padding: 12px 20px;
+      border-top: 1px solid #30363d;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    /* Scene 4: The 100x Speed Difference */
+    .matrix-table {
+      width: 780px;
+      border-collapse: collapse;
+      margin-top: 24px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.5);
+    }
+    .matrix-table th, .matrix-table td {
+      padding: 14px 20px;
+      text-align: left;
+      font-size: 15px;
+      border-bottom: 1px solid #21262d;
+    }
+    .matrix-table th { background: #21262d; color: #8b949e; font-weight: 600; }
+    .highlight-cell { color: #3fb950; font-weight: 700; }
+    .legacy-cell { color: #f85149; }
+
+    /* Scene 5: Outro */
+    .cta-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 14px;
+      padding: 36px 54px;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+      margin-top: 16px;
+    }
+    .install-cmd {
+      background: #0d1117;
+      border: 1px solid #388bfd;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-family: ui-monospace, monospace;
+      font-size: 18px;
+      color: #58a6ff;
+      margin: 18px 0;
+      display: inline-block;
+    }
+
+    /* Timeline Bar */
+    .timeline-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #007acc, #2ea043);
+      z-index: 100;
+      width: 0%;
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-mesh"></div>
+  <div class="grid-lines"></div>
+
+  <!-- Scene 1: 0.0s - 3.8s -->
+  <div class="scene" id="scene1">
+    <div class="badge-tag" style="border-color: #ff5f56; color: #ff7b72; background: rgba(255,95,86,0.15);">The Setup Nightmare</div>
+    <h1 class="title-large">LaTeX in VS Code shouldn't take all afternoon.</h1>
+    <p class="subtitle">5GB TeX Live downloads. Broken Perl paths. Cryptic logs.</p>
+    <div class="pain-card">
+      <div style="font-size: 15px; font-weight: 600; color: #f0f6fc;">MacTeX-2024.pkg — 5.42 GB</div>
+      <div class="file-progress">
+        <div style="display: flex; justify-content: space-between; font-size: 13px; color: #8b949e;">
+          <span>Downloading installer package...</span>
+          <span>3 hours 42 minutes remaining</span>
+        </div>
+        <div class="bar"><div class="bar-fill"></div></div>
+        <div style="font-size: 13px; color: #f85149; font-weight: 500;">⚠️ Error: Perl script 'latexmk' not found in PATH</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scene 2: 3.8s - 7.5s -->
+  <div class="scene" id="scene2">
+    <div class="badge-tag">Available Now</div>
+    <h1 class="title-large">Meet FerroTeX for VS Code</h1>
+    <p class="subtitle">Zero Configuration. Instant Startup. Powered by Rust 🦀</p>
+    <div class="ext-card">
+      <div class="ext-logo">
+        <img src="file:///Users/mey/FerroTex/editors/vscode/images/hero_banner.png" alt="FerroTeX Crab Icon">
+      </div>
+      <div class="ext-info">
+        <h2>FerroTeX</h2>
+        <p>The Scientific LaTeX IDE Platform. Replaces 5GB compilers with an on-demand, self-provisioning Rust engine.</p>
+        <div class="badges-row">
+          <span class="badge-pill" style="color: #58a6ff; border-color: #388bfd;">v0.25.0</span>
+          <span class="badge-pill" style="color: #f1e05a;">★★★★★ 5.0</span>
+          <span class="badge-pill" style="color: #3fb950; border-color: #2ea043;">88/88 E2E Tests</span>
+          <span class="badge-pill" style="color: #ff7b72;">0 TeX Live Needed</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scene 3: 7.5s - 13.8s -->
+  <div class="scene" id="scene3">
+    <div class="badge-tag" style="border-color: #3fb950; color: #3fb950; background: rgba(46,160,67,0.15);">Live Feature Walkthrough</div>
+    <h1 class="title-large" id="superpowerTitle" style="font-size: 38px; margin-bottom: 4px;">Live PDF Preview & SyncTeX</h1>
+    <p class="subtitle" id="superpowerSub" style="font-size: 16px;">Real-time background compile with instant split-pane viewer.</p>
+    
+    <div class="feature-showcase-box">
+      <img id="feat1" class="feature-img active-img" src="file:///Users/mey/FerroTex/editors/vscode/images/feature_preview.png" alt="Preview">
+      <img id="feat2" class="feature-img" src="file:///Users/mey/FerroTex/editors/vscode/images/feature_diagnostics.png" alt="Diagnostics">
+      <img id="feat3" class="feature-img" src="file:///Users/mey/FerroTex/editors/vscode/images/feature_completion.png" alt="Completion">
+      <img id="feat4" class="feature-img" src="file:///Users/mey/FerroTex/editors/vscode/images/feature_hover.png" alt="Hover">
+      <div class="feature-caption">
+        <span id="featLabel" style="color: #58a6ff;">Feature 1/4: Built-in PDF.js Viewer</span>
+        <span style="color: #8b949e;">Cmd + Alt + B to Build • SyncTeX Enabled</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scene 4: 13.8s - 17.0s -->
+  <div class="scene" id="scene4">
+    <div class="badge-tag">Benchmark Truth</div>
+    <h1 class="title-large">The 100x Performance Leap</h1>
+    <table class="matrix-table">
+      <thead>
+        <tr>
+          <th>Capability</th>
+          <th>Legacy LaTeX Tools</th>
+          <th>FerroTeX (v0.25.0)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Prerequisites</strong></td>
+          <td class="legacy-cell">5GB+ TeX Live / MacTeX + Perl</td>
+          <td class="highlight-cell">None (Auto-provisioned)</td>
+        </tr>
+        <tr>
+          <td><strong>Cold Startup Latency</strong></td>
+          <td class="legacy-cell">3.0 – 8.0 seconds</td>
+          <td class="highlight-cell">&lt; 45 milliseconds</td>
+        </tr>
+        <tr>
+          <td><strong>Memory Consumption</strong></td>
+          <td class="legacy-cell">300 – 800 MB</td>
+          <td class="highlight-cell">&lt; 40 MB</td>
+        </tr>
+        <tr>
+          <td><strong>Math Verification</strong></td>
+          <td class="legacy-cell">Superficial text regex</td>
+          <td class="highlight-cell">Algebraic AST Dimension Check</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Scene 5: 17.0s - 20.0s -->
+  <div class="scene" id="scene5">
+    <div class="badge-tag">Install in Seconds</div>
+    <h1 class="title-large" style="font-size: 50px;">Upgrade Your LaTeX Workflow.</h1>
+    <p class="subtitle">Open a .tex file and write immediately.</p>
+    <div class="cta-card">
+      <div style="font-size: 15px; color: #8b949e;">Quick install via VS Code CLI:</div>
+      <div class="install-cmd">code --install-extension ferrotex.ferrotex</div>
+      <div style="margin-top: 10px; font-size: 14px; color: #8b949e; display: flex; gap: 24px; justify-content: center;">
+        <span>⭐️ Visual Studio Marketplace</span>
+        <span>🟣 Open VSX Registry</span>
+        <span>🦀 100% Free & Open Source</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="timeline-bar" id="progressBar"></div>
+
+  <script>
+    window.renderAt = function(seconds) {
+      const s1 = document.getElementById('scene1');
+      const s2 = document.getElementById('scene2');
+      const s3 = document.getElementById('scene3');
+      const s4 = document.getElementById('scene4');
+      const s5 = document.getElementById('scene5');
+      const pBar = document.getElementById('progressBar');
+
+      const f1 = document.getElementById('feat1');
+      const f2 = document.getElementById('feat2');
+      const f3 = document.getElementById('feat3');
+      const f4 = document.getElementById('feat4');
+      const featTitle = document.getElementById('superpowerTitle');
+      const featSub = document.getElementById('superpowerSub');
+      const featLabel = document.getElementById('featLabel');
+
+      pBar.style.width = ((seconds / 20.0) * 100) + '%';
+
+      [s1, s2, s3, s4, s5].forEach(s => s.classList.remove('active'));
+
+      if (seconds < 3.8) {
+        s1.classList.add('active');
+      } else if (seconds < 7.5) {
+        s2.classList.add('active');
+      } else if (seconds < 13.8) {
+        s3.classList.add('active');
+
+        // Sub-carousel within Scene 3
+        [f1, f2, f3, f4].forEach(f => f.classList.remove('active-img'));
+        const subT = seconds - 7.5;
+        if (subT < 1.6) {
+          f1.classList.add('active-img');
+          featTitle.textContent = "Live PDF Preview & SyncTeX";
+          featSub.textContent = "Instant split-pane document rendering with bi-directional SyncTeX navigation.";
+          featLabel.textContent = "Feature 1/4: Live PDF.js Viewer";
+        } else if (subT < 3.2) {
+          f2.classList.add('active-img');
+          featTitle.textContent = "Algebraic Math Diagnostics & QuickFixes";
+          featSub.textContent = "Catches mismatched delimiters & jagged matrix rows with 1-click modernizations.";
+          featLabel.textContent = "Feature 2/4: Algebraic Verification";
+        } else if (subT < 4.8) {
+          f3.classList.add('active-img');
+          featTitle.textContent = "Contextual Autocompletion & Tab-Stops";
+          featSub.textContent = "Pre-balances environments and places active tab-stops for immediate math entry.";
+          featLabel.textContent = "Feature 3/4: Smart Snippets";
+        } else {
+          f4.classList.add('active-img');
+          featTitle.textContent = "Rich Hovers & Citation Metadata";
+          featSub.textContent = "Instantly inspect LaTeX package definitions, command syntax, and BibTeX citations.";
+          featLabel.textContent = "Feature 4/4: Rich Hover Engine";
+        }
+      } else if (seconds < 17.0) {
+        s4.classList.add('active');
+      } else {
+        s5.classList.add('active');
+      }
+    };
+
+    window.renderAt(0);
+  </script>
+</body>
+</html>

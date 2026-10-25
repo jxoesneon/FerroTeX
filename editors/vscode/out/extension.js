@@ -15,15 +15,27 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 }) : function(o, v) {
     o["default"] = v;
 });
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deactivate = exports.activate = void 0;
+exports.activate = activate;
+exports.deactivate = deactivate;
+const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const vscode = __importStar(require("vscode"));
 const node_1 = require("vscode-languageclient/node");
@@ -33,11 +45,78 @@ const installFerrotexd_1 = require("./installFerrotexd");
 const engineValidator_1 = require("./engineValidator");
 const imagePaste_1 = require("./imagePaste");
 let client;
+/**
+ * Resolves which TeX file to build for multi-file projects.
+ * Priority: %!TEX root magic comment → .ferrotex.json config → VS Code setting → main.tex heuristic → current file
+ */
+async function resolveBuildTargetFromUri(uri) {
+    const currentPath = uri.fsPath;
+    const dir = path.dirname(currentPath);
+    // 1. Check for %!TEX root magic comment
+    try {
+        const doc = await vscode.workspace.openTextDocument(uri);
+        const text = doc.getText();
+        const head = text.length > 1024 ? text.substring(0, 1024) : text;
+        const magicMatch = head.match(/^%\s*!TEX\s+root\s*=\s*(.+)$/im);
+        if (magicMatch) {
+            const rootPath = magicMatch[1].trim();
+            const resolved = path.resolve(dir, rootPath);
+            if (fs.existsSync(resolved)) {
+                return vscode.Uri.file(resolved).toString();
+            }
+        }
+    }
+    catch {
+        // Can't read document, continue
+    }
+    // 2. .ferrotex.json config (walk up parent directories)
+    let currentDir = dir;
+    for (let i = 0; i < 20; i++) {
+        const configPath = path.join(currentDir, ".ferrotex.json");
+        if (fs.existsSync(configPath)) {
+            try {
+                const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+                if (config.mainFile) {
+                    const mainPath = path.resolve(currentDir, config.mainFile);
+                    if (fs.existsSync(mainPath)) {
+                        return vscode.Uri.file(mainPath).toString();
+                    }
+                }
+            }
+            catch {
+                // Invalid JSON, continue
+            }
+        }
+        const parent = path.dirname(currentDir);
+        if (parent === currentDir)
+            break;
+        currentDir = parent;
+    }
+    // 3. Check VS Code setting ferrotex.build.mainFile
+    const config = vscode.workspace.getConfiguration("ferrotex");
+    const mainFileSetting = config.get("build.mainFile", "");
+    if (mainFileSetting) {
+        const mainPath = path.resolve(dir, mainFileSetting);
+        if (fs.existsSync(mainPath)) {
+            return vscode.Uri.file(mainPath).toString();
+        }
+    }
+    // 4. Check for main.tex heuristic
+    const mainTexPath = path.join(dir, "main.tex");
+    if (fs.existsSync(mainTexPath) && mainTexPath !== currentPath) {
+        return vscode.Uri.file(mainTexPath).toString();
+    }
+    // 5. Fallback to current file
+    return uri.toString();
+}
+async function resolveBuildTarget(editor) {
+    return resolveBuildTargetFromUri(editor.document.uri);
+}
 async function activate(context) {
     const config = vscode.workspace.getConfiguration("ferrotex");
     let serverPath = config.get("serverPath");
-    // UX-Upgrade: Frictionless Install
-    (0, installTectonic_1.checkAndInstallTectonic)(context);
+    // Self-install Tectonic engine from jxoesneon/tectonic if not present
+    await (0, installTectonic_1.checkAndInstallTectonic)(context);
     // Validate build engine when configuration changes
     context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(async (e) => {
         if (e.affectsConfiguration("ferrotex.build.engine")) {
@@ -93,7 +172,7 @@ async function activate(context) {
         }
         // Auto-save before build
         await editor.document.save();
-        const uri = editor.document.uri.toString();
+        const uri = await resolveBuildTarget(editor);
         try {
             await client.sendRequest("workspace/executeCommand", {
                 command: "ferrotex.internal.build",
@@ -143,17 +222,19 @@ async function activate(context) {
         // Try to find the PDF
         // 1. Check build/ subdirectory (common output location)
         // 2. Check same directory as source
-        const baseName = path.basename(texUri.fsPath, path.extname(texUri.fsPath));
-        const dirName = path.dirname(texUri.fsPath);
-        const possiblePdfPaths = [
-            path.join(dirName, "build", `${baseName}.pdf`),
-            path.join(dirName, `${baseName}.pdf`),
+        const rootUriString = await resolveBuildTargetFromUri(texUri);
+        const rootUri = vscode.Uri.parse(rootUriString);
+        const baseName = path.basename(rootUri.fsPath, path.extname(rootUri.fsPath));
+        const dirName = path.dirname(rootUri.fsPath);
+        const possibleUris = [
+            rootUri.with({ path: path.join(dirName, "build", `${baseName}.pdf`) }),
+            rootUri.with({ path: path.join(dirName, `${baseName}.pdf`) }),
         ];
         let pdfUri = null;
-        for (const pdfPath of possiblePdfPaths) {
+        for (const candidate of possibleUris) {
             try {
-                await vscode.workspace.fs.stat(vscode.Uri.file(pdfPath));
-                pdfUri = vscode.Uri.file(pdfPath);
+                await vscode.workspace.fs.stat(candidate);
+                pdfUri = candidate;
                 break;
             }
             catch {
@@ -171,10 +252,10 @@ async function activate(context) {
                 });
                 // Wait a bit for build to complete and try again
                 await new Promise((resolve) => setTimeout(resolve, 500));
-                for (const pdfPath of possiblePdfPaths) {
+                for (const candidate of possibleUris) {
                     try {
-                        await vscode.workspace.fs.stat(vscode.Uri.file(pdfPath));
-                        pdfUri = vscode.Uri.file(pdfPath);
+                        await vscode.workspace.fs.stat(candidate);
+                        pdfUri = candidate;
                         break;
                     }
                     catch {
@@ -238,7 +319,7 @@ async function activate(context) {
             return;
         }
         // Trigger build
-        const uri = document.uri.toString();
+        const uri = await resolveBuildTargetFromUri(document.uri);
         try {
             await client.sendRequest("workspace/executeCommand", {
                 command: "ferrotex.internal.build",
@@ -270,12 +351,10 @@ async function activate(context) {
         vscode.window.showErrorMessage(`FerroTeX Server Failed to Start: ${e.message || e}`);
     });
 }
-exports.activate = activate;
 function deactivate() {
     if (!client) {
         return undefined;
     }
     return client.stop();
 }
-exports.deactivate = deactivate;
 //# sourceMappingURL=extension.js.map

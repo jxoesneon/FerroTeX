@@ -19,7 +19,7 @@ let errors = 0;
 let warnings = 0;
 
 // Expected settings count
-const expectedCount = 32;
+const expectedCount = 38;
 const actualCount = Object.keys(props).length;
 
 if (actualCount !== expectedCount) {
@@ -71,6 +71,12 @@ const settingsToValidate = [
   { key: "ferrotex.workspace.excludePatterns", type: "array", hasDefault: true },
   { key: "ferrotex.diagnostics.humanReadableErrors", type: "boolean", hasDefault: true },
   { key: "ferrotex.diagnostics.showCode", type: "boolean", hasDefault: true },
+  { key: "ferrotex.build.tectonicPath", type: "string", hasDefault: true },
+  { key: "ferrotex.build.latexmkPath", type: "string", hasDefault: true },
+  { key: "ferrotex.build.pdflatexPath", type: "string", hasDefault: true },
+  { key: "ferrotex.build.xelatexPath", type: "string", hasDefault: true },
+  { key: "ferrotex.build.lualatexPath", type: "string", hasDefault: true },
+  { key: "ferrotex.build.mainFile", type: "string", hasDefault: true },
 ];
 
 console.log("\n📋 Validating Individual Settings:\n");

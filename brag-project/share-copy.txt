@@ -1,0 +1,5 @@
+LaTeX has powered human discovery for 40 years, but its toolchain was stuck in 1984. 
+
+We built FerroTeX: a modern, institutional-grade scientific LaTeX platform written entirely in safe, concurrent Rust 🦀. Lossless CST parsing via rowan, algebraic math verification, hermetic ferrotex.lock reproducible builds, and an interactive DAP stepping debugger—with <45ms cold startup and zero 5GB TeX Live installation.
+
+Open source on GitHub: https://github.com/jxoesneon/FerroTex

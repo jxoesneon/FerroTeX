@@ -1,0 +1,18 @@
+\documentclass{article}
+\usepackage{amsmath}
+
+\begin{document}
+\section{Semantic Diagnostics}
+
+% Delimiter balance error: unmatched \left
+\begin{equation}
+  f(x) = \left( \frac{1}{1 + e^{-x}}
+\end{equation}
+
+% Matrix dimension mismatch: jagged rows
+\begin{pmatrix}
+  1 & 0 & 0 \\
+  0 & 1
+\end{pmatrix}
+
+\end{document}
