@@ -71,3 +71,20 @@ summary: "Ciel's active cognitive working memory and current operational context
   2. [`README.md`](file:///Users/mey/FerroTex/README.md): Elevated root GitHub showcase with unified badges, "Replaces Legacy Stack" callout, 4 feature GIF cards, Mermaid architecture diagram, visual benchmark meters, 10-crate ecosystem map, and Neovim/Helix config drawers.
   3. [`editors/vscode/README.md`](file:///Users/mey/FerroTex/editors/vscode/README.md): Elevated VS Code Marketplace showcase with comparison matrix, 10-second quickstart, command palette cheat sheet, 38-setting configuration drawer, image paste wizard spotlight, and interactive FAQ.
   4. Repackaged distribution VSIX: `editors/vscode/ferrotex-0.25.0.vsix` and `ferrotex.vsix` (33.51 MB).
+
+
+### [21:28] Full /brag Launch Suites, CI Gate Remediation, & PR #197 Delivery
+- **Full Launch Suites Delivered**:
+  - `brag-project/`: 20-second 720p HD video with Happy Beats Vol 1 soundtrack, settled poster frame, and social launch copy.
+  - `brag-extension/`: 20-second 720p HD video with Happy Beats Vol 11 soundtrack, settled poster frame, and social launch copy.
+  - Interactive Launch Theater hosted at `file:///tmp/ferrotex_launch_theater.html`.
+  - Mirrored showcase GIFs: `editors/vscode/images/brag_project.gif` (1.01 MB) and `editors/vscode/images/brag_extension.gif` (941 KB) embedded at the head of showcase sections in `README.md` and `editors/vscode/README.md`.
+- **Branch & Pull Request**:
+  - Branch: `feat/showcase-excellence-and-brag`
+  - GitHub PR: [jxoesneon/FerroTeX#197](https://github.com/jxoesneon/FerroTex/pull/197)
+- **CI Gate Remediations**:
+  - TeX Live smoke build: Escaped math ampersand `\&` and wrapped matrix in math block in `tests/tex/smoke/main.tex`.
+  - Markdownlint & Prettier: Ignored external `vault/` and `brag-*/` directories; auto-formatted all repository files with Prettier.
+  - Security Audit: Documented transitive advisory waivers across `.audit.toml`, `.cargo/audit.toml`, and `.github/workflows/ci.yml`.
+  - External Link Check: Switched extension README image sources to relative paths and added GitHub raw URLs to ignore patterns.
+  - Distribution Artifact: Rebuilt `editors/vscode/ferrotex-0.25.0.vsix` and `ferrotex.vsix` (35.33 MB).
