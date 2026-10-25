@@ -14,10 +14,18 @@ suite("Engine Validator Test Suite", () => {
 
   suiteTeardown(async () => {
     if (originalEngine !== undefined) {
-      await getConfig().update("build.engine", originalEngine, vscode.ConfigurationTarget.Workspace);
+      await getConfig().update(
+        "build.engine",
+        originalEngine,
+        vscode.ConfigurationTarget.Workspace,
+      );
     }
     if (originalSync !== undefined) {
-      await getConfig().update("preview.syncToSource", originalSync, vscode.ConfigurationTarget.Workspace);
+      await getConfig().update(
+        "preview.syncToSource",
+        originalSync,
+        vscode.ConfigurationTarget.Workspace,
+      );
     }
   });
 

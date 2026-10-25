@@ -88,7 +88,10 @@ suite("Image Paste Provider Document Edits Test Suite", () => {
     assert.strictEqual(edits.length, 1, "Should return exactly one edit");
 
     const snippet = edits[0].insertText as vscode.SnippetString;
-    assert.ok(snippet.value.startsWith("\\includegraphics{"), "Should emit \\includegraphics snippet");
+    assert.ok(
+      snippet.value.startsWith("\\includegraphics{"),
+      "Should emit \\includegraphics snippet",
+    );
     assert.ok(snippet.value.includes("figures/"), "Should target figures directory");
   });
 });

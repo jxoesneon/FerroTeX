@@ -47,7 +47,11 @@ suite("PDF Preview Provider Test Suite", () => {
 
   test("openCustomDocument: returns document with valid URI and dispose method", () => {
     const uri = vscode.Uri.file(tempPdfPath);
-    const doc = provider.openCustomDocument(uri, {} as any, new vscode.CancellationTokenSource().token);
+    const doc = provider.openCustomDocument(
+      uri,
+      {} as any,
+      new vscode.CancellationTokenSource().token,
+    );
     assert.strictEqual(doc.uri.toString(), uri.toString());
     assert.strictEqual(typeof doc.dispose, "function");
     doc.dispose(); // Should not throw
@@ -55,7 +59,11 @@ suite("PDF Preview Provider Test Suite", () => {
 
   test("resolveCustomEditor: initializes webview with options, HTML, and disposal hooks", async () => {
     const docUri = vscode.Uri.file(tempPdfPath);
-    const doc = provider.openCustomDocument(docUri, {} as any, new vscode.CancellationTokenSource().token);
+    const doc = provider.openCustomDocument(
+      docUri,
+      {} as any,
+      new vscode.CancellationTokenSource().token,
+    );
 
     let disposed = false;
     let webviewHtml = "";

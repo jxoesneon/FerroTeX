@@ -20,10 +20,7 @@ suite("Extension Commands & Target Resolution Test Suite", () => {
       mainPath,
       "\\documentclass{article}\n\\begin{document}\n\\include{chapter}\n\\end{document}\n",
     );
-    fs.writeFileSync(
-      subPath,
-      "% !TEX root = main.tex\n\\section{Chapter}\nChapter content.\n",
-    );
+    fs.writeFileSync(subPath, "% !TEX root = main.tex\n\\section{Chapter}\nChapter content.\n");
 
     mainDoc = await vscode.workspace.openTextDocument(vscode.Uri.file(mainPath));
     subDoc = await vscode.workspace.openTextDocument(vscode.Uri.file(subPath));

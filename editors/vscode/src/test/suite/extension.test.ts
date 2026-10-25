@@ -357,10 +357,7 @@ suite("Regression Suite v2 (Comprehensive)", function () {
     const names = symbols.map((s) => s.name);
     assert.ok(
       names.some(
-        (n) =>
-          n.includes("Main Section") ||
-          n.includes("sec:main") ||
-          n.includes("equation"),
+        (n) => n.includes("Main Section") || n.includes("sec:main") || n.includes("equation"),
       ),
       `Symbols should contain section, label, or equation, found: ${names.join(", ")}`,
     );
@@ -485,8 +482,7 @@ suite("Regression Suite v2 (Comprehensive)", function () {
         return (
           actions &&
           actions.some(
-            (a: any) =>
-              a.title && (a.title.includes("textbf") || a.title.includes("Replace")),
+            (a: any) => a.title && (a.title.includes("textbf") || a.title.includes("Replace")),
           )
         );
       },
@@ -497,13 +493,9 @@ suite("Regression Suite v2 (Comprehensive)", function () {
       (vscode.CodeAction | vscode.Command)[]
     >("vscode.executeCodeActionProvider", docUri, depDiag.range);
 
-    assert.ok(
-      codeActions && codeActions.length > 0,
-      "Quick fix code action should be available",
-    );
+    assert.ok(codeActions && codeActions.length > 0, "Quick fix code action should be available");
     const fix = codeActions.find(
-      (a: any) =>
-        a.title && (a.title.includes("textbf") || a.title.includes("Replace")),
+      (a: any) => a.title && (a.title.includes("textbf") || a.title.includes("Replace")),
     );
     assert.ok(
       fix,

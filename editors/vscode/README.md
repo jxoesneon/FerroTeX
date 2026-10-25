@@ -24,23 +24,24 @@
 
 ## ⚡ The FerroTeX Difference
 
-| Feature | Legacy LaTeX Extensions | FerroTeX (v0.25.0) |
-| :--- | :--- | :--- |
-| **Prerequisites** | 5GB+ TeX Live / MacTeX + Perl | **None.** Bundled on-demand engine |
-| **Cold Startup Latency** | 3 – 8 seconds | **< 45 milliseconds** |
-| **Memory Footprint** | 300 MB – 800 MB | **< 40 MB** |
-| **Math Verification** | Superficial text regex | **Deep AST dimension & delimiter tracking** |
-| **Compilation Errors** | 100-line raw log dumps | **Mapped inline diagnostics with 1-click Quick Fixes** |
-| **Live PDF Preview** | External viewer or heavy plugins | **Built-in PDF.js viewer with instant auto-reload** |
-| **Step Debugging** | None | **Full DAP register & macro stepping** |
-| **Image Paste Wizard** | Manual file copying & typing | **1-click clipboard paste with auto-generated snippets** |
-| **Reproducibility** | Machine-dependent | **Hermetic `ferrotex.lock` dependency tracking** |
+| Feature                  | Legacy LaTeX Extensions          | FerroTeX (v0.25.0)                                       |
+| :----------------------- | :------------------------------- | :------------------------------------------------------- |
+| **Prerequisites**        | 5GB+ TeX Live / MacTeX + Perl    | **None.** Bundled on-demand engine                       |
+| **Cold Startup Latency** | 3 – 8 seconds                    | **< 45 milliseconds**                                    |
+| **Memory Footprint**     | 300 MB – 800 MB                  | **< 40 MB**                                              |
+| **Math Verification**    | Superficial text regex           | **Deep AST dimension & delimiter tracking**              |
+| **Compilation Errors**   | 100-line raw log dumps           | **Mapped inline diagnostics with 1-click Quick Fixes**   |
+| **Live PDF Preview**     | External viewer or heavy plugins | **Built-in PDF.js viewer with instant auto-reload**      |
+| **Step Debugging**       | None                             | **Full DAP register & macro stepping**                   |
+| **Image Paste Wizard**   | Manual file copying & typing     | **1-click clipboard paste with auto-generated snippets** |
+| **Reproducibility**      | Machine-dependent                | **Hermetic `ferrotex.lock` dependency tracking**         |
 
 ---
 
 ## 🎬 Real Feature Walkthrough
 
 ### 1. Zero-Config Build & Live PDF Preview with SyncTeX
+
 Compile complex documents on a clean machine without installing external TeX distributions. The integrated PDF viewer automatically re-renders on save with responsive auto-fit scaling and SyncTeX synchronization.
 
 > **Key Shortcut**: Press <kbd>Cmd</kbd>+<kbd>Alt</kbd>+<kbd>B</kbd> (macOS) or <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>B</kbd> (Windows/Linux) to build, and click the **PDF Preview** icon in the editor toolbar.
@@ -52,6 +53,7 @@ Compile complex documents on a clean machine without installing external TeX dis
 ---
 
 ### 2. Semantic Math Diagnostics & One-Click Quick Fixes
+
 FerroTeX continuously validates your mathematical environments in real-time. Jagged matrix rows (dimension mismatches) and unmatched delimiters are surfaced with exact line squiggles, and deprecated LaTeX 2.09 commands (`\bf`, `\it`, `$$...$$`) offer one-click automatic modernizations.
 
 > **Key Shortcut**: Place cursor on any warning squiggle and press <kbd>Cmd</kbd>+<kbd>.</kbd> / <kbd>Ctrl</kbd>+<kbd>.</kbd> to apply the suggested quick fix.
@@ -63,6 +65,7 @@ FerroTeX continuously validates your mathematical environments in real-time. Jag
 ---
 
 ### 3. Contextual Autocompletion & Tab-Stop Snippets
+
 Intelligent completions adapt dynamically to your cursor context. Type `\begin{pm` and press Tab to expand a full `pmatrix` environment with pre-balanced delimiters and cursor tab stops positioned for immediate element entry.
 
 > **Key Shortcut**: Press <kbd>Ctrl</kbd>+<kbd>Space</kbd> anywhere to trigger contextual suggestions.
@@ -74,6 +77,7 @@ Intelligent completions adapt dynamically to your cursor context. Type `\begin{p
 ---
 
 ### 4. Rich Citation & Macro Hover Documentation
+
 Hover over any citation key (`\cite{...}`) to view author, title, publication venue, and DOI extracted directly from your `.bib` library. Hovering over LaTeX commands displays rich signatures, required packages, and parameter explanations.
 
 <p align="center">
@@ -97,19 +101,20 @@ Step 3: Click the split-view Preview icon in the editor title bar
 
 ## ⌨️ Command Palette & Keybinding Reference
 
-| Command Title | Command Identifier | Keybinding (macOS) | Keybinding (Win/Linux) |
-| :--- | :--- | :---: | :---: |
-| **FerroTeX: Build Document** | `ferrotex.build` | <kbd>Cmd</kbd>+<kbd>Alt</kbd>+<kbd>B</kbd> | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>B</kbd> |
-| **FerroTeX: Open PDF Preview** | `ferrotex.openPreview` | *Editor Title Icon* | *Editor Title Icon* |
-| **FerroTeX: Sync to PDF** | `ferrotex.syncToPdf` | <kbd>Cmd</kbd>+<kbd>Alt</kbd>+<kbd>J</kbd> | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>J</kbd> |
-| **FerroTeX: Clean Auxiliary Files** | `ferrotex.clean` | *Command Palette* | *Command Palette* |
-| **FerroTeX: Install Tectonic Engine** | `ferrotex.installTectonic` | *Command Palette* | *Command Palette* |
+| Command Title                         | Command Identifier         |             Keybinding (macOS)             |           Keybinding (Win/Linux)            |
+| :------------------------------------ | :------------------------- | :----------------------------------------: | :-----------------------------------------: |
+| **FerroTeX: Build Document**          | `ferrotex.build`           | <kbd>Cmd</kbd>+<kbd>Alt</kbd>+<kbd>B</kbd> | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>B</kbd> |
+| **FerroTeX: Open PDF Preview**        | `ferrotex.openPreview`     |            _Editor Title Icon_             |             _Editor Title Icon_             |
+| **FerroTeX: Sync to PDF**             | `ferrotex.syncToPdf`       | <kbd>Cmd</kbd>+<kbd>Alt</kbd>+<kbd>J</kbd> | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>J</kbd> |
+| **FerroTeX: Clean Auxiliary Files**   | `ferrotex.clean`           |             _Command Palette_              |              _Command Palette_              |
+| **FerroTeX: Install Tectonic Engine** | `ferrotex.installTectonic` |             _Command Palette_              |              _Command Palette_              |
 
 ---
 
 ## 🖼️ Clipboard Image Paste Wizard
 
 Pasting diagrams and screenshots into your LaTeX paper is effortless:
+
 1. Copy any image to your clipboard (screenshot, diagram, web image).
 2. Inside any `.tex` file, press <kbd>Cmd</kbd>+<kbd>V</kbd> / <kbd>Ctrl</kbd>+<kbd>V</kbd>.
 3. FerroTeX automatically prompts for a clean filename, saves the PNG into your project's `figures/` directory, and inserts the formatted `\begin{figure}` snippet right at your cursor.
@@ -121,41 +126,44 @@ Pasting diagrams and screenshots into your LaTeX paper is effortless:
 <details open>
 <summary><strong>Core & Build Engine Settings</strong></summary>
 
-| Setting Key | Type | Default | Description |
-| :--- | :---: | :---: | :--- |
-| `ferrotex.build.engine` | `enum` | `"auto"` | Compiler engine (`"auto"`, `"tectonic"`, `"latexmk"`, `"pdflatex"`, `"xelatex"`, `"lualatex"`). |
-| `ferrotex.build.autoBuildOnSave` | `boolean` | `false` | Automatically recompile document when saving. |
-| `ferrotex.build.outputDirectory` | `string` | `""` | Directory for build artifacts (e.g. `"build"`). |
-| `ferrotex.build.cleanAuxiliaryFiles` | `boolean` | `false` | Automatically clean auxiliary files (`.aux`, `.log`, etc.) after build. |
-| `ferrotex.build.showOutputPanel` | `enum` | `"onError"` | When to reveal the build output panel (`"always"`, `"onError"`, `"never"`). |
-| `ferrotex.serverPath` | `string` | `"ferrotexd"` | Custom path to the `ferrotexd` binary. |
+| Setting Key                          |   Type    |    Default    | Description                                                                                     |
+| :----------------------------------- | :-------: | :-----------: | :---------------------------------------------------------------------------------------------- |
+| `ferrotex.build.engine`              |  `enum`   |   `"auto"`    | Compiler engine (`"auto"`, `"tectonic"`, `"latexmk"`, `"pdflatex"`, `"xelatex"`, `"lualatex"`). |
+| `ferrotex.build.autoBuildOnSave`     | `boolean` |    `false`    | Automatically recompile document when saving.                                                   |
+| `ferrotex.build.outputDirectory`     | `string`  |     `""`      | Directory for build artifacts (e.g. `"build"`).                                                 |
+| `ferrotex.build.cleanAuxiliaryFiles` | `boolean` |    `false`    | Automatically clean auxiliary files (`.aux`, `.log`, etc.) after build.                         |
+| `ferrotex.build.showOutputPanel`     |  `enum`   |  `"onError"`  | When to reveal the build output panel (`"always"`, `"onError"`, `"never"`).                     |
+| `ferrotex.serverPath`                | `string`  | `"ferrotexd"` | Custom path to the `ferrotexd` binary.                                                          |
+
 </details>
 
 <details>
 <summary><strong>Diagnostics, Linting & Semantic Verification Settings (Click to Expand)</strong></summary>
 
-| Setting Key | Type | Default | Description |
-| :--- | :---: | :---: | :--- |
-| `ferrotex.lint.enabled` | `boolean` | `true` | Master toggle for background document linting. |
-| `ferrotex.lint.onType` | `boolean` | `true` | Validate document continuously as you type. |
-| `ferrotex.lint.checkMath` | `boolean` | `true` | Enable algebraic matrix dimension and delimiter validation. |
-| `ferrotex.lint.checkCitations` | `boolean` | `true` | Validate citation keys against loaded `.bib` files. |
-| `ferrotex.lint.checkPackages` | `boolean` | `true` | Verify package availability and imports. |
-| `ferrotex.diagnostics.humanReadableErrors` | `boolean` | `true` | Translate low-level TeX errors into plain, actionable advice. |
-| `ferrotex.diagnostics.showCode` | `boolean` | `true` | Show error codes in diagnostic tooltips. |
+| Setting Key                                |   Type    | Default | Description                                                   |
+| :----------------------------------------- | :-------: | :-----: | :------------------------------------------------------------ |
+| `ferrotex.lint.enabled`                    | `boolean` | `true`  | Master toggle for background document linting.                |
+| `ferrotex.lint.onType`                     | `boolean` | `true`  | Validate document continuously as you type.                   |
+| `ferrotex.lint.checkMath`                  | `boolean` | `true`  | Enable algebraic matrix dimension and delimiter validation.   |
+| `ferrotex.lint.checkCitations`             | `boolean` | `true`  | Validate citation keys against loaded `.bib` files.           |
+| `ferrotex.lint.checkPackages`              | `boolean` | `true`  | Verify package availability and imports.                      |
+| `ferrotex.diagnostics.humanReadableErrors` | `boolean` | `true`  | Translate low-level TeX errors into plain, actionable advice. |
+| `ferrotex.diagnostics.showCode`            | `boolean` | `true`  | Show error codes in diagnostic tooltips.                      |
+
 </details>
 
 <details>
 <summary><strong>Editor, Hover & Image Paste Settings (Click to Expand)</strong></summary>
 
-| Setting Key | Type | Default | Description |
-| :--- | :---: | :---: | :--- |
-| `ferrotex.hover.enabled` | `boolean` | `true` | Show rich hover tooltips for commands and packages. |
-| `ferrotex.hover.citations` | `boolean` | `true` | Extract and preview BibTeX metadata on hover. |
-| `ferrotex.imagePaste.enabled` | `boolean` | `true` | Enable clipboard image paste wizard on <kbd>Cmd</kbd>+<kbd>V</kbd>. |
-| `ferrotex.imagePaste.defaultDirectory` | `string` | `"figures"` | Relative destination folder for pasted images. |
-| `ferrotex.format.enabled` | `boolean` | `true` | Enable document formatting. |
-| `ferrotex.format.indentSize` | `number` | `2` | Number of spaces per indentation level. |
+| Setting Key                            |   Type    |   Default   | Description                                                         |
+| :------------------------------------- | :-------: | :---------: | :------------------------------------------------------------------ |
+| `ferrotex.hover.enabled`               | `boolean` |   `true`    | Show rich hover tooltips for commands and packages.                 |
+| `ferrotex.hover.citations`             | `boolean` |   `true`    | Extract and preview BibTeX metadata on hover.                       |
+| `ferrotex.imagePaste.enabled`          | `boolean` |   `true`    | Enable clipboard image paste wizard on <kbd>Cmd</kbd>+<kbd>V</kbd>. |
+| `ferrotex.imagePaste.defaultDirectory` | `string`  | `"figures"` | Relative destination folder for pasted images.                      |
+| `ferrotex.format.enabled`              | `boolean` |   `true`    | Enable document formatting.                                         |
+| `ferrotex.format.indentSize`           | `number`  |     `2`     | Number of spaces per indentation level.                             |
+
 </details>
 
 ---

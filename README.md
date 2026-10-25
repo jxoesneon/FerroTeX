@@ -29,6 +29,7 @@ For four decades, LaTeX has remained the indisputable gold standard for academic
 **FerroTeX transforms LaTeX into an institutional-grade modern language platform.**
 
 Built entirely in safe, concurrent **Rust** 🦀, FerroTeX provides:
+
 1. **Lossless Concrete Syntax Trees (`rowan`)**: Retains 100% of source fidelity including comments, whitespace, and invalid trivia with instant fault recovery.
 2. **Algebraic Semantic Analysis**: Deep mathematical understanding that validates matrix dimensions and balances nested delimiters before compilation.
 3. **Hermetic Content-Addressable Builds (`ferrotex.lock`)**: Deterministic SHA256 dependency lockfiles guaranteeing that if your paper compiles today, it compiles identically forever.
@@ -147,18 +148,18 @@ graph TD
 
 ### Workspace Member Crates
 
-| Crate | Responsibility | Key Technologies |
-| :--- | :--- | :--- |
-| **[`crates/ferrotexd`](file:///Users/mey/FerroTex/crates/ferrotexd)** | LSP Daemon | `tower-lsp`, async Tokio runtime, sub-millisecond document sync |
-| **[`crates/ferrotex-syntax`](file:///Users/mey/FerroTex/crates/ferrotex-syntax)** | Lossless CST Parser | `rowan`, full trivia preservation, fault-tolerant error recovery |
-| **[`crates/ferrotex-analysis`](file:///Users/mey/FerroTex/crates/ferrotex-analysis)** | Semantic Analysis | Scope resolution, cross-file reference indexing, macro loops |
-| **[`crates/ferrotex-math-semantics`](file:///Users/mey/FerroTex/crates/ferrotex-math-semantics)** | Algebraic Verification | Matrix dimension tracking, delimiter nesting, math environments |
-| **[`crates/ferrotex-build`](file:///Users/mey/FerroTex/crates/ferrotex-build)** | Hermetic Build Graph | DAG compiler engine, Tectonic adapter, step execution |
-| **[`crates/ferrotex-dap`](file:///Users/mey/FerroTex/crates/ferrotex-dap)** | Debug Adapter Protocol | Stepping execution, TeX register shadow inspection (`\count`, `\dimen`) |
-| **[`crates/ferrotex-log`](file:///Users/mey/FerroTex/crates/ferrotex-log)** | Structured Log IR | Zero-allocation streaming parser parsing >65 MB/s of raw TeX logs |
-| **[`crates/ferrotex-package`](file:///Users/mey/FerroTex/crates/ferrotex-package)** | Package Registry | Content-addressed lockfile generation, CTAN package resolution |
-| **[`crates/ferrotex-core`](file:///Users/mey/FerroTex/crates/ferrotex-core)** | Core Primitives | Virtual File System (VFS), line indices, document abstractions |
-| **[`crates/ferrotex-cli`](file:///Users/mey/FerroTex/crates/ferrotex-cli)** | Command-Line Interface | `clap v4`, headless compilation, standalone workspace linting |
+| Crate                                                                  | Responsibility         | Key Technologies                                                        |
+| :--------------------------------------------------------------------- | :--------------------- | :---------------------------------------------------------------------- |
+| **[`crates/ferrotexd`](crates/ferrotexd)**                             | LSP Daemon             | `tower-lsp`, async Tokio runtime, sub-millisecond document sync         |
+| **[`crates/ferrotex-syntax`](crates/ferrotex-syntax)**                 | Lossless CST Parser    | `rowan`, full trivia preservation, fault-tolerant error recovery        |
+| **[`crates/ferrotex-analysis`](crates/ferrotex-analysis)**             | Semantic Analysis      | Scope resolution, cross-file reference indexing, macro loops            |
+| **[`crates/ferrotex-math-semantics`](crates/ferrotex-math-semantics)** | Algebraic Verification | Matrix dimension tracking, delimiter nesting, math environments         |
+| **[`crates/ferrotex-build`](crates/ferrotex-build)**                   | Hermetic Build Graph   | DAG compiler engine, Tectonic adapter, step execution                   |
+| **[`crates/ferrotex-dap`](crates/ferrotex-dap)**                       | Debug Adapter Protocol | Stepping execution, TeX register shadow inspection (`\count`, `\dimen`) |
+| **[`crates/ferrotex-log`](crates/ferrotex-log)**                       | Structured Log IR      | Zero-allocation streaming parser parsing >65 MB/s of raw TeX logs       |
+| **[`crates/ferrotex-package`](crates/ferrotex-package)**               | Package Registry       | Content-addressed lockfile generation, CTAN package resolution          |
+| **[`crates/ferrotex-core`](crates/ferrotex-core)**                     | Core Primitives        | Virtual File System (VFS), line indices, document abstractions          |
+| **[`crates/ferrotex-cli`](crates/ferrotex-cli)**                       | Command-Line Interface | `clap v4`, headless compilation, standalone workspace linting           |
 
 ---
 
@@ -180,22 +181,24 @@ Memory Footprint (Active Workspace)
   Legacy Tools      ████████████████████ 380 MB
 ```
 
-| Metric | Traditional TeX Tools (Perl/Python/Node) | FerroTeX (Rust Core) | Speedup / Efficiency |
-| :--- | :---: | :---: | :---: |
-| **Cold Syntax Parsing** | ~240 ms | **1.8 ms** | **133× faster ⚡** |
-| **LSP Cold Startup** | ~3,200 ms | **< 45 ms** | **71× faster ⚡** |
-| **Memory Consumption** | ~380 MB | **< 38 MB** | **10× lighter ⚡** |
-| **Log Streaming Throughput** | ~2.1 MB/s | **> 65 MB/s** | **31× faster ⚡** |
-| **Pre-installed Dependencies** | 5GB+ TeX Live / MacTeX | **0 MB (Self-contained)** | **Instant setup ⚡** |
+| Metric                         | Traditional TeX Tools (Perl/Python/Node) |   FerroTeX (Rust Core)    | Speedup / Efficiency |
+| :----------------------------- | :--------------------------------------: | :-----------------------: | :------------------: |
+| **Cold Syntax Parsing**        |                 ~240 ms                  |        **1.8 ms**         |  **133× faster ⚡**  |
+| **LSP Cold Startup**           |                ~3,200 ms                 |        **< 45 ms**        |  **71× faster ⚡**   |
+| **Memory Consumption**         |                 ~380 MB                  |        **< 38 MB**        |  **10× lighter ⚡**  |
+| **Log Streaming Throughput**   |                ~2.1 MB/s                 |       **> 65 MB/s**       |  **31× faster ⚡**   |
+| **Pre-installed Dependencies** |          5GB+ TeX Live / MacTeX          | **0 MB (Self-contained)** | **Instant setup ⚡** |
 
 ---
 
 ## 📦 Installation & Setup
 
 ### 1. VS Code / Cursor / Positron (Recommended)
+
 Search for **`FerroTeX`** in the Extensions Marketplace (`Ctrl+P` / `Cmd+P` $\rightarrow$ `ext install ferrotex.ferrotex`) or install via [Open VSX](https://open-vsx.org/extension/ferrotex/ferrotex).
 
 ### 2. Standalone CLI & Source Installation
+
 Requires **Rust 1.70+**:
 
 ```bash
@@ -217,6 +220,7 @@ cargo test --workspace
 <summary><strong>🔧 Neovim & Helix LSP Integration (Click to Expand)</strong></summary>
 
 #### Neovim (`nvim-lspconfig`)
+
 ```lua
 local lspconfig = require('lspconfig')
 local configs = require('lspconfig.configs')
@@ -236,6 +240,7 @@ lspconfig.ferrotexd.setup{}
 ```
 
 #### Helix (`languages.toml`)
+
 ```toml
 [[language]]
 name = "latex"
@@ -245,6 +250,7 @@ language-servers = [ "ferrotexd" ]
 [language-server.ferrotexd]
 command = "ferrotexd"
 ```
+
 </details>
 
 ---

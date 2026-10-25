@@ -6,3 +6,6 @@ build
 **/dist
 patches
 tarpaulin-report.html
+vault
+brag-*
+

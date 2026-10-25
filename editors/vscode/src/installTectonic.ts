@@ -189,14 +189,15 @@ export async function ensureTectonicBinary(
 
         try {
           const release = await fetchLatestRelease();
-          const asset = release.assets.find(
-            (a) => a.name.includes(target) && a.name.endsWith(ext),
-          );
+          const asset = release.assets.find((a) => a.name.includes(target) && a.name.endsWith(ext));
           if (asset) {
             downloadUrl = asset.browser_download_url;
           }
         } catch (e) {
-          console.warn("[FerroTeX] Could not query GitHub release API, using direct download URL", e);
+          console.warn(
+            "[FerroTeX] Could not query GitHub release API, using direct download URL",
+            e,
+          );
         }
 
         if (!downloadUrl) {
